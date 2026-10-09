@@ -1,0 +1,35 @@
+Rimanendo strictly sul modello di Computer Vision offline, puoi estrarre più informazioni dallo stesso frame:
+
+    Conteggio e Stima dei Tempi (Dynamic Clearance Time):
+
+        Idea: Invece di aggiungere un tempo fisso (+10s disabile, -5s bici), calcola il tempo necessario in base alla velocità reale di attraversamento e al numero di persone sul crosswalk.
+
+        Valore aggiunto: Il semaforo torna rosso subito dopo che l'ultimo pedone ha messo piede sul marciapiede, evitando di far attendere le auto inutilmente.
+
+    Cancellazione Prenotazione "Falso Pulsante":
+
+        Idea: Se qualcuno preme la prenotazione ma poi attraversa subito con il rosso o se ne va, l'AI rileva che la zona di attesa è vuota e cancella la chiamata del verde.
+
+    Riconoscimento Posizione e Traiettoria (In / Out Zone):
+
+        Idea: Definisci due ROI (Region of Interest): Zona di Attesa (marciapiede) e Zona di Attraversamento (strisce).
+
+        Valore aggiunto: Distingui chi sta semplicemente passeggiando sul marciapiede da chi ha intenzione di attraversare o è già sulle strisce.
+
+2. Rilevamenti ad "Alto Valore" (Stesso Modello + Classi aggiuntive)
+
+Se stai addestrando o personalizzando un modello (es. YOLO), puoi semplicemente estendere il dataset con poche classi ad alto impatto:
+
+    Passeggini e Bambini Piccoli: Trattali con la stessa priorità di tempo/sicurezza riservata ai disabili o agli anziani.
+
+    Cani Guida / Cani al guinzaglio: Estendi leggermente il margine di sicurezza del verde se c'è un animale di assistenza.
+
+    Veicoli Fermi sulle Strisce (Incrocio Bloccato): Rileva auto o scooter fermi sopra le strisce pedonali che bloccano il passaggio dei disabili/passeggini.
+
+3. Rilevamento Incidenti / Cadute Offline
+
+Senza bisogno di chiamare direttamente il 112 al primo prototipo, puoi implementare una logica di Fall Detection o Near-Miss:
+
+    Caduta Pedone/Disabile: Se il Bounding Box di una persona cambia proporzioni rapidamente (da verticale a orizzontale) e rimane fermo al centro della strada, attiva una logica di emergenza (mantieni il rosso per le auto).
+
+    Quasi-Incidente (Near-Miss Analytics): Salva un log anonimo quando la traiettoria di un veicolo e quella di un pedone si incrociano troppo da vicino. Questo fornisce al Comune dati preziosi per capire se l'incrocio è pericoloso.
