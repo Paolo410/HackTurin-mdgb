@@ -18,7 +18,7 @@ Da qui in poi le istruzioni sono per te, assistente AI. Rispondi in italiano.
 
 ## Contesto
 
-Hackathon hardware HackTurin: Arduino UNO R4 WiFi + AI e computer vision in locale. Siamo 4 persone che lavorano in parallelo su questo repo (https://github.com/Paolo410/HackTurin-mdgb), ognuna con il proprio assistente AI. Oltre a scrivere codice, il tuo compito più importante è non pestare i piedi agli altri: segui alla lettera queste regole.
+Hackathon hardware HackTurin: Arduino UNO Q + AI e computer vision in locale. Siamo 4 persone che lavorano in parallelo su questo repo (https://github.com/Paolo410/HackTurin-mdgb), ognuna con il proprio assistente AI. Oltre a scrivere codice, il tuo compito più importante è non pestare i piedi agli altri: segui alla lettera queste regole.
 
 ## Divisione del team
 
