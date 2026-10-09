@@ -9,7 +9,7 @@
 > Solo per il setup iniziale (una persona, una volta, dopo aver scelto la sfida):
 >
 > ```text
-> Leggi PROMPT_GIT_TEAM.md ed esegui il Setup. Sfida: <sfida>. Team: <nome> firmware, <nome> vision, <nome> app, <nome> docs.
+> Leggi PROMPT_GIT_TEAM.md ed esegui il Setup. Sfida: <sfida>. Team: <nome> data scientist, <nome> embedded, <nome> communication, <nome> electronics.
 > ```
 
 ---
@@ -24,12 +24,15 @@ Hackathon hardware HackTurin: Arduino UNO Q + AI e computer vision in locale. Si
 
 Sfida: _da decidere_
 
-| Persona        | Area                                        | Cartelle        |
-|----------------|---------------------------------------------|-----------------|
-| _da assegnare_ | firmware e hardware (Arduino, sensori, LED) | firmware/       |
-| _da assegnare_ | computer vision / AI locale                 | vision/         |
-| _da assegnare_ | app / backend / dashboard                   | app/            |
-| _da assegnare_ | integrazione, script, documentazione, pitch | docs/, scripts/ |
+| Persona        | Ruolo                  | Area                                                                                  | Cartelle                         |
+|----------------|------------------------|---------------------------------------------------------------------------------------|----------------------------------|
+| _da assegnare_ | Data scientist         | modelli AI e computer vision in locale (training, export, inferenza), dataset, analisi dei dati | ai/                     |
+| _da assegnare_ | Embedded engineer      | firmware dell'Arduino UNO Q (sketch sul microcontrollore, integrazione con il lato Linux), logica in tempo reale | firmware/ |
+| _da assegnare_ | Communication engineer | comunicazione tra dispositivi (seriale, WiFi, MQTT/HTTP), backend e dashboard          | comms/, app/, docs/CONTRACTS.md  |
+| _da assegnare_ | Electronics engineer   | circuito, sensori, LED e attuatori, alimentazione, schemi elettrici, BOM, pinout       | hardware/                        |
+
+- `docs/CONTRACTS.md` ha un owner: il communication engineer. La sezione pinout la decide l'electronics engineer.
+- `docs/` (pitch, presentazione) e il README principale sono condivisi: tutti possono aggiungere, nessuno riscrive il lavoro degli altri.
 
 ## Inizio sessione
 
@@ -46,15 +49,15 @@ Se l'utente ti ha chiesto il Setup, vai alla sezione [Setup](#setup). Altrimenti
 
 ### Perimetro
 - Modifica solo i file nelle cartelle dell'utente. Se serve una modifica nell'area di un altro, non farla: di' all'utente esattamente cosa serve, la chiederà all'owner.
-- File condivisi (questo file, `docs/CONTRACTS.md`, `.gitignore`, README principale, config in root): modifiche minime, solo aggiunte, in un commit separato. Avvisa l'utente, perché vanno comunicate al team.
+- File condivisi (questo file, `.gitignore`, README principale, `docs/`, config in root): modifiche minime, solo aggiunte, in un commit separato. Avvisa l'utente, perché vanno comunicate al team.
 - Senza OK esplicito dell'utente non: rinominare o spostare file e cartelle, riformattare file interi, cambiare la config di formatter/linter, aggiornare versioni di dipendenze, cancellare file che non hai creato tu.
 
 ### Interfacce
-- I moduli comunicano solo come scritto in `docs/CONTRACTS.md`. Scrivi codice contro il contratto; se l'altra parte non è ancora pronta, crea un mock o un simulatore dentro le cartelle dell'utente.
-- Se il contratto va cambiato, fermati e proponilo all'utente: rompe il lavoro degli altri e va concordato col team.
+- I moduli comunicano solo come scritto in `docs/CONTRACTS.md`: messaggi tra dispositivi, formato degli eventi del modello AI, pinout. Scrivi codice contro il contratto; se l'altra parte non è ancora pronta, crea un mock o un simulatore dentro le cartelle dell'utente.
+- Se il contratto va cambiato, fermati e proponilo all'utente: rompe il lavoro degli altri e va concordato col team. Lo modifica solo il communication engineer; il pinout solo l'electronics engineer.
 
 ### Commit
-- Commit piccoli e frequenti, uno per modifica logica. Formato: `tipo(area): descrizione` (tipi: feat, fix, refactor, docs, chore, test). Es.: `feat(vision): conteggio attraversamenti per direzione`.
+- Commit piccoli e frequenti, uno per modifica logica. Formato: `tipo(area): descrizione` (tipi: feat, fix, refactor, docs, chore, test). Es.: `feat(ai): conteggio attraversamenti per direzione`.
 - Mai `git add .` o `git add -A` alla cieca: aggiungi i file per nome e controlla `git diff --staged` prima di committare.
 - Mai committare: `.env`, token o API key, password WiFi (su Arduino stanno in `arduino_secrets.h`, ignorato da git; si committa solo `arduino_secrets.h.example`), pesi dei modelli, dataset, foto o video sopra i 5 MB, virtualenv, file generati. Se manca una regola nel `.gitignore`, aggiungila (è un file condiviso: avvisa l'utente).
 - Notebook Jupyter: preferisci script `.py`. Se servono, solo nelle cartelle dell'utente e con gli output puliti prima del commit.
@@ -77,6 +80,7 @@ Se l'utente ti ha chiesto il Setup, vai alla sezione [Setup](#setup). Altrimenti
 ### Dipendenze
 - Python: il `requirements.txt` nella cartella dell'utente, con versioni fissate. Ogni nuova dipendenza va scritta nel messaggio di commit.
 - Librerie Arduino: elencale con la versione nel README di `firmware/`.
+- Elettronica: in `hardware/` vanno i file sorgente degli schemi (KiCad, Fritzing…) più un export PNG/PDF leggibile da tutti, e la BOM. I datasheet si linkano nel README, non si committano.
 
 ### Più agenti in parallelo
 - Se l'utente lancia più agenti AI sullo stesso computer, ognuno lavora in un worktree separato: `git worktree add ../HackTurin-<task> -b <nome>/<task> origin/main`. Mai due agenti nella stessa cartella.
@@ -100,10 +104,10 @@ Solo se l'utente lo chiede esplicitamente. Lo fa una persona sola, una volta, pr
 
 1. `git switch main && git pull`. Il working tree deve essere pulito, altrimenti fermati e dillo.
 2. Compila la sezione "Divisione del team" di questo file con la sfida e i nomi che ti ha dato l'utente. Adatta aree e cartelle solo se te lo chiede.
-3. Crea le cartelle della tabella, ognuna con un README.md breve: owner, scopo, come si avvia/compila, dipendenze, versione di Python se serve.
-4. Crea `docs/CONTRACTS.md` con le interfacce tra i moduli (es. protocollo seriale Arduino↔PC, formato JSON degli eventi, topic MQTT, endpoint HTTP). Per ogni interfaccia: chi produce, chi consuma, formato con un esempio concreto, numero di versione. Proponi una prima bozza in base alla sfida e aspetta la conferma dell'utente prima di scriverla.
+3. Crea le cartelle della tabella più `docs/`, ognuna con un README.md breve: owner, scopo, come si avvia/compila, dipendenze, versione di Python se serve.
+4. Crea `docs/CONTRACTS.md` con le interfacce tra i moduli (es. eventi in uscita dal modello AI, chiamate tra lato Linux e microcontrollore dell'UNO Q, topic MQTT, endpoint HTTP). Per ogni interfaccia: chi produce, chi consuma, formato con un esempio concreto, numero di versione. Aggiungi una sezione Pinout (pin, componente, direzione, note) da far compilare all'electronics engineer. Proponi una prima bozza in base alla sfida e aspetta la conferma dell'utente prima di scriverla.
 5. Aggiorna `.gitignore`: `.env`, `arduino_secrets.h`, pesi dei modelli (`*.pt`, `*.onnx`, `*.tflite`, `models/`), `dataset/`, video, `.DS_Store`, `.vscode/`, cartelle di build di Arduino. Aggiungi `.gitattributes` con `* text=auto eol=lf` per evitare diff fantasma tra Windows e Mac.
-6. Python: un `requirements.txt` per ogni modulo (es. `vision/requirements.txt`), non uno unico in root.
+6. Python: un `requirements.txt` per ogni modulo (es. `ai/requirements.txt`, `comms/requirements.txt`), non uno unico in root.
 7. Crea `CLAUDE.md` con la sola riga `@PROMPT_GIT_TEAM.md` e `AGENTS.md` con la riga `Leggi e segui PROMPT_GIT_TEAM.md.`, così gli assistenti che li supportano caricano queste regole anche senza il comando.
 8. Mostra `git status` e `git diff --staged`, poi fai un unico commit `chore: struttura repo, ownership e contratti` direttamente su main (unica eccezione alla regola "mai su main") e push.
 9. Scrivi all'utente il messaggio da mandare al team: "fate git pull, poi iniziate ogni chat con il comando in cima a PROMPT_GIT_TEAM.md".
