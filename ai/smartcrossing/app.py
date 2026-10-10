@@ -68,7 +68,8 @@ def main(argv: list[str] | None = None) -> int:
     alpha = float(o["fps_ema_alpha"])
     fps = 0.0
     frames = 0
-    start = last = last_status = perf_counter()
+    # The clock starts at the first frame: opening the camera is not part of the frame rate.
+    first = last = last_status = perf_counter()
     try:
         while True:
             item = source.read()
@@ -80,8 +81,11 @@ def main(argv: list[str] | None = None) -> int:
             frames += 1
 
             now = perf_counter()
-            instant = 1.0 / max(now - last, _MIN_DT)
-            fps = instant if frames == 1 else (1 - alpha) * fps + alpha * instant
+            if frames == 1:
+                first = last_status = now
+            else:
+                instant = 1.0 / max(now - last, _MIN_DT)
+                fps = instant if frames == 2 else (1 - alpha) * fps + alpha * instant
             last = now
             n_tracks = len(result.tracked)
             n_valid = int(result.valid.sum())
@@ -89,7 +93,7 @@ def main(argv: list[str] | None = None) -> int:
 
             if args.headless:
                 if now - last_status >= float(o["status_every_s"]):
-                    print(f"t={now - start:6.1f}s frame={frames} fps={fps:.1f} ms[{lat}] tracks={n_tracks} valid={n_valid}")
+                    print(f"t={now - first:6.1f}s frame={frames} fps={fps:.1f} ms[{lat}] tracks={n_tracks} valid={n_valid}")
                     last_status = now
             else:
                 draw_tracks(frame, result, pipeline.tracker, cfg)
@@ -108,8 +112,10 @@ def main(argv: list[str] | None = None) -> int:
         if not args.headless:
             cv2.destroyAllWindows()
 
-    elapsed = perf_counter() - start
-    print(f"\nframes={frames} elapsed={elapsed:.1f}s end-to-end FPS={frames / elapsed if elapsed > 0 else 0:.1f}")
+    # Frame intervals between the first and the last frame.
+    elapsed = last - first
+    end_to_end = (frames - 1) / elapsed if frames > 1 and elapsed > 0 else 0.0
+    print(f"\nframes={frames} elapsed={elapsed:.1f}s end-to-end FPS={end_to_end:.1f}")
     print(stats.table(float(cfg["bench"]["percentile"])))
     return 0
 

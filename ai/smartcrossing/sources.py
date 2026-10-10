@@ -56,7 +56,7 @@ class FrameSource:
         if not self.is_live and self.max_fps > 0 and self.native_fps > self.max_fps:
             self._step = max(1, round(self.native_fps / self.max_fps))
         self._frame_idx = -1
-        self._t0 = time.monotonic()
+        self._t0 = None   # origin of the file timeline, set when the first frame is read
         self._last_emit = None
 
     @property
@@ -85,6 +85,8 @@ class FrameSource:
                 return None
             self._frame_idx += self._step
             fps = self.native_fps or 1.0
+            if self._t0 is None:
+                self._t0 = time.monotonic() - self._frame_idx / fps
             t = self._t0 + self._frame_idx / fps
             if self.realtime:
                 delay = t - time.monotonic()
