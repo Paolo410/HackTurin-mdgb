@@ -5,7 +5,8 @@ Same pipeline as `python -m smartcrossing.app --profile unoq --actuator bridge`,
 - C1/C2 go to the sketch with Bridge.call("mdgb_line", line) of arduino.app_utils, the C5 lines of the sketch
   ("mcu_event") come back through main.py;
 - the web page (assets/) gets, a few times a second, the frame as JPEG plus the boxes of the tracks, and draws
-  the boxes itself. Frames are never written to disk and are encoded only while a browser is connected.
+  the boxes itself. Frames are never written to disk and are encoded only while a browser is connected;
+- health.py checks every part of the node once a second (camera, AI, sketch, sensors) for the technician.
 
 The smartcrossing package, config.yaml, the calibration and the model are copied next to this file by
 firmware/tools/build_applab_zip.py: the code stays in ai/, here there is only the glue.
@@ -40,6 +41,8 @@ from smartcrossing.mcu import McuState  # noqa: E402
 from smartcrossing.overlay import KMH, ROLE_GROUP  # noqa: E402
 from smartcrossing.pipeline import PHASES, Pipeline  # noqa: E402
 
+from health import Health  # noqa: E402
+
 logger = Logger("mdgb-vision")
 
 PROFILE = "unoq"                                     # ai/config.yaml: detector one frame out of two, 3 threads
@@ -54,7 +57,8 @@ LIVE_VIEW = os.environ.get("MDGB_LIVE_VIEW", "1") != "0"   # 0 = the page gets o
 VIEW_FPS = 5
 VIEW_JPEG_QUALITY = 70
 FPS_WINDOW = 20                                      # frames used for the FPS shown
-EVENT_LOG_LEN = 40                                   # last events kept for the page (memory only)
+EVENT_LOG_LEN = 100                                  # last events kept for the page (memory only)
+HEALTH_PERIOD_S = 1.0                                # sensor check and its message to the page
 NOTE_REPEAT_S = 5.0                                  # the same log line again within this time is dropped
 
 
@@ -174,17 +178,20 @@ class VisionService:
         self.ui = ui
         self.cfg = load_config(profile=PROFILE)
         self.mcu = McuState(self.cfg)
-        self.sensors: dict = {}                       # last values of the sketch notifications (main.py)
-        self.log: deque = deque(maxlen=EVENT_LOG_LEN)  # last events for the page: never written from here
+        self.log: deque = deque(maxlen=EVENT_LOG_LEN)  # last events for the page, in memory only
+        self.health = Health(on_change=self._health_changed)
         self._started = time.time()
         self._viewers: set[str] = set()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run_forever, name="mdgb-vision", daemon=True)
+        # Health has its own thread: the technician sees what is broken also while the vision is down.
+        self._health_thread = threading.Thread(target=self._health_loop, name="mdgb-health", daemon=True)
         ui.on_connect(self._on_connect)
         ui.on_disconnect(lambda sid: self._viewers.discard(sid))
 
     def start(self) -> None:
         self._thread.start()
+        self._health_thread.start()
 
     def on_mcu_line(self, line) -> None:
         """One C5 line of the sketch (Bridge "mcu_event"). Runs in the Bridge thread: only parse and store."""
@@ -193,18 +200,25 @@ class VisionService:
         except (ValueError, TypeError):
             logger.warning(f"C5 line not valid: {line!r}")
 
-    def set_sensor(self, name: str, value) -> None:
-        """Last value of a sketch notification (temperature, light, badge...), shown on the page."""
-        self.sensors[name] = value
-
     def note(self, kind: str, text: str) -> None:
-        """One line of the event log of the page (alarms, badge, state changes).
+        """One line of the event log of the page (alarms, badge, state changes, sensors).
         The same line again within NOTE_REPEAT_S is dropped: the sketch repeats the shock alarm every 500 ms."""
         now = time.time()
         last = self.log[-1] if self.log else None
         if last and last["type"] == kind and last["text"] == text and now - last["ts"] < NOTE_REPEAT_S:
             return
         self.log.append({"ts": round(now, 1), "type": kind, "text": text})
+
+    def _health_changed(self, level: str, text: str) -> None:
+        (logger.warning if level == "warning" else logger.info)(f"diagnosi: {text}")
+        self.note("diag", text)
+
+    def _health_loop(self) -> None:
+        while not self._stop.wait(HEALTH_PERIOD_S):
+            report = self.health.evaluate()   # also when nobody watches: the changes go in the log
+            if self._viewers:
+                self._publish("health", {**report, "mcu": self.mcu.snapshot(), "log": list(self.log),
+                                         "uptime_s": round(time.time() - self._started)})
 
     def _on_connect(self, sid: str) -> None:
         self._viewers.add(sid)
@@ -214,9 +228,11 @@ class VisionService:
         while not self._stop.is_set():
             try:
                 self._run()
-            except Exception:
+            except Exception as exc:
                 logger.error("vision stopped, restarting in %.0f s:\n%s" % (RESTART_S, traceback.format_exc()))
-                self._publish({"state": "DEGRADED", "reason": "vision restarting", "boxes": []})
+                self.note("diag", f"visione ferma per un errore ({exc.__class__.__name__}: {exc}), "
+                                  f"riavvio tra {RESTART_S:.0f} s")
+                self._publish("vision", {"state": "DEGRADED", "reason": "visione in riavvio", "boxes": []})
                 self._stop.wait(RESTART_S)
 
     def _run(self) -> None:
@@ -225,6 +241,7 @@ class VisionService:
         actuator = AppLabActuator()
         pipeline = Pipeline(cfg, float(cfg["source"]["max_fps"]) or CAMERA_FPS, calib, actuator)
         log = C3Logger(cfg) if cfg["logger"]["enabled"] else None
+        storage_error = None
         camera = Camera(CAMERA_SOURCE, resolution=CAMERA_RESOLUTION, fps=CAMERA_FPS)
         camera.start()
         logger.info(f"vision on: camera={CAMERA_SOURCE or 'auto'} {CAMERA_RESOLUTION} profile={PROFILE} "
@@ -257,6 +274,10 @@ class VisionService:
                     stamps = (stamps + [time.monotonic()])[-FPS_WINDOW:]
                     if len(stamps) > 1:
                         fps = (len(stamps) - 1) / max(stamps[-1] - stamps[0], 1e-6)
+                    h, w = frame.shape[:2]
+                    self.health.seen("camera", {"w": w, "h": h, "fault": pipeline.fault, "lum": pipeline.luminance})
+                    if result.detected:
+                        self.health.seen("ai", {"fps": fps, "detect_ms": result.lat_ms["detect"]})
                     for event in result.events:
                         if event["type"] == "crossing":
                             text = f"{event['cls']} #{event['track_id']} {event['dir'].upper()} linea {event['line']}"
@@ -264,12 +285,22 @@ class VisionService:
                             text = " ".join(f"{k}={v}" for k, v in event.items() if k != "type")
                         self.note(event["type"], text)
                         logger.info("event " + " ".join(f"{k}={v}" for k, v in event.items()))
+                    # The C3 file must never stop the traffic light: a write error is only reported.
+                    try:
                         if log:
-                            log.write(event)
-                    if log and log.status_due():
-                        log.write_status(command["state"], fps, result.lat_ms,
-                                         flat_counts(pipeline.counter.counts) if pipeline.counter else {})
+                            for event in result.events:
+                                log.write(event)
+                            if log.status_due():
+                                log.write_status(command["state"], fps, result.lat_ms,
+                                                 flat_counts(pipeline.counter.counts) if pipeline.counter else {})
+                        storage_error = None
+                    except OSError as exc:
+                        storage_error = exc.strerror or str(exc)
 
+                self.health.seen("link", {"failsafe": actuator.failsafe, "rejected": actuator.rejected,
+                                          "c1": actuator.sent, "c2": actuator.heartbeats})
+                self.health.seen("storage", {"enabled": log is not None, "error": storage_error,
+                                             "written": log.written if log else 0})
                 if command["state"] != last_state:
                     last_state = command["state"]
                     self.note("state", f"{command['state']}: {command['reason']}")
@@ -281,7 +312,7 @@ class VisionService:
                                 f"C1={actuator.sent} C2={actuator.heartbeats} failsafe={actuator.failsafe}")
                 if self._viewers and now - last_view >= 1.0 / VIEW_FPS:
                     last_view = now
-                    self._publish(self._view(command, result, frame, pipeline, actuator, fps, frames))
+                    self._publish("vision", self._view(command, result, frame, pipeline, actuator, fps, frames))
 
                 if max_fps > 0:   # same cap as the unoq profile of ai/
                     wait = 1.0 / max_fps - (time.monotonic() - loop_t)
@@ -306,8 +337,7 @@ class VisionService:
             "stats": {"yield_rate": ev.yield_rate, "yielded": ev.yields["yielded"], "approaching": ev.yields["total"],
                       "near_miss": ev.near_misses, "incidents": ev.incidents},
             "link": {"c1": actuator.sent, "c2": actuator.heartbeats, "rejected": actuator.rejected},
-            "frames": frames, "uptime_s": round(time.time() - self._started),
-            "mcu": self.mcu.snapshot(), "sensors": self.sensors, "log": list(self.log),
+            "frames": frames, "profile": PROFILE, "input_px": pipeline.detector.input_size,
             "scene": self._scene(pipeline),
         }
         if result is not None:
@@ -345,8 +375,8 @@ class VisionService:
                                                                     for x, y in polygon]})
         return scene
 
-    def _publish(self, msg: dict) -> None:
+    def _publish(self, kind: str, msg: dict) -> None:
         try:
-            self.ui.send_message("vision", msg)
+            self.ui.send_message(kind, msg)
         except Exception as exc:     # the page is optional: the traffic light must not depend on it
             logger.warning(f"web page not updated: {exc!r}")

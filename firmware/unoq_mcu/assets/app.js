@@ -1,6 +1,7 @@
-// MDGB technician's panel. python/vision.py sends a "vision" message a few times a second: the frame as JPEG
-// (field jpg, base64), the boxes of the tracks in frame pixels, the counting lines and zones, the rule, the
-// sensors of the sketch and the last events. Everything is drawn here; nothing is stored.
+// MDGB technician's panel. Two messages arrive from python/vision.py:
+//   "health" once a second: the check of every part of the node (python/health.py), the log, the uptime;
+//   "vision" a few times a second: frame (JPEG, base64), boxes, counting lines and zones, the rule, counts.
+// Everything is drawn here and nothing is stored, apart from the view options in this browser.
 
 const GROUP_COLORS = {
   person: "#50c850",      // pedestrians
@@ -14,16 +15,34 @@ const STATE_COLORS = {
   ANIMAL_WARN: "#ffaa00", ANIMAL_ALERT: "#ff7a1a", DEGRADED: "#ffe14d",
 };
 const STATE_NAMES = {
-  IDLE: "Nessuno", PRESENCE: "Presenza", WARN_DRIVER: "Avviso conducenti", WARN_PEDESTRIAN: "Avviso pedoni",
-  ANIMAL_WARN: "Animale vicino", ANIMAL_ALERT: "Animale in strada", DEGRADED: "Degradato",
+  IDLE: "Strada libera", PRESENCE: "Pedone presente", WARN_DRIVER: "Avviso ai conducenti",
+  WARN_PEDESTRIAN: "Avviso ai pedoni", ANIMAL_WARN: "Animale vicino", ANIMAL_ALERT: "Animale in strada",
+  DEGRADED: "Visione non affidabile",
 };
 const ROLE_NAMES = {
   pedestrian: "pedoni", cyclist: "ciclisti", motorcyclist: "motociclisti", car: "auto", bus: "bus",
   truck: "camion", bicycle: "bici", motorcycle: "moto", animal: "animali", bird: "uccelli",
 };
-const PHASE_NAMES = { detect: "rileva", track: "traccia", rules: "regola", act: "invio" };
+const PHASE_NAMES = { detect: "rilevamento", track: "tracciamento", rules: "regola", act: "invio" };
+const CHECK_ICONS = {
+  camera: "📷", ai: "🧠", link: "🔗", lamp: "🚦", accel: "📳", env: "🌡", air: "💨", light: "💡",
+  rfid: "🔑", storage: "💾",
+};
+const STATUS_LABELS = {
+  ok: "✔ Funziona", warn: "⚠ Da controllare", fault: "✖ Non funziona", waiting: "⏳ In attesa", untested: "☐ Da provare",
+};
+const TAG_LABELS = {
+  diag: "sensori", crossing: "passaggio", state: "stato", alarm: "allarme", rfid: "badge", link: "sketch",
+  near_miss: "quasi incid.", incident: "incidente",
+};
+const LOG_TABS = {
+  all: () => true,
+  diag: (e) => e.type === "diag",
+  security: (e) => ["alarm", "rfid", "link"].includes(e.type),
+  traffic: (e) => !["diag", "alarm", "rfid", "link"].includes(e.type),
+};
 const PHASE_SCALE_MS = 120;   // full bar
-const STALE_MS = 3000;        // no message for longer: the vision is restarting or the camera is missing
+const STALE_MS = 3000;        // no message for longer: something is not running
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("canvas");
@@ -32,28 +51,33 @@ const image = new Image();
 
 const opts = loadOpts();
 let paused = false;
-let lastMsg = null;
-let lastSeen = 0;
-let clearedBefore = 0;   // log lines older than this are hidden ("Pulisci")
+let connected = false;
+let lastMsg = null;       // last "vision" message drawn
+let lastHealth = null;    // last "health" message
+let visionSeen = 0;
+let healthSeen = 0;
+let clearedBefore = 0;    // log lines older than this are hidden ("Pulisci")
+let logTab = "all";
+let logKey = "";
 
 // ---------- connection ----------
 const ui = new WebUI();
-ui.on_connect(() => setPill("pill-page", "ok", "Pagina"));
-ui.on_disconnect(() => setPill("pill-page", "bad", "Pagina"));
+ui.on_connect(() => { connected = true; showConn(); });
+ui.on_disconnect(() => { connected = false; showConn(); showHero(); });
 ui.on_message("config", (cfg) => {
   $("privacy").textContent = cfg.live
     ? "Le immagini non vengono mai salvate: si producono solo mentre questa pagina è aperta."
     : "Vista dal vivo disattivata (MDGB_LIVE_VIEW=0): solo riquadri e numeri.";
 });
 ui.on_message("vision", onVision);
+ui.on_message("health", onHealth);
 
-function setPill(id, cls, text) {
-  const el = $(id);
-  el.className = "pill " + cls;
-  el.textContent = text;
+function showConn() {
+  $("conn").className = "conn " + (connected ? "on" : "off");
+  $("conn").textContent = connected ? "Collegato" : "Non collegato";
 }
 
-// ---------- options (remembered in this browser only) ----------
+// ---------- view options (remembered in this browser only) ----------
 function loadOpts() {
   const base = { labels: true, scene: true, groups: { person: true, two_wheeler: true, vehicle: true, animal: true, pending: true } };
   try {
@@ -76,6 +100,7 @@ document.querySelectorAll("#filters input").forEach((input) => {
   });
 });
 
+// ---------- buttons ----------
 $("btn-pause").addEventListener("click", () => {
   paused = !paused;
   $("btn-pause").setAttribute("aria-pressed", String(paused));
@@ -89,25 +114,196 @@ $("btn-full").addEventListener("click", () => {
 });
 $("btn-clear").addEventListener("click", () => {
   clearedBefore = Date.now() / 1000;
-  if (lastMsg) showLog(lastMsg.log || []);
+  logKey = "";
+  showLog();
+});
+$("btn-download").addEventListener("click", downloadLog);
+document.querySelectorAll("#tabs .tab").forEach((tab) => {
+  tab.addEventListener("click", () => {
+    logTab = tab.dataset.tab;
+    document.querySelectorAll("#tabs .tab").forEach((t) => t.classList.toggle("active", t === tab));
+    logKey = "";
+    showLog();
+  });
 });
 
-// ---------- messages ----------
+// ---------- "health": overall status, sensor check, log ----------
+function onHealth(msg) {
+  healthSeen = Date.now();
+  lastHealth = msg;
+  showHero();
+  showChecks(msg.checks || [], msg.summary || {});
+  const lamp = (msg.checks || []).find((c) => c.key === "lamp");
+  showLantern(lamp && lamp.status !== "fault" ? lamp.value : null);
+  $("uptime").textContent = msg.uptime_s != null ? duration(msg.uptime_s) : "—";
+  showLog();
+}
+
+function showHero() {
+  const hero = $("hero");
+  const overall = $("overall");
+  const h = lastHealth;
+  const silent = !connected || !healthSeen || Date.now() - healthSeen > STALE_MS;
+  let level, icon, title, text, items = [];
+  if (silent && (healthSeen || !connected)) {
+    level = "fault"; icon = "📡"; title = "La scheda non risponde";
+    text = connected ? "La pagina è collegata ma non arrivano dati: l'app si sta riavviando o è ferma. Guarda i log in App Lab."
+                     : "Questa pagina non è collegata alla scheda: controlla che l'app sia avviata in App Lab e di essere sulla stessa rete.";
+  } else if (!h) {
+    level = "waiting"; icon = "⏳"; title = "Avvio in corso"; text = "Aspetto i primi dati dalla scheda.";
+  } else {
+    const s = h.summary;
+    const problems = h.checks.filter((c) => c.status === "fault").concat(h.checks.filter((c) => c.status === "warn"));
+    items = problems;
+    level = s.overall;
+    if (level === "ok") {
+      icon = "✅"; title = "Tutto funziona"; text = `${s.ok} controlli su ${s.total} superati.`;
+    } else if (level === "waiting") {
+      icon = "⏳"; title = "Avvio in corso"; text = "Aspetto i primi dati da sensori e camera (al massimo 15 s).";
+    } else if (level === "warn") {
+      icon = "⚠️"; title = "Da controllare";
+      text = `${problems.length} ${problems.length === 1 ? "cosa da guardare" : "cose da guardare"}. Il semaforo funziona.`;
+    } else {
+      icon = "❌"; title = "Qualcosa non funziona";
+      text = `${s.fault} ${s.fault === 1 ? "guasto" : "guasti"}${s.warn ? ` e ${s.warn} da controllare` : ""}. ` +
+             "Il semaforo continua comunque il suo ciclo.";
+    }
+  }
+  hero.className = "card hero " + level;
+  $("hero-icon").textContent = icon;
+  $("hero-title").textContent = title;
+  $("hero-text").textContent = text;
+  $("hero-list").innerHTML = items.map((c) =>
+    `<li><b>${CHECK_ICONS[c.key] || ""} ${esc(c.name)}</b><span>${esc(c.detail)}</span> <a href="#check-${c.key}">cosa fare →</a></li>`
+  ).join("");
+  const untested = h ? h.checks.filter((c) => c.status === "untested") : [];
+  $("hero-foot").textContent = [
+    untested.length ? `Da provare: ${untested.map((c) => `${c.name} (${c.detail})`).join(", ")}.` : "",
+    h && !silent ? "Controllo aggiornato adesso." : "",
+  ].filter(Boolean).join(" ");
+
+  const labels = { ok: "✅ Tutto OK", warn: "⚠️ Da controllare", fault: "❌ Problemi", waiting: "⏳ Avvio…" };
+  const n = h && !silent ? h.summary.fault + h.summary.warn : 0;
+  overall.className = "overall " + level;
+  overall.textContent = silent && (healthSeen || !connected) ? "📡 Scheda muta"
+    : labels[level] + (n && level !== "ok" ? ` (${n})` : "");
+}
+
+function showChecks(checks, s) {
+  $("tally").innerHTML = [
+    s.ok ? `<span class="t-ok">✔ ${s.ok} ok</span>` : "",
+    s.warn ? `<span class="t-warn">⚠ ${s.warn} da controllare</span>` : "",
+    s.fault ? `<span class="t-fault">✖ ${s.fault} ${s.fault === 1 ? "guasto" : "guasti"}</span>` : "",
+    s.waiting ? `<span class="t-wait">⏳ ${s.waiting} in attesa</span>` : "",
+    s.untested ? `<span class="t-wait">☐ ${s.untested} da provare</span>` : "",
+  ].join("");
+  $("checks").innerHTML = checks.map((c) => `
+    <div class="check ${c.status}" id="check-${c.key}">
+      <div class="check-head">
+        <span class="check-icon" aria-hidden="true">${CHECK_ICONS[c.key] || "•"}</span>
+        <div class="check-name"><b>${esc(c.name)}</b><small>${esc(c.where)}</small></div>
+      </div>
+      <div class="check-status">
+        <span class="badge ${c.status}">${STATUS_LABELS[c.status] || c.status}</span>
+        ${c.age_s != null ? `<small>${ago(c.age_s)}</small>` : ""}
+      </div>
+      <div class="check-value">${esc(c.shown || "—")}</div>
+      <div class="check-detail">${esc(c.detail)}</div>
+      ${c.hint ? `<div class="check-hint">${esc(c.hint)}</div>` : ""}
+    </div>`).join("");
+}
+
+function showLantern(lamp) {
+  const lantern = $("lantern");
+  lantern.classList.toggle("unknown", !lamp);
+  lantern.querySelectorAll(".lamp").forEach((l) => l.classList.toggle("on", !!lamp && l.classList.contains(lamp)));
+}
+
+// ---------- log ----------
+function logEntries() {
+  return ((lastHealth && lastHealth.log) || []).filter((e) => e.ts > clearedBefore);
+}
+
+function showLog() {
+  const entries = logEntries();
+  document.querySelectorAll("[data-tabcount]").forEach((el) => {
+    el.textContent = entries.filter(LOG_TABS[el.dataset.tabcount]).length;
+  });
+  const shown = entries.filter(LOG_TABS[logTab]).reverse();
+  const key = `${logTab}:${shown.length}:${shown.length ? shown[0].ts + shown[0].text : ""}`;
+  if (key === logKey) return;   // unchanged: keep the scroll position of the list
+  logKey = key;
+  $("log").innerHTML = shown.length ? shown.map((e) => {
+    // Green tag for good news from the check: back to normal, tested, start-up check with nothing to look at.
+    const good = e.type === "diag" && (/di nuovo a posto|provato, funziona/.test(e.text)
+      || (e.text.startsWith("controllo iniziale") && !e.text.includes("da guardare")));
+    return `<li><time>${clock(e.ts)}</time><span class="tag ${esc(e.type)}${good ? " good" : ""}">${esc(TAG_LABELS[e.type] || e.type)}</span><span>${esc(logText(e))}</span></li>`;
+  }).join("") : `<li class="empty">Nessun evento in questa scheda.</li>`;
+}
+
+const ROLE_ONE = {
+  pedestrian: "Pedone", cyclist: "Ciclista", motorcyclist: "Motociclista", car: "Auto", bus: "Bus",
+  truck: "Camion", bicycle: "Bici", motorcycle: "Moto", animal: "Animale", bird: "Uccello",
+};
+const LINE_WHERE = { ped: "sulle strisce", veh: "in corsia" };
+
+function logText(e) {
+  const crossing = e.type === "crossing" && /^(\S+) #(\d+) (IN|OUT) linea (\S+)$/.exec(e.text);
+  if (crossing) {
+    const [, role, id, dir, line] = crossing;
+    return `${ROLE_ONE[role] || role} #${id} · ${dir} ${LINE_WHERE[line] || "linea " + line}`;
+  }
+  if (e.type === "state") {
+    const [code, ...rest] = e.text.split(": ");
+    return `${STATE_NAMES[code] || code}: ${rest.join(": ")}`;
+  }
+  return e.text;
+}
+
+function downloadLog() {
+  const now = new Date();
+  const lines = [`MDGB - registro del nodo, scaricato il ${now.toLocaleString("it-IT")}`, ""];
+  if (lastHealth) {
+    lines.push("CONTROLLO SENSORI");
+    for (const c of lastHealth.checks) {
+      lines.push(`  ${(STATUS_LABELS[c.status] || c.status).padEnd(18)} ${c.name}: ${c.shown || "-"} (${c.detail})`);
+    }
+    lines.push("");
+  }
+  lines.push("EVENTI");
+  for (const e of logEntries()) {
+    lines.push(`  ${new Date(e.ts * 1000).toLocaleString("it-IT")}  [${TAG_LABELS[e.type] || e.type}]  ${logText(e)}`);
+  }
+  const blob = new Blob([lines.join("\n") + "\n"], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a");
+  const stamp = now.toISOString().slice(0, 16).replace(/[-:T]/g, "");
+  a.href = URL.createObjectURL(blob);
+  a.download = `mdgb-registro-${stamp}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+// ---------- "vision": live view, rule, traffic ----------
 function onVision(msg) {
-  lastSeen = Date.now();
-  showPanels(msg);
+  visionSeen = Date.now();
+  showRule(msg);
+  showTraffic(msg);
+  showTech(msg);
+  const counts = { person: 0, two_wheeler: 0, vehicle: 0, animal: 0, pending: 0 };
+  for (const b of msg.boxes || []) counts[b.group] = (counts[b.group] || 0) + 1;
+  document.querySelectorAll("[data-count]").forEach((el) => { el.textContent = counts[el.dataset.count] || 0; });
   if (paused || !msg.w) return;        // frozen by the technician, or no frame (camera missing)
+  lastMsg = msg;
   if (msg.jpg) {
     image.onload = () => { if (lastMsg === msg) render(msg, image); };
-    lastMsg = msg;
     image.src = "data:image/jpeg;base64," + msg.jpg;
   } else {
-    lastMsg = msg;
     render(msg, null);
   }
 }
 
-// ---------- live view ----------
 function render(msg, img) {
   if (canvas.width !== msg.w || canvas.height !== msg.h) {
     canvas.width = msg.w;
@@ -172,33 +368,26 @@ function drawScene(scene, font) {
     ctx.closePath();
     ctx.fillStyle = "#00ffff";
     ctx.fill();
-    ctx.fillText(`${l.name} IN`, tx + 4, ty - font / 2);
+    ctx.fillText(`${l.name === "ped" ? "pedoni" : l.name === "veh" ? "veicoli" : l.name} IN`, tx + 4, ty - font / 2);
   }
 }
 
 function showBanner() {
   const banner = $("banner");
-  const stale = lastSeen && Date.now() - lastSeen > STALE_MS;
+  const stale = visionSeen && Date.now() - visionSeen > STALE_MS;
   const text = paused ? "In pausa: l'immagine è ferma, i numeri continuano ad aggiornarsi."
-    : stale ? "Nessun dato dalla visione: si sta riavviando o la camera non risponde." : "";
+    : stale ? "Nessuna immagine dalla visione: si sta riavviando o la camera non risponde (vedi Controllo sensori)." : "";
   banner.hidden = !text;
   banner.textContent = text;
 }
 
-// ---------- panels ----------
-function showPanels(msg) {
-  setPill("pill-vision", "ok", "Visione");
-  setPill("pill-sketch", msg.failsafe ? "bad" : "ok", msg.failsafe ? "Sketch: fail-safe" : "Sketch");
-  setPill("pill-fps", "neutral", `${msg.fps != null ? msg.fps.toFixed(1) : "—"} FPS`);
-  if (msg.uptime_s != null) $("uptime").textContent = "attiva da " + duration(msg.uptime_s);
-
-  // rule and traffic light
+function showRule(msg) {
   const state = $("state");
-  state.textContent = STATE_NAMES[msg.state] || msg.state;
+  state.textContent = (STATE_NAMES[msg.state] || msg.state) + (msg.failsafe ? " · fail-safe" : "");
   state.title = msg.state;
   state.style.background = STATE_COLORS[msg.state] || "#555";
   $("reason").textContent = msg.reason || "";
-  $("led").textContent = "LED " + (msg.led || "—");
+  $("led").textContent = msg.led ? "LED " + msg.led : "—";
   const req = msg.req || {};
   const reqs = [
     [`verde pedonale +${req.ped_green_extend_s || 0} s`, (req.ped_green_extend_s || 0) > 0],
@@ -209,14 +398,27 @@ function showPanels(msg) {
   $("reqs").innerHTML = reqs.map(([t, on]) => `<span class="req${on ? " on" : ""}">${t}</span>`).join("");
   $("lcd").textContent = fitLcd(msg.lcd || "");
   $("oled").textContent = msg.oled || "";
-  const s = msg.sensors || {};
-  const lantern = $("lantern");
-  lantern.classList.toggle("unknown", !s.lamp);
-  lantern.querySelectorAll(".lamp").forEach((l) => l.classList.toggle("on", l.classList.contains(s.lamp)));
+}
 
-  // performance
+function showTraffic(msg) {
+  const lines = msg.lines || {};
+  const names = Object.keys(lines);
+  $("lines").innerHTML = names.length ? names.map((name) => {
+    const l = lines[name];
+    const roles = Object.entries(l.roles || {})
+      .map(([r, c]) => `${ROLE_NAMES[r] || r} ${c.in} IN / ${c.out} OUT`).join(" · ");
+    const label = name === "ped" ? "Attraversamenti sulle strisce" : name === "veh" ? "Passaggi in corsia" : name;
+    return `<div class="line-row"><header><strong>${esc(label)}</strong><div class="io"><span>IN <b>${l.in}</b></span><span>OUT <b>${l.out}</b></span></div></header><div class="roles">${esc(roles || "nessun passaggio finora")}</div></div>`;
+  }).join("") : `<p class="muted">Nessuna linea di conteggio: manca la calibrazione della camera.</p>`;
+  const st = msg.stats || {};
+  $("yield").textContent = st.yield_rate == null ? "—" : `${Math.round(st.yield_rate * 100)}%`;
+  $("yield").title = st.approaching ? `${st.yielded} su ${st.approaching} veicoli` : "ancora nessun caso";
+  $("nearmiss").textContent = st.near_miss ?? 0;
+  $("incidents").textContent = st.incidents ?? 0;
+}
+
+function showTech(msg) {
   $("fps").textContent = msg.fps != null ? msg.fps.toFixed(1) : "—";
-  $("frames").textContent = `${(msg.frames || 0).toLocaleString("it-IT")} frame`;
   if (msg.lat_ms) {
     $("bars").innerHTML = Object.entries(msg.lat_ms).map(([k, v]) => {
       const pct = v == null ? 0 : Math.min(100, (v / PHASE_SCALE_MS) * 100);
@@ -224,71 +426,11 @@ function showPanels(msg) {
     }).join("");
   }
   const link = msg.link || {};
+  $("frames").textContent = msg.frames != null ? msg.frames.toLocaleString("it-IT") : "—";
   $("c1").textContent = link.c1 ?? "—";
   $("c2").textContent = link.c2 ?? "—";
   $("rej").textContent = link.rejected ?? "—";
-
-  // boxes per group
-  const counts = { person: 0, two_wheeler: 0, vehicle: 0, animal: 0, pending: 0 };
-  for (const b of msg.boxes || []) counts[b.group] = (counts[b.group] || 0) + 1;
-  document.querySelectorAll("[data-count]").forEach((el) => { el.textContent = counts[el.dataset.count] || 0; });
-
-  showCounts(msg);
-  showSensors(msg);
-  showLog(msg.log || []);
-}
-
-function showCounts(msg) {
-  const lines = msg.lines || {};
-  const names = Object.keys(lines);
-  $("lines").innerHTML = names.length ? names.map((name) => {
-    const l = lines[name];
-    const roles = Object.entries(l.roles || {})
-      .map(([r, c]) => `${ROLE_NAMES[r] || r} ${c.in}/${c.out}`).join(" · ");
-    const label = name === "ped" ? "Strisce (pedoni)" : name === "veh" ? "Corsia (veicoli)" : name;
-    return `<div class="line-row"><header><strong>${esc(label)}</strong><div class="io"><span>IN <b>${l.in}</b></span><span>OUT <b>${l.out}</b></span></div></header><div class="roles">${esc(roles || "nessun passaggio")}</div></div>`;
-  }).join("") : `<p class="muted">Nessuna linea di conteggio: manca la calibrazione.</p>`;
-  const st = msg.stats || {};
-  $("yield").textContent = st.yield_rate == null ? "—" : `${Math.round(st.yield_rate * 100)}%`;
-  $("yield").title = st.approaching ? `${st.yielded} su ${st.approaching} veicoli` : "";
-  $("nearmiss").textContent = st.near_miss ?? 0;
-  $("incidents").textContent = st.incidents ?? 0;
-}
-
-function showSensors(msg) {
-  const s = msg.sensors || {};
-  const mcu = msg.mcu || {};
-  $("s-temp").textContent = s.temp_c != null ? `${s.temp_c.toFixed(1)} °C` : "—";
-  $("s-rh").textContent = s.rh != null ? `${Math.round(s.rh)} %` : "—";
-  $("s-eco2").textContent = s.eco2 != null ? `${s.eco2} ppm` : "—";
-  $("s-tvoc").textContent = s.tvoc != null ? `${s.tvoc} ppb` : "—";
-  $("s-light").textContent = s.light != null ? `${s.light} / 1023` : "—";
-  $("s-light-bar").style.width = s.light != null ? `${(s.light / 1023) * 100}%` : "0";
-  if (s.accel) {
-    const g = Math.hypot(...s.accel);
-    $("s-accel").textContent = `${g.toFixed(2)} g  (x ${s.accel[0]}  y ${s.accel[1]}  z ${s.accel[2]})`;
-  } else {
-    $("s-accel").textContent = "—";
-  }
-  $("s-rfid").textContent = s.rfid || "—";
-  const shock = mcu.shock_s_ago;
-  $("s-shock").textContent = shock == null ? "mai" : `${duration(shock)} fa`;
-  $("t-shock").classList.toggle("alert", shock != null && shock < 60);
-  const fs = mcu.firmware_failsafe;
-  $("s-fs").textContent = fs ? `${fs.reason}, ${duration(fs.s_ago)} fa` : "mai";
-  $("t-fs").classList.toggle("alert", !!fs && fs.s_ago < 60);
-}
-
-let logKey = "";
-function showLog(entries) {
-  const shown = entries.filter((e) => e.ts > clearedBefore).reverse();
-  const key = `${shown.length}:${shown.length ? shown[0].ts + shown[0].text : ""}`;
-  if (key === logKey) return;   // unchanged: keep the scroll position of the list
-  logKey = key;
-  $("log").innerHTML = shown.length ? shown.map((e) => {
-    const t = new Date(e.ts * 1000).toLocaleTimeString("it-IT");
-    return `<li><time>${t}</time><span class="tag ${esc(e.type)}">${esc(e.type.replace("_", " "))}</span><span>${esc(e.text)}</span></li>`;
-  }).join("") : `<li class="empty">Nessun evento.</li>`;
+  $("profile").textContent = msg.profile ? `${msg.profile} / ${msg.input_px} px` : "—";
 }
 
 // ---------- helpers ----------
@@ -303,16 +445,17 @@ function duration(s) {
   if (s < 3600) return `${Math.floor(s / 60)} min ${s % 60} s`;
   return `${Math.floor(s / 3600)} h ${Math.floor((s % 3600) / 60)} min`;
 }
+function ago(s) {
+  return s < 2 ? "aggiornato ora" : `aggiornato ${duration(s)} fa`;
+}
+function clock(ts) {
+  return new Date(ts * 1000).toLocaleTimeString("it-IT");
+}
 function esc(text) {
   return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 
 setInterval(() => {
-  if (lastSeen && Date.now() - lastSeen > STALE_MS) {
-    setPill("pill-vision", "bad", "Visione");
-    const state = $("state");
-    state.textContent = "Nessun dato";
-    state.style.background = STATE_COLORS.DEGRADED;
-  }
+  showHero();
   showBanner();
 }, 1000);

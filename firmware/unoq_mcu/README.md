@@ -6,8 +6,32 @@ Owner: Salvatore Gullotta. Un'unica app di App Lab che fa tutto sulla UNO Q:
 - `python/main.py` — le stesse callback Bridge di prima, più `mcu_event` e l'avvio della visione;
 - `python/vision.py` — camera (periferica `Camera` di App Lab) → `smartcrossing` di `ai/` (profilo `unoq`) →
   C1/C2 allo sketch con `Bridge.call("mdgb_line", ...)` → pagina web;
-- `assets/` — pagina web: immagine dal vivo con i riquadri su persone, ciclisti, veicoli e animali, stato del
-  semaforo, motivo, FPS, ms per fase, conteggi.
+- `python/health.py` — controllo di ogni parte del nodo, una volta al secondo (vedi sotto);
+- `assets/` — pannello del tecnico: riepilogo, controllo sensori, semaforo, vista dal vivo con i riquadri,
+  traffico, registro.
+
+## Pannello del tecnico (porta 7000)
+
+In cima c'è il riepilogo: "Tutto funziona", "Da controllare" o "Qualcosa non funziona", con l'elenco dei problemi.
+Sotto, una scheda per ogni parte del nodo con stato, ultimo valore e, se non va, **cosa fare**:
+
+| Parte | Come si controlla | Non funziona se |
+|---|---|---|
+| Camera | arrivano immagini; autodiagnosi della visione | nessuna immagine da 2 s; lente coperta o abbagliamento = da controllare |
+| Riconoscimento (AI) | fotogrammi elaborati | fermo da 3 s; sotto 5 FPS = da controllare |
+| Collegamento con lo sketch | heartbeat accettati dallo sketch | sketch in fail-safe |
+| Ciclo del semaforo | `led_status` dello sketch | nessun cambio di fase da 60 s |
+| Accelerometro | `sensor_movement` | nessun dato da 5 s o sempre 0; fuori da 0,65–1,15 g = scossa |
+| Temperatura e umidità (AHT20) | `sensor_env` | nessun dato da 5 s o lettura a −50 °C (sensore muto) |
+| Qualità dell'aria (SGP30) | `sensor_air` | nessun dato da 5 s |
+| Sensore di luce | `sensor_light` | nessun dato da 5 s; sempre 0 o sempre al massimo = da controllare |
+| Lettore badge | `rfid_data` | — si prova passando il badge ("da provare" finché non succede) |
+| Salvataggio eventi | file C3 in `data/` | errore di scrittura |
+
+Nei primi 15 s dall'avvio le parti senza dati sono "in attesa", non guaste. Ogni cambio di stato finisce nel
+registro (scheda "Sensori") e nella console di App Lab con il prefisso `diagnosi:`. Il registro tiene gli ultimi
+100 eventi solo in memoria; "Scarica" salva sul dispositivo del tecnico un file di testo con il controllo sensori e
+gli eventi. Il semaforo non dipende da questi controlli.
 
 Il codice della visione **non è copiato qui**: lo script di build mette dentro `python/` il pacchetto
 `ai/smartcrossing`, `config.yaml`, la calibrazione e il modello presi dal repo.
