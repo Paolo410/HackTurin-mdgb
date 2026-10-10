@@ -21,8 +21,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      # Installer ufficiale (NSIS) da https://mosquitto.org/download/ ; /S = silenzioso, /D = cartella (ultimo argomento)
       - name: Mosquitto per Windows (finisce dentro l'app)
-        run: choco install mosquitto -y --no-progress
+        shell: pwsh
+        run: |
+          Invoke-WebRequest "https://mosquitto.org/files/binary/win64/mosquitto-2.1.2-install-windows-x64.exe" -OutFile mosquitto-setup.exe
+          Start-Process -FilePath .\mosquitto-setup.exe -ArgumentList '/S', '/D=C:\Program Files\mosquitto' -Wait
+          if (-not (Test-Path "C:\Program Files\mosquitto\mosquitto.exe")) { throw "Mosquitto non installato" }
+          Get-ChildItem "C:\Program Files\mosquitto" -Filter *.dll | ForEach-Object { $_.Name }
 
       - name: Test della centrale su Windows
         run: |
