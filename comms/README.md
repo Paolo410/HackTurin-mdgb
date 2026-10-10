@@ -1,111 +1,105 @@
-# comms/ — comunicazione di MDGB
+# comms/ — la rete dei nodi (lato Arduino UNO Q)
 
-**Owner:** Lorenzo Dragoni (communication engineer). Contratti: [`docs/CONTRACTS.md`](../docs/CONTRACTS.md).
-Decisioni, numeri e questioni aperte: [DECISIONS.md](DECISIONS.md).
+**Owner:** Lorenzo Dragoni (communication engineer).
+Contratti tra i moduli: [`docs/CONTRACTS.md`](../docs/CONTRACTS.md). Decisioni e numeri: [DECISIONS.md](DECISIONS.md).
+Il programma del PC (la centrale) è in [`app/`](../app/README.md). Cosa devono fare gli altri: [`docs/INSTRUCTIONS_FOR_OTHERS.md`](../docs/INSTRUCTIONS_FOR_OTHERS.md).
 
-Il codice che gira **sull'Arduino UNO Q** è `comms/node/` (`python comms/node/main.py`); quello del **PC** è in
-`app/` (`python app/central.py`). Come rilasciare e provare tutto: [RILASCIO.md](RILASCIO.md).
+## Cosa fa
 
-## Scopo
+Sull'Arduino UNO Q gira un programma, `comms/node/main.py`, che porta i dati del nodo alla centrale e non li perde mai:
 
-- Trasporto dei comandi verso l'MCU: interfaccia `Actuator` per C1 (comando) e C2 (heartbeat), righe C5 dall'MCU.
-- Uplink verso la centrale: MQTT 5 su AWS IoT Core con Store & Forward (CM-M2).
-- Backup BLE (demo) / LoRaWAN (produzione) con isteresi 30 s / 60 s (CM-M3).
+```
+ ai/ (Paolo) ── scrive gli eventi ──► logs/c3/c3-*.jsonl
+ firmware (Salvatore) ── righe MCU ──► logs/c3/mcu-*.jsonl          (le scrive comms/actuators.py)
+                                            │
+                              comms/node/main.py
+                                            │ 1. salva ogni evento su disco (SQLite)
+                                            │ 2. lo manda alla centrale via Wi-Fi (MQTT), lo segna "inviato" solo alla conferma
+                                            │ 3. se per 30 s non arrivano conferme: accende il Bluetooth (BLE) e manda
+                                            │    stato, conteggi e allarmi; dopo 60 s di rete stabile lo spegne
+                                            ▼
+                         PC della centrale (app "MDGB Centrale")
+```
 
-La centrale (ingest, diagnosi, dashboard) sta in `app/`.
+Il semaforo **non** passa da qui: lo comandano `ai/` e il firmware. Se questa rete si rompe, il semaforo funziona lo stesso.
 
-## Stato
+### Demo in locale, produzione nel cloud
 
-| Milestone | Contenuto | Stato |
+| | Demo (adesso) | Produzione (in futuro) |
 |---|---|---|
-| CM-M1 | `docs/CONTRACTS.md` v1, `actuators.py` (sim, serial), `tools/c1_send.py` | fatto |
-| CM-M2 | MQTT/AWS IoT Core + Store & Forward (codice già testato) + dedup in centrale | fatto (non ancora provato su UNO Q e AWS reale) |
-| CM-M3 | backup BLE con isteresi 30/60 s, allarmi, diagnosi, centrale unica | fatto (dashboard da fare) |
-| CM-M4 | `BridgeActuator` | da fare |
+| Broker MQTT | dentro l'app sul PC della centrale (Mosquitto) | AWS IoT Core o un altro broker MQTT 5 in cloud |
+| Rete | PC e Arduino sulla stessa rete Wi-Fi | Internet |
+| Sicurezza | rete locale, senza cifratura | TLS e un certificato per nodo (`comms/aws/`) |
+| Backup | BLE verso il PC (10–50 m) | LoRaWAN (chilometri) |
 
-## Rete (CM-M2)
+Il codice è lo stesso: cambiano solo le righe `MQTT_*` e `BACKUP_LINK` in `comms/.env`.
 
+## Installazione sull'Arduino UNO Q
+
+Sulla scheda va **solo** il codice che gira lì. Dal PC dello sviluppatore, un comando copia via ssh la rete
+(`comms/node`, gli strumenti per la scheda, la configurazione d'esempio e il servizio di avvio) in `~/mdgb` e prepara
+Python. Niente app del PC, test, AWS o documentazione:
+
+```bash
+./comms/deploy/push_to_arduino.sh arduino@<IP della scheda>     # oppure --pack: crea mdgb-nodo.tar.gz per la chiavetta
 ```
-ai/ ──► logs/c3/c3-*.jsonl ─┐                                   (C3, file JSONL: docs/CONTRACTS.md)
-MCU ──► logs/c3/mcu-*.jsonl ─┴► comms/node: C3FileSource ─► Outbox SQLite (eMMC) ─► MQTT 5/TLS ─► AWS IoT Core ─► app/ingest.py
-                                                                  └─(rete giù)─► AGG 26 byte ─► BLE / LoRa ─► ricevitore ─┘
-```
+
+Poi sulla scheda: `nano ~/mdgb/comms/.env` (in `MQTT_HOST` l'indirizzo che l'app sul PC mostra in alto) e
+`sudo ~/venv/bin/python ~/mdgb/comms/node/main.py` (`sudo` serve per il Bluetooth). Avvio automatico all'accensione:
+[`deploy/mdgb-comms.service`](deploy/mdgb-comms.service). Rilanciare lo script aggiorna il codice: `.env` e dati restano.
+
+La visione di Paolo (`ai/`) gira sulla stessa scheda, in `~/mdgb/ai`: così scrive gli eventi in `~/mdgb/logs/c3/`, dove
+questo programma li legge, e importa `comms/actuators.py`. Come portarla sulla scheda lo decide Paolo.
+Procedura completa: [`docs/INSTRUCTIONS_FOR_OTHERS.md`](../docs/INSTRUCTIONS_FOR_OTHERS.md#7-arduino-uno-q).
+
+## Configurazione (`comms/.env`)
+
+| Chiave | Demo | Significato |
+|---|---|---|
+| `NODE_ID` | `nodo01` | nome del nodo, uguale a una camera di `app/nodes.json` |
+| `MQTT_HOST`, `MQTT_PORT`, `MQTT_TLS` | IP del PC, `1883`, `0` | dove sta il broker (l'app sul PC mostra l'indirizzo giusto) |
+| `BACKUP_LINK` | `ble` | canale di backup: `ble`, `lora` (futuro) o `none` |
+| `BACKUP_HB_S` | `30` | ogni quanto il BLE manda lo stato (300 in produzione) |
+| `EVENT_SOURCE` | `c3` | `c3` = eventi dai file di `ai/`; `sim` = eventi finti generati qui |
+| `AGG_PERIOD_S` | `60` | finestra dei conteggi (900 in produzione) |
+
+Le altre (tempi del backup, batch, ritentativi) hanno già il valore giusto: sono in [`node/config.py`](node/config.py).
+
+## File
 
 | File | Cosa fa |
 |---|---|
-| `node/outbox.py` | Store & Forward: ogni evento su disco prima dell'invio; cursore dei file C3 nella stessa transazione |
-| `node/uplink_mqtt.py` | MQTT 5 + TLS, batch da 50, inviato solo con PUBACK positivo, attesa crescente dopo un PUBACK negativo, `online()` sulle conferme |
-| `node/aggregator.py` | aggregati esatti per finestra su MQTT |
-| `node/failover.py` | backup: acceso dopo 30 s senza conferme MQTT (HB + AGG subito), HB periodico, AGG a ogni finestra, allarmi subito, spento dopo 60 s di MQTT stabile |
-| `node/backup_link.py` | backup BLE (`btmgmt`) o LoRa (Bridge → MCU → Wio-E5) |
-| `node/event_source.py` | `C3FileSource` (file di `ai/` e dell'MCU) e simulatore |
-| `node/main.py`, `node/config.py` | orchestrazione, `hb` ogni 10 s, configurazione con variabili d'ambiente (`.env.example`) |
-| `aws/` | policy IoT e `setup_thing.sh` (un certificato per Thing, in `certs/`, ignorata da git) |
-| `tools/c3_sim.py` | scrive righe C3 finte come farà `ai/`: serve finché la visione non è pronta |
+| `node/main.py` | il programma del nodo: mette insieme i pezzi qui sotto |
+| `node/outbox.py` | Store & Forward: ogni evento su disco prima dell'invio, segnato "inviato" solo dopo la conferma |
+| `node/uplink_mqtt.py` | invio MQTT: conferme (PUBACK), ritentativi, "online" solo se arrivano conferme |
+| `node/failover.py` | backup BLE: quando accenderlo, cosa mandare, quando spegnerlo |
+| `node/backup_link.py` | radio di backup: BLE (`btmgmt`) o LoRa tramite l'MCU |
+| `node/aggregator.py` | conteggi per finestra di tempo |
+| `node/event_source.py` | lettura dei file di `ai/` e dell'MCU (senza perdere né duplicare righe) e simulatore |
+| `node/payload.py` | formati dei messaggi (JSON e binari da 26/12 byte per il backup) |
+| `node/config.py` | impostazioni (lette da `comms/.env`) |
+| `actuators.py` | **per Paolo**: come `ai/` manda i comandi al semaforo (C1/C2), via seriale o simulato |
+| `jsonl.py` | **per Paolo**: scrittura dei file di eventi `logs/c3/c3-*.jsonl` con rotazione |
+| `tools/c3_sim.py` | eventi finti come quelli di `ai/`: per provare la rete prima che la visione sia pronta |
+| `tools/ble_beacon_test.py` | prima prova del Bluetooth vero sulla UNO Q |
+| `tools/c1_send.py` | **per Salvatore**: manda comandi e heartbeat al firmware dal PC, per provare il fail-safe |
+| `aws/` | per il futuro: policy e script dei certificati per AWS IoT Core |
+| `deploy/push_to_arduino.sh` | copia sulla scheda solo questi file e prepara Python (o crea il pacchetto `--pack`) |
+| `deploy/mdgb-comms.service` | avvio automatico sulla UNO Q |
+| `tests/` | test automatici della rete e della centrale |
 
-### Demo sul laptop (4 terminali, dalla root del repo)
-
-```bash
-mosquitto -c app/mosquitto.conf -v                                     # 1: broker locale
-python app/ingest.py                                                   # 2: centrale
-python -m comms.tools.c3_sim --rate 2 --duration 3600                  # 3: "ai/" finta
-cd comms/node && EVENT_SOURCE=c3 AGG_PERIOD_S=60 python main.py        # 4: nodo
-```
-
-Prova "rete giù": Ctrl-C nel terminale 1. Il nodo scrive `rete=OFFLINE` e il backlog cresce; gli `AGG` vanno al backup
-(sul laptop il BLE è simulato: si vedono i comandi `btmgmt` nel log). Si riaccende il broker: backfill, `backlog=0`.
-`python app/ingest.py --report` deve dire `"gaps": 0`.
-
-### Con AWS IoT Core
+## Test
 
 ```bash
-./comms/aws/setup_thing.sh nodo01      comms/aws/node-policy.json      # una volta per Thing
-./comms/aws/setup_thing.sh mdgb-ingest comms/aws/ingest-policy.json
-cp comms/.env.example comms/.env       # e si compila con l'endpoint stampato dallo script
-set -a; source comms/.env; set +a
+pip install -r comms/requirements-dev.txt -r app/requirements.txt
+brew install mosquitto                  # solo per i test che usano un broker vero
+python -m pytest comms -q               # atteso: tutti verdi in ~45 s
 ```
 
-## Uso da `ai/`
+Tra i test c'è la prova completa "Wi-Fi spento / riacceso" con i tempi accorciati: il BLE si accende, la centrale
+dice "rete giù, nodo sano", un allarme arriva via BLE, al ritorno della rete gli eventi arrivano tutti e il BLE si spegne.
 
-```python
-from comms.actuators import make_actuator
+## Python
 
-act = make_actuator("serial", port="/dev/cu.usbmodem1101")   # "sim" senza hardware; "bridge" in CM-M4
-act.set_listener(lambda c5: ...)   # opzionale: righe C5 dall'MCU (env, tamper, lamp_fault, failsafe, thermal)
-act.send(c1)                       # dict conforme a C1: non blocca, non solleva se il cavo cade
-act.heartbeat(seq)                 # ogni 100 ms
-act.close()
-```
-
-- La root del repo deve essere nel path: da `ai/` si lancia con `PYTHONPATH=..` (oppure `ai/` aggiunge la root a `sys.path`).
-- `send` solleva `ValueError` solo se il comando non sta in 512 byte nemmeno accorciando `reason`.
-- Se il collegamento è lento si mandano solo l'ultimo C1 e l'ultimo C2. Dopo una riconnessione un comando più vecchio
-  di 1 s non si manda: il contratto chiede all'AI di ripetere C1 almeno ogni secondo.
-- Le righe C5 (tranne `thermal`) finiscono in `$MDGB_C3_DIR/mcu-*.jsonl` (default `logs/c3/`, ignorata da git).
-- `SimActuator.failsafe` dice se il firmware vero sarebbe in fail-safe (nessun C2 da più di 500 ms): utile per l'overlay.
-
-## Provare il firmware da PC (per Salvatore)
-
-```bash
-python -m comms.tools.c1_send --port /dev/cu.usbmodem1101 --duration 30 --stop-hb-at 20
-```
-
-Cicla IDLE → PRESENCE → WARN_DRIVER → WARN_PEDESTRIAN → ANIMAL_ALERT (3 s ciascuno, C1 ripetuto ogni secondo), C2 a 10 Hz,
-stampa le righe C5 che arrivano. A 20 s toglie l'heartbeat: entro 500 ms il firmware deve andare in fail-safe.
-Senza hardware: `--port sim`.
-
-## Come si avvia e si prova
-
-```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r comms/requirements.txt
-python -m pytest comms -q          # dalla root del repo: 18 test, ~30 s; gli end-to-end usano mosquitto (brew install mosquitto)
-```
-
-## Dipendenze
-
-`pyserial`, `paho-mqtt` (versioni fissate in `requirements.txt`); `pytest` per i test; `mosquitto` per gli end-to-end.
-
-## Versione di Python
-
-Import provato con 3.9, test completi con 3.14: niente sintassi oltre la 3.8. Sulla UNO Q: il `python3` di Debian in un venv.
+Python 3.9 o superiore (sulla UNO Q il `python3` di Debian in un venv). Sulla scheda servono solo `requirements.txt`
+(`paho-mqtt`, `pyserial`); per i test `requirements-dev.txt` (aggiunge `pytest`). Versioni fissate.

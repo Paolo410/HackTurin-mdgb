@@ -149,9 +149,9 @@ Origine: `~/Desktop/HACKATHLON`. Importato invariato nel repo (commit `dea7f50`)
 | `crosswalk-node/sketch/sketch.ino` | MCU: LoRaWAN/P2P/ESP-NOW, LED, watchdog `DEAD` | **non è area comms**: riferimento per Salvatore (`firmware/`) |
 | `esp32-pianoC/` | sketch ESP-NOW (Piano C) | riferimento, non si integra per la demo |
 | `backend/ingest.py` | subscriber: dedup `PRIMARY KEY(node, seq)`, buchi, allarmi, aggregati provvisori, anche da TTN | `app/` |
-| `backend/decoder.py`, `ttn_formatter.js` | decoder del backup (Python e TTN) | `app/` |
+| `backend/decoder.py`, `ttn_formatter.js` | decoder del backup (Python e TTN) | `app/decoder.py`; il formatter TTN è stato tolto (LoRa più avanti) |
 | `backend/ble_receiver.py` | ricevitore BLE (bleak) → ripubblica sul topic di backup | `app/` |
-| `backend/lora_p2p_receiver.py`, `mosquitto.conf` | mini-gateway LoRa P2P / ESP-NOW; broker locale | `app/` |
+| `backend/lora_p2p_receiver.py`, `mosquitto.conf` | mini-gateway LoRa P2P / ESP-NOW; broker locale | tolti: piani B/C fuori dalla demo; il broker lo configura e avvia l'app |
 | `aws/node-policy.json`, `ingest-policy.json`, `setup_thing.sh` | policy e creazione dei Thing con certificati in `certs/` | `comms/` |
 | `tests/test_offline.py` | payload, BLE, end-to-end offline | `comms/` |
 | `docs/BOM_crosswalk_node.xlsx` | BOM del prototipo e del nodo sul campo, dimensionamento solare | resta fuori: la BOM del team è `hardware/BOM.md` |
@@ -190,7 +190,12 @@ Fatto (10/10/2026):
 - dashboard nella centrale (`app/dashboard.py`, http://localhost:8080): mappa delle camere da `app/nodes.json`
   (OpenStreetMap con Internet, schematica senza), dettaglio per camera, allarmi, eventi persi e doppioni.
 
-Cosa manca: prove su UNO Q, AWS reale e BLE vero (guida: `comms/RILASCIO.md`); test LoRa ogni 6 h e
+- **Niente crediti AWS (10/10/2026)**: la demo gira in locale. Il broker MQTT (Mosquitto) è dentro l'app "MDGB Centrale"
+  sul PC, l'Arduino si collega al PC sulla stessa rete Wi-Fi (porta 1883, senza TLS). In produzione: AWS IoT Core o un
+  altro broker MQTT 5 con TLS e un certificato per nodo; stesso codice, cambia solo la configurazione (`comms/aws/` è pronto).
+- app per il PC "MDGB Centrale.app" (`app/desktop/`): doppio clic, broker + centrale + dashboard in una finestra.
+
+Cosa manca: prove su UNO Q e BLE vero (guida: `docs/INSTRUCTIONS_FOR_OTHERS.md`); test LoRa ogni 6 h e
 backup LoRa (dopo).
 
 ## 4. Cosa mi serve dagli altri
@@ -233,7 +238,7 @@ Ancora aperte:
 3. **Esterni**: disponibilità del Wio-E5, copertura TTN nella venue, Wi-Fi della venue (porta 8883, client isolation), account AWS.
 4. **`.gitignore`**: copre `.env`, `*.pem`, `*.key`, `*.crt` ma non la cartella `certs/` (si aggiunge in CM-M2, commit separato).
 5. **Versioni**: [CT] usa intervalli (`paho-mqtt>=2.0,<3`); nel repo si fissano.
-6. **`ttn_formatter.js`** gestisce solo le fPort 1 e 9; si rifà sul formato C4-B in CM-M3.
+6. **Formatter TTN**: tolto; da riscrivere sul formato C4-B quando si farà LoRa.
 7. **Aggregato online "inviato" troppo presto**: in `aggregator.py` la finestra conta come pubblicata quando paho accetta il messaggio, non al PUBACK.
 8. **Contesto di altre aree** ([R], non comms): profili del semaforo (velocità 3,0 / 1,2 / 0,8 m/s, verde = 2 s + L/v, minimo 7 s, massimo 25 s),
    modello YOLO26n/NCNN. La specifica del team decide diversamente (YOLOX-nano ONNX, `green_s` in `rules.py`): valgono le aree di Paolo e Salvatore.
