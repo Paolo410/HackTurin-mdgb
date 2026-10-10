@@ -19,7 +19,9 @@ l'app della centrale. Il codice è lo stesso: in produzione basta puntare un bro
 | Isteresi del backup | Acceso dopo 30 s senza conferme (subito heartbeat + conteggi + allarmi in sospeso); spento dopo 60 s di rete stabile. MQTT intanto riprova e recupera la coda |
 | Centrale | Un'app per il PC (**Mac e Windows**), **MDGB Centrale**: broker + ricezione MQTT + ricezione Bluetooth diretta (senza Internet) + database + diagnosi + dashboard con mappa. Autonoma: un solo file, si sposta dove si vuole. L'exe per Windows lo costruisce GitHub Actions |
 | Diagnosi | Incrociando MQTT e backup: OK / rete giù, nodo sano / nodo guasto / Linux bloccato / manomissione / batteria scarica / nodo spento o distrutto |
-| Chi ha cosa | Sviluppatori: tutto il repo. Arduino: solo la rete (`comms/deploy/push_to_arduino.sh`) accanto alla visione di Paolo, in `~/HackTurin-mdgb`. Centralino: solo lo zip dell'app (Mac o Windows) |
+| Chi ha cosa | Sviluppatori: tutto il repo. Arduino: solo i 15 file di comms che girano lì (`comms/deploy/push_to_arduino.sh`, gli strumenti di collaudo solo con `--tools`) accanto alla visione di Paolo, in `~/HackTurin-mdgb`. Centralino: solo lo zip dell'app (Mac o Windows) |
+| Niente finte sulla scheda | Il nodo legge solo i file veri di `ai/` e dell'MCU; BLE solo vero (senza BlueZ il nodo non parte); camere sulla mappa solo vere. Eventi di prova solo con `tools/c3_sim.py` lanciato a mano |
+| Bridge (visione ↔ MCU) | `BridgeActuator` con la libreria ufficiale `arduino-router-bridge` (la stessa di App Lab, funziona da un venv normale): `call("mdgb_line")` per C1/C2, `provide("mcu_event")` per C5 |
 | Mappa | Vettoriale (MapLibre + OpenFreeMap, gratis, senza chiave), stile chiaro/scuro/dettagliato; senza Internet mappa schematica. Google Maps solo con una chiave (facoltativo) |
 | Privacy | Solo metadati anonimi verso la centrale. Unica eccezione (specifica §5.3): il video **dal vivo** della camera nell'app, in rete locale, se abilitato e mai registrato |
 | Fuori scope | 4G / seconda SIM (solo nel pitch); LoRa (dopo la demo) |
@@ -45,23 +47,24 @@ Formati completi con esempi: [`docs/CONTRACTS.md`](../docs/CONTRACTS.md).
 | Dove | Cosa |
 |---|---|
 | `comms/node/` | il programma della rete sull'Arduino: Store & Forward, MQTT, backup BLE con isteresi, lettura degli eventi di `ai/` |
-| `comms/actuators.py`, `comms/jsonl.py` | librerie per `ai/`: comandi al semaforo (simulato, seriale) e scrittura dei file di eventi |
-| `comms/tools/` | `c3_sim` (eventi finti), `ble_beacon_test` (prova radio), `c1_send` (prova del firmware dal PC) |
-| `comms/deploy/` | `push_to_arduino.sh` (porta la rete sulla scheda), servizio di avvio automatico |
+| `comms/actuators.py`, `comms/jsonl.py` | per `ai/`: comandi al semaforo e righe dell'MCU (Bridge sulla UNO Q, seriale, simulato sul PC) e scrittura dei file di eventi |
+| `comms/tools/` | collaudo, solo a mano: `ble_beacon_test` (radio), `c1_send` (semaforo via Bridge o USB), `c3_sim` (eventi di prova) |
+| `comms/deploy/` | `push_to_arduino.sh` (porta la rete sulla scheda, imposta il broker, `--service` per l'avvio automatico), servizio systemd |
 | `app/` | la centrale: `central.py`, `ingest.py`, `diagnosis.py`, `dashboard.py`/`.html`, `decoder.py`, `ble_receiver.py` |
 | `app/desktop/` | l'app per il PC e la sua costruzione (`build_mac.sh`) |
-| `comms/tests/` | 29 test, tra cui la prova "Wi-Fi spento / riacceso" e un PUBACK negativo vero |
+| `comms/tests/` | 38 test, tra cui il nodo vero che legge file reali, la prova "Wi-Fi spento / riacceso", un PUBACK negativo vero e il Bridge con la libreria ufficiale contro un router finto |
 
-Provato: tutta la catena sul PC (broker vero, nodo vero con eventi simulati, perdita di rete simulata: 0 eventi persi);
-l'app costruita, firmata e avviata dallo zip; il pacchetto per l'Arduino in un ambiente pulito.
-**Mai provato**: UNO Q vera, Bluetooth reale, Wi-Fi della sede.
+Provato: tutta la catena sul PC (broker vero, nodo vero con eventi di prova nei file, perdita di rete: 0 eventi persi);
+il Bridge con la libreria ufficiale di Arduino; l'app costruita, firmata e avviata dallo zip; `push_to_arduino.sh` su una
+"scheda finta" (cartella pulita, ssh simulato) con il nodo avviato da lì.
+**Mai provato**: UNO Q vera, Bluetooth reale, sketch con `mdgb_line`, Wi-Fi della sede.
 
 ## 4. Cosa mi serve dagli altri
 
 | Da chi | Cosa |
 |---|---|
 | Paolo | eventi C3 in `logs/c3/` (fatto con il suo `logger.py`); la visione sulla scheda in `~/HackTurin-mdgb/ai` |
-| Salvatore | parser C1/C2 e fail-safe; righe C5 (ambiente, batteria, manomissione, guasto lampada, fail-safe); nomi delle funzioni Bridge per il `BridgeActuator` |
+| Salvatore | parser C1/C2 e fail-safe; nello sketch `Bridge.provide_safe("mdgb_line", ...)` e `Bridge.notify("mcu_event", riga)` per le righe C5 (ambiente, batteria, manomissione, guasto lampada, fail-safe) |
 | Kuzey | pinout in `docs/CONTRACTS.md` (sportello, NFC, LTC2941, AHT20, luce) |
 
 ## 5. Cosa fornisco agli altri
@@ -71,9 +74,10 @@ di prova, l'app della centrale e le istruzioni (`docs/INSTRUCTIONS_FOR_OTHERS.md
 
 ## 6. Questioni aperte
 
-1. **`BridgeActuator`**: serve alla visione sulla scheda (`--actuator bridge`); da fare con Salvatore.
-2. **Prove su hardware**: Bluetooth della UNO Q (`btmgmt` con root, più beacon insieme, portata), rete della sede
-   (dispositivi isolati? → hotspot o router vostro), firewall del Mac per le connessioni in entrata.
+1. **Bridge, lato sketch**: `mdgb_line` e `mcu_event` da Salvatore; il lato Linux è fatto. Prova: `c1_send --port bridge`.
+2. **Prove su hardware**: Bluetooth della UNO Q (`btmgmt` con root, più beacon insieme, portata), permessi del socket
+   `arduino-router` per l'utente della visione, rete della sede (dispositivi isolati? → hotspot o router vostro),
+   firewall del Mac per le connessioni in entrata.
 3. **`seq` dopo la perdita del database**: se il file del nodo si perde, `seq` riparte da 1 e la centrale scarterebbe i
    nuovi eventi come doppioni. Il database deve restare sulla scheda (`comms/node/data/`).
 4. **Conteggi via MQTT segnati "inviati" troppo presto**: la finestra conta come pubblicata quando parte, non alla

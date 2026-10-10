@@ -6,99 +6,119 @@ Il programma del PC (la centrale) è in [`app/`](../app/README.md). Cosa devono 
 
 ## Cosa fa
 
-Sull'Arduino UNO Q gira un programma, `comms/node/main.py`, che porta i dati del nodo alla centrale e non li perde mai:
+Sull'Arduino UNO Q `comms/` fa due lavori, entrambi veri (nessuna simulazione sulla scheda):
 
 ```
- ai/ (Paolo) ── scrive gli eventi ──► logs/c3/c3-*.jsonl
- firmware (Salvatore) ── righe MCU ──► logs/c3/mcu-*.jsonl          (le scrive comms/actuators.py)
-                                            │
-                              comms/node/main.py
-                                            │ 1. salva ogni evento su disco (SQLite)
-                                            │ 2. lo manda alla centrale via Wi-Fi (MQTT), lo segna "inviato" solo alla conferma
-                                            │ 3. se per 30 s non arrivano conferme: accende il Bluetooth (BLE) e manda
-                                            │    stato, conteggi e allarmi; dopo 60 s di rete stabile lo spegne
-                                            ▼
-                         PC della centrale (app "MDGB Centrale")
+                    ┌──────────── MCU (firmware di Salvatore): semaforo, LED, display, sensori
+                    │  ▲ C1 comandi + C2 "sono vivo"        │ C5 batteria, ambiente, manomissione, fail-safe
+                    │  │      (Bridge della UNO Q)          ▼
+ 2) actuators.py ───┘  ai/ (Paolo) ── usa actuators.py ──► logs/c3/mcu-*.jsonl
+                       ai/ (Paolo) ── scrive gli eventi ──► logs/c3/c3-*.jsonl
+                                                                 │
+ 1) node/main.py  ◄──────────────────── legge i due file ────────┘
+       │ salva ogni evento su disco (SQLite), lo manda alla centrale via Wi-Fi (MQTT) e lo segna "inviato" solo alla
+       │ conferma; se per 30 s non arrivano conferme accende il Bluetooth (BLE) e manda stato, conteggi e allarmi;
+       │ dopo 60 s di rete stabile lo spegne
+       ▼
+ PC della centrale (app "MDGB Centrale")
 ```
 
-Il semaforo **non** passa da qui: lo comandano `ai/` e il firmware. Se questa rete si rompe, il semaforo funziona lo stesso.
+1. **La rete** (`node/`): porta i dati alla centrale e non li perde mai. È il programma `node/main.py`.
+2. **Il collegamento visione ↔ semaforo** (`actuators.py`): la visione di Paolo lo importa per mandare i comandi all'MCU
+   tramite il Bridge della UNO Q e ricevere le righe dell'MCU. Non è la rete verso la centrale, ma la specifica lo
+   assegna a comms (trasporti degli attuatori) e la visione sulla scheda non parte senza.
+
+La sicurezza non passa dalla rete: se la rete si rompe, il semaforo funziona lo stesso.
 
 ### Demo in locale, produzione nel cloud
 
 | | Demo (adesso) | Produzione (in futuro) |
 |---|---|---|
-| Broker MQTT | dentro l'app sul PC della centrale (Mosquitto) | un broker MQTT 5 in cloud |
+| Broker MQTT | Mosquitto dentro l'app sul PC della centrale | un broker MQTT 5 in cloud |
 | Rete | PC e Arduino sulla stessa rete Wi-Fi | Internet |
 | Sicurezza | rete locale, senza cifratura | TLS e un certificato per nodo |
 | Backup | BLE verso il PC (10–50 m) | LoRaWAN (chilometri) |
 
+MQTT è vero in entrambi i casi: Mosquitto è un broker MQTT 5 completo, solo che gira sul PC invece che in cloud.
 Il codice è lo stesso: cambiano solo le righe `MQTT_*` e `BACKUP_LINK` in `comms/.env`.
 
 ## Installazione sull'Arduino UNO Q
 
-Sulla scheda va **solo** il codice che gira lì. Dal PC dello sviluppatore, un comando copia via ssh la rete
-(`comms/node`, gli strumenti per la scheda, la configurazione d'esempio e il servizio di avvio) in `~/HackTurin-mdgb` e prepara
-Python. Niente app del PC, test o documentazione:
+Dal PC dove gira l'app della centrale, nella cartella del repo:
 
 ```bash
-./comms/deploy/push_to_arduino.sh arduino@<IP della scheda>     # oppure --pack: crea mdgb-nodo.tar.gz per la chiavetta
+./comms/deploy/push_to_arduino.sh arduino@<IP della scheda> --service
 ```
 
-Poi sulla scheda: `nano ~/HackTurin-mdgb/comms/.env` (in `MQTT_HOST` l'indirizzo che l'app sul PC mostra in alto) e
-`sudo ~/venv/bin/python ~/HackTurin-mdgb/comms/node/main.py` (`sudo` serve per il Bluetooth). Avvio automatico all'accensione:
-[`deploy/mdgb-comms.service`](deploy/mdgb-comms.service). Rilanciare lo script aggiorna il codice: `.env` e dati restano.
+Copia sulla scheda **solo** i file che girano lì (in `~/HackTurin-mdgb/comms`), crea `~/venv` con le dipendenze, scrive
+`comms/.env` con il broker = questo PC, e con `--service` installa l'avvio automatico e fa partire il nodo (chiede la
+password di sudo della scheda). Rilanciarlo aggiorna il codice; i dati restano. Altre opzioni:
+`--tools` (aggiunge i 3 strumenti di collaudo, vedi sotto), `--broker IP` (broker su un altro PC),
+`--pack` (crea `mdgb-nodo.tar.gz` da copiare a mano, senza ssh).
 
-La visione di Paolo (`ai/`) gira sulla stessa scheda, in `~/HackTurin-mdgb/ai`: così scrive gli eventi in `~/HackTurin-mdgb/logs/c3/`, dove
-questo programma li legge, e importa `comms/actuators.py`. Come portarla sulla scheda lo decide Paolo.
+Nel log del nodo (`journalctl -u mdgb-comms -f`) deve comparire `backup BLE reale (btmgmt)`. Se manca BlueZ il nodo
+**non parte** e lo dice (`sudo apt install bluez`): niente Bluetooth finto.
+
+La visione di Paolo (`ai/`) gira sulla stessa scheda, in `~/HackTurin-mdgb/ai`: scrive gli eventi in
+`~/HackTurin-mdgb/logs/c3/`, dove la rete li legge, e importa `comms/actuators.py`.
 Procedura completa: [`docs/INSTRUCTIONS_FOR_OTHERS.md`](../docs/INSTRUCTIONS_FOR_OTHERS.md#7-arduino-uno-q).
 
-## Configurazione (`comms/.env`)
+## Configurazione (`comms/.env` sulla scheda)
 
 | Chiave | Demo | Significato |
 |---|---|---|
-| `NODE_ID` | `nodo01` | nome del nodo, uguale a una camera di `app/nodes.json` |
-| `MQTT_HOST`, `MQTT_PORT`, `MQTT_TLS` | IP del PC, `1883`, `0` | dove sta il broker (l'app sul PC mostra l'indirizzo giusto) |
+| `NODE_ID` | `nodo01` | nome del nodo, uguale a una camera di `nodes.json` nell'app |
+| `MQTT_HOST`, `MQTT_PORT`, `MQTT_TLS` | IP del PC, `1883`, `0` | dove sta il broker (lo imposta `push_to_arduino.sh`) |
 | `BACKUP_LINK` | `ble` | canale di backup: `ble`, `lora` (futuro) o `none` |
 | `BACKUP_HB_S` | `30` | ogni quanto il BLE manda lo stato (300 in produzione) |
-| `EVENT_SOURCE` | `c3` | `c3` = eventi dai file di `ai/`; `sim` = eventi finti generati qui |
 | `AGG_PERIOD_S` | `60` | finestra dei conteggi (900 in produzione) |
 
 Le altre (tempi del backup, batch, ritentativi) hanno già il valore giusto: sono in [`node/config.py`](node/config.py).
 
 ## File
 
+Sulla scheda (copiati da `push_to_arduino.sh`):
+
 | File | Cosa fa |
 |---|---|
-| `node/main.py` | il programma del nodo: mette insieme i pezzi qui sotto |
+| `node/main.py` | il programma della rete: mette insieme i pezzi qui sotto |
+| `node/event_source.py` | legge i file di `ai/` e dell'MCU in `logs/c3/`, senza perdere né duplicare righe |
 | `node/outbox.py` | Store & Forward: ogni evento su disco prima dell'invio, segnato "inviato" solo dopo la conferma |
 | `node/uplink_mqtt.py` | invio MQTT: conferme (PUBACK), ritentativi, "online" solo se arrivano conferme |
-| `node/failover.py` | backup BLE: quando accenderlo, cosa mandare, quando spegnerlo |
+| `node/failover.py` | backup: quando accenderlo, cosa mandare, quando spegnerlo |
 | `node/backup_link.py` | radio di backup: BLE (`btmgmt`) o LoRa tramite l'MCU |
 | `node/aggregator.py` | conteggi per finestra di tempo |
-| `node/event_source.py` | lettura dei file di `ai/` e dell'MCU (senza perdere né duplicare righe) e simulatore |
-| `node/payload.py` | formati dei messaggi (JSON e binari da 26/12 byte per il backup) |
+| `node/payload.py` | formati dei messaggi (JSON e binari da 26/12/5 byte per il backup) |
 | `node/config.py` | impostazioni (lette da `comms/.env`) |
-| `actuators.py` | **per Paolo**: come `ai/` manda i comandi al semaforo (C1/C2), via seriale o simulato |
-| `jsonl.py` | **per Paolo**: scrittura dei file di eventi `logs/c3/c3-*.jsonl` con rotazione |
-| `tools/c3_sim.py` | eventi finti come quelli di `ai/`: per provare la rete prima che la visione sia pronta |
-| `tools/ble_beacon_test.py` | prima prova del Bluetooth vero sulla UNO Q |
-| `tools/c1_send.py` | **per Salvatore**: manda comandi e heartbeat al firmware dal PC, per provare il fail-safe |
-| `deploy/push_to_arduino.sh` | copia sulla scheda solo questi file e prepara Python (o crea il pacchetto `--pack`) |
-| `deploy/mdgb-comms.service` | avvio automatico sulla UNO Q |
-| `tests/` | test automatici della rete e della centrale |
+| `actuators.py` | visione ↔ MCU: comandi C1/C2 e righe C5 via Bridge (sulla UNO Q), seriale (Arduino in USB) o simulato (PC) |
+| `jsonl.py` | scrittura dei file `logs/c3/*.jsonl` con rotazione (la usa `actuators.py`) |
+| `requirements.txt`, `.env.example`, `deploy/mdgb-comms.service` | dipendenze, configurazione d'esempio, avvio automatico |
+
+Solo con `--tools`, per il collaudo (si lanciano a mano, il nodo non li usa mai):
+
+| File | Cosa fa |
+|---|---|
+| `tools/ble_beacon_test.py` | prima prova della radio Bluetooth: beacon per 60 s, li vede l'app sul PC |
+| `tools/c1_send.py` | prova del semaforo: stati C1 e heartbeat all'MCU via Bridge (`--port bridge`) o USB, fail-safe compreso |
+| `tools/c3_sim.py` | eventi di prova nei file di `ai/`, per provare la rete sulla scheda prima che la visione sia pronta |
+
+Solo nel repo (sviluppatori): `deploy/push_to_arduino.sh`, `tests/` (test automatici della rete e della centrale),
+`requirements-dev.txt`, questa documentazione.
 
 ## Test
 
 ```bash
 pip install -r comms/requirements-dev.txt -r app/requirements.txt
 brew install mosquitto                  # solo per i test che usano un broker vero
-python -m pytest comms -q               # atteso: tutti verdi in ~45 s
+python -m pytest comms -q               # atteso: tutti verdi in ~1 minuto
 ```
 
-Tra i test c'è la prova completa "Wi-Fi spento / riacceso" con i tempi accorciati: il BLE si accende, la centrale
-dice "rete giù, nodo sano", un allarme arriva via BLE, al ritorno della rete gli eventi arrivano tutti e il BLE si spegne.
+Tra i test: il nodo vero (`node/main.py`) che legge file reali e consegna tutto alla centrale; la prova "Wi-Fi spento /
+riacceso" con i tempi accorciati (BLE acceso, "rete giù, nodo sano", allarme via BLE, al ritorno 0 eventi persi); un
+PUBACK negativo vero; `actuators.py` sul Bridge con la libreria ufficiale di Arduino contro un router finto.
 
 ## Python
 
-Python 3.9 o superiore (sulla UNO Q il `python3` di Debian in un venv). Sulla scheda servono solo `requirements.txt`
-(`paho-mqtt`, `pyserial`); per i test `requirements-dev.txt` (aggiunge `pytest`). Versioni fissate.
+Python 3.10 o superiore (sulla UNO Q il `python3` di Debian in un venv). Sulla scheda servono solo `requirements.txt`:
+`paho-mqtt` (MQTT), `arduino-router-bridge` (il Bridge, libreria ufficiale di Arduino), `pyserial` (solo per un
+Arduino in USB). Per i test `requirements-dev.txt` (aggiunge `pytest`). Versioni fissate.

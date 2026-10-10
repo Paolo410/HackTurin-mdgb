@@ -74,7 +74,7 @@ Pulsanti **Configurazione** e **Cartella** in alto nella finestra. La cartella �
 | File | Cosa |
 |---|---|
 | `config.env` | broker (locale o cloud), Bluetooth, porta della dashboard, chiave di Google Maps. Dopo una modifica, riapri l'app |
-| `nodes.json` | camere sulla mappa: `id` (= `NODE_ID` dell'Arduino), nome, `lat`, `lon`, profilo, `mock: true` per le camere di esempio, `video` (facoltativo: indirizzo dello stream dal vivo, es. `http://192.168.1.50:8090/stream.mjpg`). Si modifica anche ad app aperta |
+| `nodes.json` | camere sulla mappa, una per Arduino: `id` (= `NODE_ID` dell'Arduino), nome, `lat`, `lon`, profilo, `video` (facoltativo: indirizzo dello stream dal vivo, es. `http://192.168.1.50:8090/stream.mjpg`). Si modifica anche ad app aperta. Un nodo che si collega senza essere qui compare lo stesso nella lista, senza posizione |
 | `certs/` | solo con un broker in cloud: certificati TLS della centrale |
 | `central.db`, `centrale.log` | database e log della centrale |
 
@@ -95,17 +95,18 @@ python app/central.py --no-ble            # senza finestra: dashboard su http://
 python app/central.py --report            # riepilogo del database ed esce
 ```
 
-## Nodi simulati (prove e demo, sul PC dello sviluppatore)
+## Prova sul PC senza scheda (solo sviluppatori)
 
-Con l'app aperta (il broker è dentro l'app, porta 1883), dalla cartella del repo:
+L'app mostra solo nodi veri. Per provarla senza Arduino si fa girare sul PC lo stesso programma della scheda, con eventi
+di prova scritti nei file come farebbe la visione. Con l'app aperta (broker dentro l'app, porta 1883), dalla cartella del repo:
 
 ```bash
-MQTT_HOST=127.0.0.1 MQTT_PORT=1883 MQTT_TLS=0 NODE_ID=nodo01 EVENT_SOURCE=sim BACKUP_LINK=none DB_PATH=/tmp/nodo01.db python comms/node/main.py
+python -m comms.tools.c3_sim --rate 2 --duration 600 --dir /tmp/c3 &
+MQTT_HOST=127.0.0.1 NODE_ID=nodo01 BACKUP_LINK=none MDGB_C3_DIR=/tmp/c3 DB_PATH=/tmp/nodo01.db python comms/node/main.py
 ```
 
-Cambiando `NODE_ID` (e `DB_PATH`) si accendono anche le camere del mockup (`nodo02`…`nodo05`). Gli eventi sono finti,
-ma passano dalla rete vera. Quando la scheda gira con la visione di Paolo, `nodo01` arriva dall'Arduino: vedi
-[`docs/INSTRUCTIONS_FOR_OTHERS.md`](../docs/INSTRUCTIONS_FOR_OTHERS.md#8-dal-nodo-simulato-a-quello-vero).
+`BACKUP_LINK=none` perché sul PC non c'è la radio della UNO Q. Sulla scheda vera: vedi
+[`docs/INSTRUCTIONS_FOR_OTHERS.md`](../docs/INSTRUCTIONS_FOR_OTHERS.md#7-arduino-uno-q).
 
 ## File
 
@@ -119,7 +120,7 @@ ma passano dalla rete vera. Quando la scheda gira con la visione di Paolo, `nodo
 | `diagnosis.py` | la regola che decide lo stato di ogni nodo (OK, rete giù, guasto, Linux bloccato, manomissione, batteria, spento) |
 | `decoder.py` | lettura dei messaggi binari del backup (BLE oggi, LoRa in futuro) |
 | `ble_receiver.py` | ricezione dei beacon Bluetooth; da solo con `--dry-run` serve alla prima prova radio |
-| `nodes.json` | camere di esempio, copiate nelle impostazioni al primo avvio |
+| `nodes.json` | la camera del nodo vero (`nodo01`), copiata nelle impostazioni al primo avvio |
 
 I test sono in `comms/tests/` (`python -m pytest comms -q`).
 
