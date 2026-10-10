@@ -9,14 +9,15 @@
  │                    │                    │   Wi-Fi + Internet │   ├─ riceve via MQTT da AWS      │
  │ comms/node/main.py ◄┘                   │ ──► AWS IoT Core ──►│   ├─ riceve via Bluetooth (BLE)  │
  │   salva su disco, manda via MQTT        │                    │   ├─ database app/central.db     │
- │   se MQTT tace 30 s: beacon BLE ─────────── radio, ~10–50 m ─►│   └─ diagnosi di ogni nodo       │
- └────────────────────────────────────────┘                    └──────────────────────────────────┘
+ │   se MQTT tace 30 s: beacon BLE ─────────── radio, ~10–50 m ─►│   ├─ diagnosi di ogni nodo       │
+ └────────────────────────────────────────┘                    │   └─ dashboard con mappa :8080   │
+                                                               └──────────────────────────────────┘
 ```
 
 | Dove | Cosa serve | Si lancia con |
 |---|---|---|
 | Arduino UNO Q | repo clonato, `comms/.env`, certificato del Thing `nodo01` in `certs/` | `sudo ~/venv/bin/python comms/node/main.py` (o il servizio systemd) |
-| PC | repo clonato, `app/.env`, certificato del Thing `mdgb-ingest` in `certs/` | `python app/central.py` |
+| PC | repo clonato, `app/.env`, certificato del Thing `mdgb-ingest` in `certs/`, posizioni delle camere in `app/nodes.json` | `python app/central.py`, poi il browser su http://localhost:8080 |
 | AWS IoT Core | due Thing (`nodo01`, `mdgb-ingest`) con le loro policy | si crea una volta con `comms/aws/setup_thing.sh` |
 
 Il semaforo non passa mai da qui: lo comandano `ai/` (Paolo) e il firmware (Salvatore). Se questa rete si guasta,
@@ -28,7 +29,7 @@ il semaforo continua a funzionare.
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r comms/requirements.txt -r app/requirements.txt
 brew install mosquitto
-python -m pytest comms -q              # atteso: 26 passed (~45 s)
+python -m pytest comms -q              # atteso: 29 passed (~45 s)
 ```
 
 Tra i test c'è la prova completa "Wi-Fi spento / riacceso" con tempi accorciati (30 s → 2 s, 60 s → 3 s):
@@ -36,16 +37,22 @@ BLE acceso, diagnosi "rete giù, nodo sano", allarme via BLE in meno di 1 s, bac
 
 ## 2. Demo locale sul PC (senza AWS e senza Arduino)
 
+Si vedono la dashboard, la mappa e lo Store & Forward. Il BLE no: sul PC è simulato, serve la UNO Q (passi 4–5).
+
 ```bash
 mosquitto -c app/mosquitto.conf                                        # terminale 1: broker locale
-python app/central.py --no-ble                                         # terminale 2: centrale
+MQTT_HOST=localhost MQTT_PORT=1883 MQTT_TLS=0 python app/central.py --no-ble          # terminale 2: centrale
 python -m comms.tools.c3_sim --rate 2 --duration 3600                  # terminale 3: "ai/" finta
-MQTT_HOST=localhost MQTT_PORT=1883 MQTT_TLS=0 EVENT_SOURCE=c3 python comms/node/main.py   # terminale 4: nodo
+MQTT_HOST=localhost MQTT_PORT=1883 MQTT_TLS=0 EVENT_SOURCE=c3 AGG_PERIOD_S=60 python comms/node/main.py   # terminale 4: nodo01
 ```
 
-La centrale stampa ogni 10 s `STATO nodo01: nodo OK via mqtt`. Ctrl-C sul broker: il nodo scrive `rete=OFFLINE` e il
-backlog cresce; dopo 30 s `backup ble ACCESO` (sul PC il BLE è simulato). Si riaccende il broker: backlog a 0, dopo
-60 s `backup ble SPENTO`. `python app/central.py --report` deve dare `"gaps": 0`.
+Apri http://localhost:8080: sulla mappa `nodo01` è verde, le altre camere di `app/nodes.json` sono grigie (mockup).
+Per accenderne un'altra con un nodo simulato (ognuna con il suo database):
+`MQTT_HOST=localhost MQTT_PORT=1883 MQTT_TLS=0 NODE_ID=nodo02 EVENT_SOURCE=sim BACKUP_LINK=none DB_PATH=/tmp/nodo02.db python comms/node/main.py`
+
+Prova dello Store & Forward: Ctrl-C sul nodo (terminale 4). Dopo 30 s la dashboard mostra `nodo01` rosso
+("nodo distrutto o senza alimentazione": niente MQTT e, sul PC, niente BLE). Intanto `c3_sim` continua a scrivere eventi.
+Riavvia il nodo: recupera tutti gli eventi scritti mentre era spento, torna verde, "Eventi persi" resta 0.
 
 ## 3. AWS IoT Core (una volta)
 
@@ -97,12 +104,12 @@ Per la demo conviene `BACKUP_HB_S=30` in `comms/.env`: così si vede un HB via B
 
 | Passo | Comando | Cosa deve succedere |
 |---|---|---|
-| 1 | PC: `python app/central.py` | `STATO nodo01: nodo OK via mqtt` |
+| 1 | PC: `python app/central.py` e il browser su http://localhost:8080 | `nodo01` verde, "nodo OK", canale Wi-Fi/MQTT |
 | 2 | UNO Q: `sudo iptables -A OUTPUT -p tcp --dport 8883 -j DROP` (taglia solo MQTT, ssh resta su) | nodo: `rete=OFFLINE`, backlog che cresce |
-| 3 | aspetta 30–40 s | nodo: `backup ble ACCESO`; PC: `STATO nodo01: rete giù, nodo sano via ble` |
+| 3 | aspetta 30–40 s | nodo: `backup ble ACCESO`; dashboard: `nodo01` giallo, "rete giù, nodo sano", canale BLE con RSSI, coda in crescita |
 | 4 | UNO Q: `sudo iptables -D OUTPUT -p tcp --dport 8883 -j DROP` | nodo: backlog che scende a 0 |
-| 5 | aspetta 60 s | nodo: `backup ble SPENTO`; PC: `nodo OK via mqtt` |
-| 6 | PC: `python app/central.py --report` | `"gaps": 0`: eventi inviati = ricevuti |
+| 5 | aspetta 60 s | nodo: `backup ble SPENTO`; dashboard: `nodo01` di nuovo verde via Wi-Fi/MQTT |
+| 6 | dashboard, riquadro Rete | "Eventi persi" = 0 (anche `python app/central.py --report`: `"gaps": 0`) |
 
 Con il Wi-Fi spento davvero cade anche ssh: lancia tutto in un colpo solo, per esempio
 `sudo nohup sh -c 'nmcli radio wifi off; sleep 120; nmcli radio wifi on' &` (TODO(verify): `nmcli` sulla UNO Q).
@@ -111,7 +118,6 @@ Con il Wi-Fi spento davvero cade anche ssh: lancia tutto in un colpo solo, per e
 
 | Cosa | Stato |
 |---|---|
-| Dashboard web sul PC (stato dei nodi, canale attivo, coda, conteggi, allarmi) | da fare: oggi lo stato si legge nel terminale della centrale e con `--report` |
 | Prove su hardware vero: BLE sulla UNO Q (permessi, più beacon insieme, portata), AWS reale, Wi-Fi della sede | da fare, con i passi 3–5 |
 | `ai/` di Paolo che scrive `logs/c3/c3-*.jsonl` (contratto C3) | da concordare; intanto `c3_sim` |
 | Backup LoRa (Wio-E5) | dopo |

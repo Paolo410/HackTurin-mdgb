@@ -187,7 +187,10 @@ Fatto (10/10/2026):
 - 26 test verdi, tra cui la prova "Wi-Fi spento / riacceso" (connessione che tace senza chiudersi): BLE acceso, diagnosi
   "rete giù, nodo sano", allarme via BLE in 0,4 s, backfill, BLE spento, 345/345 eventi, 0 buchi.
 
-Cosa manca: dashboard web; prove su UNO Q, AWS reale e BLE vero (guida: `comms/RILASCIO.md`); test LoRa ogni 6 h e
+- dashboard nella centrale (`app/dashboard.py`, http://localhost:8080): mappa delle camere da `app/nodes.json`
+  (OpenStreetMap con Internet, schematica senza), dettaglio per camera, allarmi, eventi persi e doppioni.
+
+Cosa manca: prove su UNO Q, AWS reale e BLE vero (guida: `comms/RILASCIO.md`); test LoRa ogni 6 h e
 backup LoRa (dopo).
 
 ## 4. Cosa mi serve dagli altri
