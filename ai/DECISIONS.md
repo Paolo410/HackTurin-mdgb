@@ -372,3 +372,23 @@ con v_ped 0,3 → 25 s.
       verificato sulla scheda e va evitato che l'allarme arrivi due volte (anche `mdgb_link.py` lo inoltra);
     - cartella unica degli eventi (`--applab`, `MDGB_C3_DIR`) e permessi di scrittura in `~/ArduinoApps/<app>/data`;
     - stato del nodo "manomesso" in centrale: come si presenta e chi lo azzera (il badge del tecnico?).
+31. **Cosa si chiede al semaforo, deciso da Paolo il 10/10 sera** (cambia quanto scritto al punto 17):
+    - **rosso subito** per un bambino non accompagnato o un animale libero in strada, con un giallo breve prima;
+    - **verde pedonale più lungo solo per chi ne ha bisogno**: `slow` (cammina sotto 0,9 m/s) o `aid`. Non più per
+      ogni pedone più lento di 1,2 m/s, né per i bambini in quanto tali;
+    - **il rosso non si trattiene più** per chiunque sia sulle strisce né negli stati di avviso: solo per chi ha
+      bisogno di tempo e per bambino solo o animale;
+    - "non accompagnato" = nessuno che non sia un bambino entro 2 m a terra (`rules.supervision_distance_m`, lo
+      stesso criterio del cane al guinzaglio). Un pedone di cui non si conosce l'altezza conta come adulto;
+    - animali: liberi, in carreggiata, di taglia media o grande (`rules.red_now_animal_sizes`);
+    - **campo nuovo `req.veh_red_now` nel comando C1**: è una modifica al contratto, da far confermare a Lorenzo.
+      È solo un'aggiunta: chi non lo conosce lo ignora;
+    - `T_need` e gli avvisi a conducenti e pedoni non cambiano: per quelli il bambino resta a 0,8 m/s.
+32. **Prima prova sulla scheda (10/10 sera)**, numeri in `README.md`:
+    - a 320 px con il detector a ogni frame la scheda fa 5,8 FPS, sotto l'obiettivo di 8. Profilo `unoq`: detector
+      un frame su due, 3 thread, tetto a 12 FPS. Con la camera vera: 9,2 FPS;
+    - la camera è un IMX219 su CSI: si apre con `libcamerify` (chiude la questione aperta 1);
+    - sulla scheda manca `python3-venv`: l'ambiente si crea senza pip e si installa con il pip di sistema;
+    - gli FPS mostrati erano una media di tempi tra frame consecutivi: con il detector un frame su due dava numeri
+      assurdi (220). Ora è la frequenza sugli ultimi 30 frame.
+

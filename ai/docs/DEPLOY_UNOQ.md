@@ -1,8 +1,8 @@
 # Portare `ai/` sulla Arduino UNO Q
 
-**Non ancora provato sulla scheda.** Provato sul PC: il pacchetto che va sulla scheda, insieme al file di
-Lorenzo che parla con lo sketch e alla libreria ufficiale del Bridge, contro un router finto (comandi, heartbeat,
-righe del microcontrollore). Le voci "da verificare" vengono dalla documentazione o da fonti non ufficiali.
+**Provato sulla scheda il 10/10/2026:** copia, ambiente Python, camera vera, 9,2 FPS, collegamento con il router.
+**Non ancora provato:** il semaforo comandato dalla visione (serve lo sketch con `mdgb_line`), la pagina del tecnico
+dal telefono, l'avvio automatico.
 
 Ordine deciso dal team: **prima sketch + visione**, poi la rete verso la centrale (Lorenzo).
 
@@ -35,10 +35,10 @@ quell'indirizzo, scheda reinstallata), poi `ssh-keygen -R <indirizzo>` sul PC.
 Controlli da fare subito sulla scheda:
 
 ```bash
-cat /etc/os-release; python3 --version    # atteso: Debian 13, Python 3.13 (requirements.txt va bene da 3.11 a 3.13)
-nproc; free -h; df -h ~                   # 4 core, 2 o 4 GB di RAM; l'ambiente Python pesa circa 500 MB
+cat /etc/os-release; python3 --version    # trovato: Debian 13, Python 3.13.5
+nproc; free -h; df -h ~                   # trovato: 4 core, 3,6 GB di RAM, 16 GB liberi
 ls ~/ArduinoApps; arduino-app-cli app list   # l'app di Salvatore e se è avviata
-ls -l /dev/video* /var/run/arduino-router.sock
+cam -l; ls -l /var/run/arduino-router.sock   # la camera vista da libcamera; il router (scrivibile da tutti)
 ```
 
 ## 2. Copiare la visione
@@ -57,7 +57,8 @@ Cosa fa, nell'ordine:
    documenti. Non si usa `git pull` sulla scheda: il repo è privato e servirebbe un token lì sopra;
 2. con `--bridge` copia anche i tre file di Lorenzo in `~/HackTurin-mdgb/comms`;
 3. sulla scheda crea l'ambiente Python `~/venv` (solo la prima volta) e installa le dipendenze. Serve Internet
-   sulla scheda e qualche minuto;
+   sulla scheda e un paio di minuti. Sulla scheda manca `python3-venv` e `sudo` chiede la password: lo script
+   crea l'ambiente senza pip e ci installa dentro con il pip di sistema, senza toccare nient'altro;
 4. controlla e stampa: versioni installate, camera, router, cartella degli eventi, credenziali del tecnico.
 
 Rilanciarlo aggiorna il codice. Senza ssh: `--pack` crea `mdgb-ai.tar.gz` da copiare a mano.
@@ -81,27 +82,33 @@ Senza `calib.json` la visione conta i passaggi ma non misura velocità e non app
 
 ## 5. Camera
 
-- **Webcam USB** con hub USB-C alimentato: `--source 0` apre `/dev/video0` (da verificare l'indice).
-- Se l'app di App Lab è avviata con il vecchio `main.py`, la camera è occupata: va usato il `main.py` senza camera.
+La camera della scheda è un sensore **IMX219 su CSI**, letto da libcamera: non è una webcam e OpenCV da solo non la
+apre. Basta lanciare il programma con `libcamerify` davanti (pacchetto `libcamera-v4l2`, già sulla scheda): OpenCV
+la vede come `/dev/video0`, 632x480.
+
+- Se l'app di App Lab è avviata con il vecchio `main.py`, la camera è occupata e la scheda è molto più lenta
+  (quel programma usa da solo il 140% di CPU): va usato il `main.py` senza camera.
+- Una webcam USB, se mai servisse, si apre senza `libcamerify` con il suo indice.
 
 ## 6. Prova a mano, nell'ordine
 
 Sulla scheda, in `~/HackTurin-mdgb/ai`:
 
 ```bash
-~/venv/bin/python scripts/bench.py 0 --profile unoq                 # 1. ms per fase: quanti FPS abbiamo davvero
-~/venv/bin/python -m smartcrossing.app --source 0 --profile unoq --headless \
+libcamerify ~/venv/bin/python scripts/bench.py 0 --profile unoq     # 1. ms per fase con la camera vera
+libcamerify ~/venv/bin/python -m smartcrossing.app --source 0 --profile unoq --headless \
     --actuator sim --operator-port 8090                             # 2. visione senza semaforo
-~/venv/bin/python -m smartcrossing.app --source 0 --profile unoq --headless \
+libcamerify ~/venv/bin/python -m smartcrossing.app --source 0 --profile unoq --headless \
     --actuator bridge --operator-port 8090                          # 3. con il semaforo (serve lo sketch con mdgb_line)
 ```
 
 Cosa guardare:
 
-1. **FPS:** obiettivo almeno 8 end-to-end a 320 px. Se non ci si arriva, in ordine: `model.detect_every_n: 2`,
-   `model.input_size: 256`, `source.resize_width` più basso nel profilo `unoq`.
-2. **Semaforo:** con una persona davanti alla camera il verde dei veicoli si accorcia; fermando la visione
-   (`Ctrl+C`) il semaforo torna al ciclo normale entro mezzo secondo.
+1. **FPS:** misurati 9,2 end-to-end con il profilo `unoq` (320 px, detector un frame su due). I numeri sono in
+   `ai/README.md`, "Prestazioni misurate".
+2. **Semaforo:** fermando la visione (`Ctrl+C`) torna al ciclo normale entro mezzo secondo. Con un bambino non
+   accompagnato o un animale libero scatta il rosso dopo un giallo breve; con chi cammina piano il rosso dei
+   veicoli dura di più. Servono la calibrazione e lo sketch nuovo.
 3. **Tecnico:** dal telefono sulla stessa Wi-Fi, `http://<scheda>:8090/` dice "BLOCCATO". Passando il badge chiede
    utente e password; dopo il login mostra numeri e vista dal vivo. Cinque password sbagliate: va ripassato il badge.
 4. **Antifurto:** scuotendo la scheda, sulla pagina compare "ultimo urto N s fa". La visione continua a lavorare.
@@ -132,12 +139,13 @@ ssh arduino@<scheda> 'journalctl -u mdgb-ai -f'
 
 ## 9. Da verificare sull'hardware vero
 
-- [ ] `pip install` completo nel `~/venv`: tempo, spazio, versioni stampate dallo script.
-- [ ] FPS e ms per fase con `bench.py`, a 320 px e 4 thread. Temperatura e rallentamenti dopo 10 minuti.
-- [ ] Camera letta da OpenCV fuori da App Lab (`/dev/video0`).
-- [ ] L'utente `arduino` può usare `/var/run/arduino-router.sock`.
+- [x] `pip install` completo nel `~/venv`: due minuti, numpy 2.4.6, onnxruntime 1.30.0, opencv 4.14.0, supervision 0.30.5.
+- [x] FPS e ms per fase: vedi `ai/README.md`.
+- [x] Camera letta da OpenCV fuori da App Lab: sì, con `libcamerify`.
+- [x] L'utente `arduino` può usare `/var/run/arduino-router.sock`: sì.
 - [ ] Sketch con `mdgb_line`: comandi e heartbeat ricevuti, fail-safe entro 0,5 s, badge e antifurto alla visione.
-- [ ] Costo della vista dal vivo sugli FPS mentre un tecnico guarda (5 immagini al secondo, 480 px).
-- [ ] Tempo del login sulla scheda (il controllo della password è volutamente lento: sul Mac 50 ms).
+- [ ] Pagina del tecnico dal telefono: login, costo della vista dal vivo sugli FPS, tempo del login.
+- [ ] Temperatura e rallentamenti dopo 10 minuti di funzionamento.
 - [ ] Visione e app di App Lab insieme: carico della CPU e memoria.
 - [ ] Avvio automatico dopo un riavvio della scheda.
+- [ ] Immagine della camera: di sera è scura e l'elaborazione di libcamera non è tarata per questo sensore.
