@@ -26,10 +26,11 @@ TARGET="${1:?uso: push_to_arduino.sh utente@ip-della-scheda   oppure   --pack}"
 echo "1/2 copio il codice della rete su $TARGET:~/HackTurin-mdgb"
 pack | ssh "$TARGET" "mkdir -p ~/HackTurin-mdgb && tar -xzf - -C ~/HackTurin-mdgb"
 echo "2/2 preparo Python sulla scheda (~/venv, serve Internet la prima volta)"
-ssh "$TARGET" 'cd ~/HackTurin-mdgb && { [ -x ~/venv/bin/python ] || python3 -m venv ~/venv; } \
+ssh "$TARGET" 'cd ~/HackTurin-mdgb && { [ -x ~/venv/bin/python ] || python3 -m venv ~/venv \
+    || { echo "Manca python3-venv sulla scheda: sudo apt install python3-venv, poi rilancia"; exit 1; }; } \
   && ~/venv/bin/pip install -q -r comms/requirements.txt \
   && { [ -f comms/.env ] || cp comms/.env.example comms/.env; }'
 echo
 echo "Fatto. Sulla scheda:"
 echo "  nano ~/HackTurin-mdgb/comms/.env                       (MQTT_HOST = indirizzo che l'app sul PC mostra in alto)"
-echo "  sudo ~/venv/bin/python ~/HackTurin-mdgb/comms/node/main.py"
+echo "  sudo ~/venv/bin/python ~/HackTurin-mdgb/comms/node/main.py   (nel log: 'backup BLE reale (btmgmt)')"
