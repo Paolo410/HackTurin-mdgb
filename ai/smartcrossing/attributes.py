@@ -79,8 +79,10 @@ class AttributeEstimator:
             attrs.update(child=None, slow=None, aid=None, walk_speed=None, _moving_since=None,
                          _walk_speeds=deque(maxlen=self.walk_samples), _aid_votes=Counter())
 
-        if attrs["child"] is None and len(state.heights) >= self.height_samples:
-            attrs["child"] = median(state.heights) < self.child_height
+        # Decided on the first frames in which the box is large enough for a height to mean something:
+        # a pedestrian still far away stays undecided, instead of being called a child by a 15 px box.
+        if attrs["child"] is None and len(state.precise_heights) >= self.height_samples:
+            attrs["child"] = median(state.precise_heights) < self.child_height
 
         # Walking speed = real progress over the last `slow_min_time` seconds, while the pedestrian is moving.
         # A person standing at the kerb is not slow, and the box of a standing person jitters: summing those

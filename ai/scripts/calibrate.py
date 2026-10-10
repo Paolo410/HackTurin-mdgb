@@ -111,6 +111,18 @@ def draw(frame, points: list[tuple[int, int]], cfg: dict, calib: dict | None = N
     return view
 
 
+def camera_check(calib: dict, width: int, height: int, cfg: dict) -> str:
+    """One line that tells whether the calibration fits a real camera, to catch wrong corners or sizes."""
+    geometry = Geometry(calib, cfg)
+    geometry.set_frame_size(width, height)
+    if geometry.camera is None:
+        return ("Warning: these corners and sizes do not fit a real camera looking at a rectangle. Check the order "
+                "of the corners and the two sizes. Counting works; speeds are less precise and children are "
+                "not recognised.")
+    return (f"Camera worked out from the calibration: {geometry.camera['height_m']:.1f} m above the ground. "
+            "If that is far from the truth, check the corners and the two sizes.")
+
+
 def write_calib(out: Path, new: dict, replace_all: bool) -> None:
     calib = {}
     if not replace_all and out.is_file():   # lines-only: keep the metric part already there
@@ -201,6 +213,7 @@ def main() -> int:
             if state["road"] is None:
                 state["road"] = _ask_metres("Distance between corners 2 and 3 (road width, kerb to kerb)")
             state["calib"] = metric_from_points(points, width, height, state["along"], state["road"], cfg)
+            print(camera_check(state["calib"], width, height, cfg))
             print("Check the zones and the lines in the window, then press s to save or r to restart.")
         cv2.imshow(WINDOW, draw(frame, points, cfg, state["calib"], args.lines_only))
         key = cv2.waitKey(30) & 0xFF

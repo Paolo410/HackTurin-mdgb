@@ -38,9 +38,15 @@ geometry:
   waiting_zone_margin_m: 1.0      # how far the waiting zones extend beyond the sides of the stripes
   carriageway_extent_m: 150       # road considered before and after the stripes
   ped_line_margin_m: 2.0          # the pedestrian line extends this far beyond the stripes
-  veh_line_offset_m: 2.0          # the vehicle line is this far before the stripes
+  veh_line_offset_m: middle       # vehicle line through the middle of the stripes (both directions fully
+                                  # in view), or a number: metres before the stripes
   scale_probe_px: 5               # half width of the step used to measure the local scale
   height_scale: 1.0               # correction of sizes in metres (tune with a person of known height)
+  camera_tolerance: 0.2           # the camera position is worked out from the calibration, and used for
+                                  # heights, only if the calibration fits a real camera this well (0 = perfectly;
+                                  # 0.2 accepts corners clicked 4 px off, rejects swapped corners or wrong sizes)
+  min_height_ratio: 0.2           # otherwise heights are rough, and a metre of height never counts as less
+                                  # than this share of a metre across (view from straight above)
 
 kinematics:
   ema_samples: 5                  # (spec) speed is an EMA over 5 samples
@@ -55,6 +61,9 @@ kinematics:
 attributes:
   child_height_m: 1.30            # (spec) below this median height the pedestrian is a child
   height_samples: 5               # (spec) frames used for the median height
+  height_min_box_px: 30           # a box shorter than this is too coarse to tell 1.3 m from 1.7 m:
+                                  # the pedestrian stays undecided (not a child) until seen larger. The same
+                                  # when the calibration does not fit a real camera (geometry.camera_tolerance)
   slow_speed_ms: 0.9              # (spec) below this walking speed the pedestrian is slow
   slow_min_time_s: 2.0            # (spec) the walking speed is the progress made over this time
   slow_min_samples: 3             # measures needed before deciding
@@ -225,13 +234,18 @@ bench:
   warmup_frames: 10               # frames discarded before measuring
   percentile: 95
 
+# At 10 FPS a track is valid after 2 frames instead of 5: five frames are half a second, and a car at
+# 30 km/h has crossed the counting line before its track counts (Turin video: 16 vehicles counted of the
+# 35 counted at 30 FPS; with 2 frames, 28).
 profiles:
   pc: {}
   unoq:
     model: {input_size: 320, intra_op_num_threads: 4}
     source: {max_fps: 10, resize_width: 640}
+    tracking: {min_track_age: 2}
 
 # Applied on top of the profile by --emulate-unoq. (spec) 10 FPS, input 320, 4 onnxruntime threads.
 emulate_unoq:
   model: {input_size: 320, intra_op_num_threads: 4}
   source: {max_fps: 10}
+  tracking: {min_track_age: 2}

@@ -37,6 +37,7 @@ class TrackState:
     accel: float = 0.0                             # m/s^2 along the motion (negative = braking)
     speed_before: float = 0.0                      # speed one window ago, the start of that acceleration
     heights: deque = field(default_factory=deque)  # recent box heights in metres
+    precise_heights: deque = field(default_factory=deque)  # the same, only from boxes large enough to trust
     length_m: float | None = None                  # last box width in metres
     zone: str | None = None
     zone_since: float = 0.0                        # time the track entered its current zone
@@ -72,6 +73,7 @@ class Tracker:
         self.max_metres_per_px = float(k["max_metres_per_px"])
         self.edge_margin = None if k["edge_margin"] is None else float(k["edge_margin"])
         self.height_samples = int(cfg["attributes"]["height_samples"])
+        self.height_min_box_px = float(cfg["attributes"]["height_min_box_px"])
         with warnings.catch_warnings():
             # Known deprecation of sv.ByteTrack: the version is pinned, see the module docstring.
             warnings.simplefilter("ignore", FutureWarning)
@@ -102,6 +104,7 @@ class Tracker:
             if state is None:
                 state = TrackState(track_id=track_id, first_t=t, history=deque(maxlen=self.history_len),
                                    heights=deque(maxlen=self.height_samples),
+                                   precise_heights=deque(maxlen=self.height_samples),
                                    ground_history=deque(maxlen=self.history_len),
                                    speed_history=deque(maxlen=self.history_len))
                 self.tracks[track_id] = state
@@ -171,9 +174,15 @@ class Tracker:
         box_h = float(xyxy[3] - xyxy[1])
         state.aspect = float(xyxy[2] - xyxy[0]) / box_h if box_h > 0 else 0.0
 
-        height = geometry.size_in_metres(float(xyxy[3] - xyxy[1]), *foot)
+        height = geometry.height_in_metres(box_h, *foot)
         if height is not None:
             state.heights.append(height)
+            # Good enough to tell a child from an adult only if: the calibration fits a real camera (else the
+            # height is a rough estimate), the box is not tiny (2 px are 10% of 20 px), and it does not
+            # touch the top of the image (the head is cut).
+            top_inside = self.edge_margin is None or xyxy[1] > self.edge_margin * geometry.height
+            if geometry.camera is not None and box_h >= self.height_min_box_px and top_inside:
+                state.precise_heights.append(height)
         state.length_m = geometry.size_in_metres(float(xyxy[2] - xyxy[0]), *foot)
 
         zone = geometry.zone_of(*position)

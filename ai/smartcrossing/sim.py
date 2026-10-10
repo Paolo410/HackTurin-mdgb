@@ -52,8 +52,8 @@ def detections_at(actors: list[Actor], t: float, geometry: Geometry) -> sv.Detec
         if position is None:
             continue
         fx, fy = geometry.to_image(*position)
-        scale = geometry.pixels_per_metre(fx, fy)
-        half, high = actor.width_m * scale / 2, actor.height_m * scale
+        half = actor.width_m * geometry.pixels_per_metre(fx, fy) / 2
+        high = geometry.box_height_px(actor.height_m, fx, fy)   # standing things look shorter from above
         boxes.append([fx - half, fy - high, fx + half, fy])
         classes.append(COCO_CLASSES.index(actor.coco_class))
     if not boxes:

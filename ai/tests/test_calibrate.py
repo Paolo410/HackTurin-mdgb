@@ -59,6 +59,16 @@ def test_metric_calibration_from_four_clicked_corners():
         assert calibrate.draw(frame, points[:n], cfg, None, lines_only=False).shape == frame.shape
 
 
+def test_camera_check_tells_a_plausible_calibration_from_a_wrong_one():
+    cfg = load_config()
+    # A rectangle seen in perspective, symmetric around the centre of the image: a camera that can exist.
+    good = calibrate.metric_from_points([(220, 420), (420, 420), (390, 250), (250, 250)], W, H, 4.0, 7.0, cfg)
+    assert "above the ground" in calibrate.camera_check(good, W, H, cfg)
+    # Same corners, clicked in the wrong order (2 and 3 swapped): no camera sees a rectangle like this.
+    bad = calibrate.metric_from_points([(220, 420), (390, 250), (420, 420), (250, 250)], W, H, 4.0, 7.0, cfg)
+    assert calibrate.camera_check(bad, W, H, cfg).startswith("Warning")
+
+
 def test_lines_only_save_keeps_the_metric_part(tmp_path):
     import json
     cfg = load_config()
