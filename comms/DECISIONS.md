@@ -17,9 +17,9 @@ l'app della centrale. Il codice è lo stesso: in produzione basta puntare un bro
 | "Online" | Solo se arrivano conferme (PUBACK positivo negli ultimi 30 s), non basta la connessione TCP |
 | Backup | **BLE** (radio della UNO Q, beacon `btmgmt`) nella demo; **LoRaWAN** (Wio-E5 sull'MCU) in futuro. Solo allarmi, heartbeat e conteggi, mai i singoli eventi |
 | Isteresi del backup | Acceso dopo 30 s senza conferme (subito heartbeat + conteggi + allarmi in sospeso); spento dopo 60 s di rete stabile. MQTT intanto riprova e recupera la coda |
-| Centrale | Un'app per il PC, **MDGB Centrale**: broker + ricezione MQTT + ricezione Bluetooth diretta (senza Internet) + database + diagnosi + dashboard con mappa |
+| Centrale | Un'app per il PC (**Mac e Windows**), **MDGB Centrale**: broker + ricezione MQTT + ricezione Bluetooth diretta (senza Internet) + database + diagnosi + dashboard con mappa. Autonoma: un solo file, si sposta dove si vuole. L'exe per Windows lo costruisce GitHub Actions |
 | Diagnosi | Incrociando MQTT e backup: OK / rete giù, nodo sano / nodo guasto / Linux bloccato / manomissione / batteria scarica / nodo spento o distrutto |
-| Chi ha cosa | Sviluppatori: tutto il repo. Arduino: solo la rete (`comms/deploy/push_to_arduino.sh`) accanto alla visione di Paolo, in `~/HackTurin-mdgb`. Centralino: solo `MDGB-Centrale-mac.zip` |
+| Chi ha cosa | Sviluppatori: tutto il repo. Arduino: solo la rete (`comms/deploy/push_to_arduino.sh`) accanto alla visione di Paolo, in `~/HackTurin-mdgb`. Centralino: solo lo zip dell'app (Mac o Windows) |
 | Mappa | Vettoriale (MapLibre + OpenFreeMap, gratis, senza chiave), stile chiaro/scuro/dettagliato; senza Internet mappa schematica. Google Maps solo con una chiave (facoltativo) |
 | Privacy | Nessuna immagine esce dal nodo: solo metadati anonimi |
 | Fuori scope | 4G / seconda SIM (solo nel pitch); LoRa (dopo la demo) |

@@ -98,9 +98,10 @@ AHT20 e sensore di luce. Il modulo LoRa (Wio-E5) serve solo più avanti.
 |---|---|---|
 | Sviluppatori | tutto il repo | `git pull` |
 | Arduino UNO Q | solo il codice che gira sulla scheda: la rete in `~/HackTurin-mdgb/comms` (Lorenzo) e la visione in `~/HackTurin-mdgb/ai` (Paolo); il firmware sull'MCU (Salvatore) | `comms/deploy/push_to_arduino.sh` per la rete; Paolo e Salvatore per le loro parti |
-| Centralino (PC) | solo l'app, `MDGB-Centrale-mac.zip` (broker incluso) | `./app/desktop/build_mac.sh` sul Mac dello sviluppatore, poi lo zip via AirDrop/chiavetta |
+| Centralino (PC Mac o Windows) | solo l'app: `MDGB-Centrale-mac.zip` o `MDGB-Centrale-windows.zip` (broker incluso, nessuna installazione) | Mac: `./app/desktop/build_mac.sh`; Windows: GitHub → Actions → "App centrale per Windows" → Artifacts. Poi lo zip via chiavetta/mail |
 
-Il centralino apre l'app (la prima volta clic destro → Apri), consente Bluetooth e connessioni in entrata. In alto compare
+Il centralino apre l'app (la prima volta: Mac clic destro → Apri; Windows "Ulteriori informazioni" → "Esegui comunque"),
+consente Bluetooth e connessioni in entrata (Firewall di Windows: reti private). In alto compare
 **`Arduino → 192.168.x.y:1883`**: è l'indirizzo da mettere nella configurazione dell'Arduino.
 
 ## 7. Arduino UNO Q

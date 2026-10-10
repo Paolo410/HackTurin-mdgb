@@ -25,35 +25,49 @@ Dietro la finestra l'app riceve i dati dei nodi in due modi e li salva nello ste
 Wi-Fi. In produzione al posto del PC ci sarà un broker MQTT 5 in cloud con TLS e un
 certificato per nodo: è la stessa app, cambiano solo le righe `MQTT_*` del file di configurazione.
 
-## Per il centralino: solo l'app
+## Per il centralino: solo l'app (Mac o Windows)
 
-Il centralino riceve **un solo file**, `MDGB-Centrale-mac.zip` (circa 18 MB, broker Mosquitto incluso), e non installa
-nient'altro:
-1. doppio clic sullo zip, trascina **MDGB Centrale** in Applicazioni;
-2. la prima volta: clic destro sull'app → **Apri** → Apri (l'app non è firmata da uno sviluppatore Apple registrato;
+Il centralino riceve **un solo file** e non installa nient'altro: dentro ci sono Python, le librerie, la dashboard e il
+broker Mosquitto. L'app si può mettere dove si vuole (Applicazioni, Desktop, chiavetta): non serve il repo.
+
+**Mac** — `MDGB-Centrale-mac.zip` (circa 18 MB):
+1. doppio clic sullo zip, trascina **MDGB Centrale** in Applicazioni (o dove vuoi);
+2. la prima volta: clic destro sull'app → **Apri** → Apri (non è firmata da uno sviluppatore Apple registrato;
    su macOS 15 se serve: Impostazioni di Sistema → Privacy e sicurezza → "Apri comunque");
 3. consenti **Bluetooth** (backup dei nodi) e **connessioni in entrata** (servono all'Arduino per collegarsi).
 
-Da lì in poi: doppio clic per aprirla, chiudi la finestra per fermarla.
+**Windows 10/11** — `MDGB-Centrale-windows.zip`:
+1. estrai lo zip: c'è un solo file, **MDGB Centrale.exe**; mettilo dove vuoi (es. sul Desktop);
+2. la prima volta Windows può mostrare "Windows ha protetto il PC": **Ulteriori informazioni** → **Esegui comunque**
+   (l'exe non è firmato da un editore registrato);
+3. quando il Firewall chiede di consentire `mosquitto` sulle **reti private**, consenti (serve all'Arduino).
+   Il Bluetooth deve essere acceso nelle impostazioni di Windows.
+
+Da lì in poi: doppio clic per aprirla, chiudi la finestra per fermarla (si fermano anche la centrale e il broker).
 
 ## Per lo sviluppatore: costruire l'app
 
-Dalla cartella del repo, su un Mac (circa 1 minuto; installa Mosquitto con Homebrew se manca, per metterlo nell'app):
+**Mac** — dalla cartella del repo (circa 1 minuto; installa Mosquitto con Homebrew se manca, per metterlo nell'app):
 
 ```bash
 ./app/desktop/build_mac.sh
 ```
 
-Crea in `app/desktop/dist/` sia `MDGB Centrale.app` sia `MDGB-Centrale-mac.zip` da dare al centralino. L'app viene
-costruita e firmata (firma ad-hoc) in una cartella temporanea: se il repo è su Desktop o Documenti sincronizzati con
-iCloud, iCloud aggiunge attributi che impedirebbero la firma.
+Crea in `app/desktop/dist/` `MDGB Centrale.app` e `MDGB-Centrale-mac.zip`. L'app viene costruita e firmata (firma
+ad-hoc) in una cartella temporanea, perché iCloud (Desktop e Documenti sincronizzati) impedirebbe la firma; alla fine
+parte un **autotest** (`--selftest`: broker, centrale e dashboard senza finestra).
 
-Per chiuderla basta chiudere la finestra: si fermano anche la centrale e il broker.
+**Windows** — due strade, stesso risultato (`MDGB Centrale.exe` e `MDGB-Centrale-windows.zip`, con autotest):
+- **senza un PC Windows**: GitHub → **Actions** → "App centrale per Windows" → ultima esecuzione → **Artifacts** →
+  `MDGB-Centrale-windows`. Parte da sola a ogni push che tocca `app/`, oppure a mano con "Run workflow"
+  ([`.github/workflows/centrale-windows.yml`](../.github/workflows/centrale-windows.yml));
+- **su un PC Windows** con Python 3.12 e Mosquitto installato: dalla cartella del repo, in PowerShell,
+  `powershell -ExecutionPolicy Bypass -File app\desktop\build_windows.ps1`.
 
 ## Impostazioni
 
 Pulsanti **Configurazione** e **Cartella** in alto nella finestra. La cartella è
-`~/Library/Application Support/MDGB Centrale/` e contiene:
+`~/Library/Application Support/MDGB Centrale/` sul Mac e `%APPDATA%\MDGB Centrale\` su Windows, e contiene:
 
 | File | Cosa |
 |---|---|
@@ -96,7 +110,7 @@ ma passano dalla rete vera. Quando la scheda gira con la visione di Paolo, `nodo
 | File | Cosa fa |
 |---|---|
 | `desktop/centrale_app.py` | l'app: cartella delle impostazioni, avvio di Mosquitto, centrale, finestra; chiusura pulita |
-| `desktop/build_mac.sh`, `desktop/centrale.spec`, `desktop/make_icon.py` | costruzione di `MDGB Centrale.app` (PyInstaller) e della sua icona |
+| `desktop/build_mac.sh`, `desktop/build_windows.ps1`, `desktop/centrale.spec`, `desktop/make_icon.py` | costruzione dell'app per Mac e Windows (PyInstaller) e delle icone |
 | `central.py` | la centrale: MQTT + Bluetooth + dashboard (`Central.start()` / `stop()`) |
 | `ingest.py` | ricezione MQTT, database, deduplica su (nodo, numero evento), conteggio degli eventi persi |
 | `dashboard.py`, `dashboard.html` | la pagina e i suoi dati (`/api/state`, `/api/info`) |
@@ -110,4 +124,6 @@ I test sono in `comms/tests/` (`python -m pytest comms -q`).
 ## Dipendenze
 
 `paho-mqtt`, `bleak`, `flask` (`requirements.txt`); per l'app anche `pywebview` e `pyinstaller` (`desktop/requirements.txt`).
-Mosquitto (broker MQTT) da Homebrew. Python 3.9 o superiore. Testata su macOS (Apple Silicon).
+Per costruire l'app serve Mosquitto installato (Homebrew sul Mac, `C:\Program Files\mosquitto` su Windows): finisce
+dentro l'app. Python 3.9 o superiore (3.12 per la build Windows). Provata su macOS (Apple Silicon); Windows tramite la
+build automatica su GitHub.
