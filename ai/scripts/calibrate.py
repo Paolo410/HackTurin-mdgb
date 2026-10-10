@@ -139,11 +139,18 @@ def main() -> int:
     p.add_argument("--width", type=float, help="distance between corners 2 and 3 (road width W), in metres")
     p.add_argument("--corners", help='skip the window: the 4 corners as normalized "x,y x,y x,y x,y"')
     p.add_argument("--lines-only", action="store_true", help="only draw the two counting lines")
+    p.add_argument("--roi", help='part of the image the detector looks at, normalized "x0,y0,x1,y1" '
+                                 "(the crossing and the road before it): objects are seen larger at the same cost")
     p.add_argument("--warmup-frames", type=int, default=10, help="frames skipped before the one shown")
     args = p.parse_args()
 
     cfg = load_config()
     out = Path(args.out) if args.out else resolve_path(cfg["counting"]["calib_path"])
+    roi = None
+    if args.roi:
+        roi = [float(v) for v in args.roi.split(",")]
+        if len(roi) != 4 or not (0 <= roi[0] < roi[2] <= 1 and 0 <= roi[1] < roi[3] <= 1):
+            p.error("--roi needs x0,y0,x1,y1 with x0 < x1 and y0 < y1, all between 0 and 1")
 
     if args.corners:   # no window: everything from the command line
         if args.along is None or args.width is None:
@@ -151,7 +158,10 @@ def main() -> int:
         corners = [[float(v) for v in pair.split(",")] for pair in args.corners.split()]
         if len(corners) != N_POINTS:
             p.error("--corners needs exactly 4 points")
-        write_calib(out, build_metric_calib(corners, args.along, args.width, cfg), replace_all=True)
+        calib = build_metric_calib(corners, args.along, args.width, cfg)
+        if roi:
+            calib["roi"] = roi
+        write_calib(out, calib, replace_all=True)
         print(f"Saved {out}")
         return 0
 
@@ -207,9 +217,9 @@ def main() -> int:
                 if not lines:
                     print("Nothing to save: click at least the two points of the pedestrian line.")
                     continue
-                write_calib(out, {"lines": lines}, replace_all=False)
+                write_calib(out, {"lines": lines, **({"roi": roi} if roi else {})}, replace_all=False)
             elif state["calib"] is not None:
-                write_calib(out, state["calib"], replace_all=True)
+                write_calib(out, {**state["calib"], **({"roi": roi} if roi else {})}, replace_all=True)
             else:
                 print("Nothing to save: click the four corners first.")
                 continue

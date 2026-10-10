@@ -76,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
 
     threads = int(cfg["model"]["intra_op_num_threads"])
     setup = (f"source={source.name} profile={cfg['profile']} emulate_unoq={cfg['emulate_unoq']} "
-             f"input={pipeline.detector.input_size}px threads={threads or 'auto'} "
+             f"input_budget={pipeline.detector.input_size}px threads={threads or 'auto'} "
              f"max_fps={cfg['source']['max_fps'] or 'unlimited'} actuator={args.actuator} "
              f"site={pipeline.animals.site_name}")
     print(setup)

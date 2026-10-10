@@ -5,6 +5,8 @@
 model:
   path: models/yolox_nano_dynamic.onnx   # relative to ai/, made by scripts/get_model.sh (free input size)
   input_size: 320                 # (spec) 320, 416 optional. Must be a multiple of the largest stride.
+  match_aspect: true              # same number of pixels as input_size squared, shaped like the image:
+                                  # no input wasted on padding, objects seen larger at the same cost
   conf: 0.30                      # minimum score (objectness * class probability)
   nms: 0.45                       # IoU threshold of the per-class NMS
   nms_cross_class: 0.85           # boxes of different classes above this IoU are one object: keep the best
@@ -28,7 +30,7 @@ tracking:
   minimum_matching_threshold: 0.8
   minimum_consecutive_frames: 1
   min_track_age: 5                # (spec) frames before a track is considered valid
-  history_len: 60                 # positions kept per track
+  history_len: 150                # positions kept per track (5 s at 30 frames per second)
   default_frame_rate: 30          # rate given to ByteTrack when the source does not report one
 
 geometry:
@@ -42,13 +44,20 @@ geometry:
 
 kinematics:
   ema_samples: 5                  # (spec) speed is an EMA over 5 samples
-  max_dt_s: 1.0                   # a gap longer than this restarts the speed estimate
+  window_s: 0.5                   # each sample is the displacement over this time, not over one frame
+  min_window_s: 0.15              # shortest time over which a speed is measured
+  max_dt_s: 1.0                   # samples older than this are not used
+  max_speed_ms: 70                # a faster jump is the tracker moving an ID to another object
+  max_metres_per_px: 0.5          # no speed where one pixel is more than this on the ground (too far)
+  edge_margin: 0.01               # no speed for boxes this close to the image border (fraction of the size);
+                                  # null = no check
 
 attributes:
   child_height_m: 1.30            # (spec) below this median height the pedestrian is a child
   height_samples: 5               # (spec) frames used for the median height
   slow_speed_ms: 0.9              # (spec) below this walking speed the pedestrian is slow
-  slow_min_time_s: 2.0            # (spec) walking time needed before deciding
+  slow_min_time_s: 2.0            # (spec) the walking speed is the progress made over this time
+  slow_min_samples: 3             # measures needed before deciding
   moving_min_speed_ms: 0.2        # below this the pedestrian is standing: not part of the walking speed
   walk_speed_samples: 100         # recent walking samples kept for the median walking speed
   aid_model_path: models/aid_cls.onnx   # (spec) optional classifier; missing file = aid unknown
@@ -120,6 +129,9 @@ events:
   near_miss_ttc_s: 1.0            # (spec) TTC below this ...
   near_miss_pet_s: 1.0            # (spec) ... or PET below this, between a vehicle and a pedestrian or animal
   near_miss_lateral_m: 1.5        # the vehicle must be heading at the pedestrian within this side distance
+  near_miss_min_speed_ms: 3.0     # slower vehicles do not make a near miss by TTC
+  max_distance_m: 30              # braking and collisions are judged only this close to the stripes:
+                                  # farther away the calibration is too coarse for accelerations
   pet_radius_m: 1.0               # two tracks passed "through the same point" within this distance
   stopped_on_crosswalk_s: 10.0    # (spec) vehicle standing on the stripes for longer than this
   stopped_ms: 0.3                 # below this speed a vehicle is standing
@@ -151,7 +163,9 @@ thermal:                          # optional, --thermal; sensor in the kit: Grov
 
 selfcheck:
   every_n_frames: 10              # how often a frame is checked
-  laplacian_var_min: 15.0         # below this sharpness the lens is covered
+  laplacian_var_min: 4.0          # below this sharpness the lens is covered (real scenes: 8 or more;
+                                  # a covered lens: below 2; measured on the test videos)
+  confirm_checks: 2               # a fault counts after this many checks in a row
   saturated_level: 250            # grey level counted as saturated
   saturated_fraction_max: 0.5     # above this fraction of saturated pixels the camera is dazzled
 
