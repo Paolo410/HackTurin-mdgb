@@ -1,0 +1,46 @@
+# Costruisce l'app della centrale per Windows ("MDGB Centrale.exe") su un PC Windows di GitHub: non serve averne uno.
+# Risultato: GitHub -> Actions -> "App centrale per Windows" -> ultima esecuzione -> Artifacts -> MDGB-Centrale-windows.
+# Owner: Lorenzo (comms/app). Parte da sola quando cambia app/, oppure a mano dal pulsante "Run workflow".
+name: App centrale per Windows
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "app/**"
+      - ".github/workflows/centrale-windows.yml"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Mosquitto per Windows (finisce dentro l'app)
+        run: choco install mosquitto -y --no-progress
+
+      - name: Test della centrale su Windows
+        run: |
+          python -m pip install -q -r comms/requirements-dev.txt -r app/requirements.txt
+          python -m pytest comms/tests/test_dashboard.py comms/tests/test_offline.py -q
+
+      - name: Build e autotest dell'app
+        shell: pwsh
+        env:
+          BUILD_PYTHON: python
+        run: ./app/desktop/build_windows.ps1
+
+      - name: Log dell'autotest (solo se qualcosa fallisce)
+        if: failure()
+        shell: pwsh
+        run: Get-ChildItem $env:TEMP -Directory -Filter "mdgb-selftest-*" | ForEach-Object { Get-Content (Join-Path $_.FullName "centrale.log") }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MDGB-Centrale-windows
+          path: app/desktop/dist/MDGB-Centrale-windows.zip
