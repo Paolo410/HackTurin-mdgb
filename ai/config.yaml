@@ -31,6 +31,75 @@ tracking:
   history_len: 60                 # positions kept per track
   default_frame_rate: 30          # rate given to ByteTrack when the source does not report one
 
+geometry:
+  waiting_zone_depth_m: 1.5       # depth of the waiting zones on the two pavements
+  waiting_zone_margin_m: 1.0      # how far the waiting zones extend beyond the sides of the stripes
+  carriageway_extent_m: 150       # road considered before and after the stripes
+  ped_line_margin_m: 2.0          # the pedestrian line extends this far beyond the stripes
+  veh_line_offset_m: 2.0          # the vehicle line is this far before the stripes
+  scale_probe_px: 5               # half width of the step used to measure the local scale
+  height_scale: 1.0               # correction of sizes in metres (tune with a person of known height)
+
+kinematics:
+  ema_samples: 5                  # (spec) speed is an EMA over 5 samples
+  max_dt_s: 1.0                   # a gap longer than this restarts the speed estimate
+
+attributes:
+  child_height_m: 1.30            # (spec) below this median height the pedestrian is a child
+  height_samples: 5               # (spec) frames used for the median height
+  slow_speed_ms: 0.9              # (spec) below this walking speed the pedestrian is slow
+  slow_min_time_s: 2.0            # (spec) walking time needed before deciding
+  moving_min_speed_ms: 0.2        # below this the pedestrian is standing: not part of the walking speed
+  walk_speed_samples: 100         # recent walking samples kept for the median walking speed
+  aid_model_path: models/aid_cls.onnx   # (spec) optional classifier; missing file = aid unknown
+  aid_input_size: 96              # (spec) crops are 96x96
+  aid_classes: [normal, wheelchair, walking_aid, stroller]   # (spec)
+  aid_votes: 5                    # (spec) vote on 3-5 crops
+  aid_min_votes: 3
+  aid_every_n_frames: 5           # frames between two crops of the same track
+
+rules:
+  reaction_time_s: 1.0            # (spec) d_stop = v * 1.0 + v^2 / (2 * 7.0)
+  deceleration_ms2: 7.0           # (spec)
+  crossing_margin_s: 1.0          # (spec) T_need = W / v_ped + 1.0
+  v_ped_default_ms: 1.2           # (spec)
+  v_ped_vulnerable_ms: 0.8        # (spec) child, slow, aid, thermal-only pedestrian
+  v_ped_min_ms: 0.3               # floor for the measured walking speed
+  stop_margin_m: 10               # (spec) WARN_DRIVER needs d > d_stop + 10
+  not_braking_ms2: -2.0           # (spec) the vehicle is not braking if a > -2 m/s^2
+  intention_wait_s: 1.0           # (spec) waiting longer than this shows the intention to cross
+  toward_road_min_ms: 0.3         # speed towards the road that shows the intention to cross
+  vehicle_min_speed_ms: 1.0       # slower vehicles are not approaching
+  vehicle_roles: [car, bus, truck, motorcyclist]
+  pedestrian_roles: [pedestrian]
+  green_max_s: 25                 # (spec) green_s = min(25, max(W / 1.2, W / v_ped) + 2)
+  green_margin_s: 2               # (spec)
+  ped_green_extend_max_s: 15      # (spec) limit of the signal controller on the green extension
+  video_timeout_s: 1.0            # (spec) no frames for longer than this = DEGRADED
+  hold_s: 1.0                     # a state is kept this long before stepping down (no flicker)
+  default_W_m: 7.0                # road width used when calib.json has no metric calibration
+  led:                            # proposal, to be confirmed with firmware
+    IDLE: "OFF"
+    PRESENCE: WHITE_ON
+    WARN_DRIVER: AMBER_BLINK_2HZ
+    WARN_PEDESTRIAN: RED_GROUND_BLINK
+    ANIMAL_WARN: AMBER_BLINK_2HZ
+    ANIMAL_ALERT: AMBER_BLINK_4HZ
+    DEGRADED: YELLOW_FAILSAFE
+  lcd_max_chars: 32               # 2 rows of 16 ASCII characters
+
+selfcheck:
+  every_n_frames: 10              # how often a frame is checked
+  laplacian_var_min: 15.0         # below this sharpness the lens is covered
+  saturated_level: 250            # grey level counted as saturated
+  saturated_fraction_max: 0.5     # above this fraction of saturated pixels the camera is dazzled
+
+actuator:
+  heartbeat_period_s: 0.1         # (spec) C2 every 100 ms
+  heartbeat_stale_s: 0.4          # no heartbeat if the vision loop has been silent for this long
+  c1_repeat_s: 1.0                # the last C1 is repeated at least this often (CONTRACTS draft)
+  failsafe_timeout_s: 0.5         # (spec) the firmware falls back after 500 ms without heartbeat
+
 derive:
   rider_iou: 0.3                  # (spec) person/two-wheeler IoU above which the person is the rider
   animal_classes: [dog, cat, horse, sheep, cow, bear]   # (spec) COCO classes reported as "animal"
@@ -52,6 +121,8 @@ overlay:
   quit_keys: [q, Q]
   line_arrow_px: 40               # length of the arrow that shows the IN direction
   line_arrow_tip: 0.3             # arrow head, as a fraction of its length
+  zones: [crosswalk, waiting_zone_left, waiting_zone_right]   # zones drawn on screen
+  reason_max_chars: 110           # longer reasons are cut on screen
   colors:                         # BGR
     person: [80, 200, 80]
     two_wheeler: [0, 200, 255]
@@ -59,6 +130,15 @@ overlay:
     animal: [200, 80, 200]
     pending: [150, 150, 150]      # track younger than min_track_age, or two-wheeler with a rider
     line: [0, 255, 255]           # counting lines
+    zone: [255, 200, 0]           # zones of the metric calibration
+    state:                        # banner colour of each state
+      IDLE: [90, 90, 90]
+      PRESENCE: [200, 200, 200]
+      WARN_DRIVER: [0, 170, 255]
+      WARN_PEDESTRIAN: [0, 0, 255]
+      ANIMAL_WARN: [0, 170, 255]
+      ANIMAL_ALERT: [0, 100, 255]
+      DEGRADED: [0, 255, 255]
     text: [255, 255, 255]
     hud_bg: [0, 0, 0]
 

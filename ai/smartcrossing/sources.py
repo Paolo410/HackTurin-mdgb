@@ -22,6 +22,21 @@ def default_source(cfg: dict) -> str:
     return "0"
 
 
+def frame_fault(frame: np.ndarray, cfg: dict) -> str | None:
+    """Self-check of the camera on one frame: "lens_covered", "glare" or None.
+
+    Lens covered or badly out of focus = almost no detail (variance of the Laplacian below a threshold).
+    Glare = a large part of the image is saturated.
+    """
+    c = cfg["selfcheck"]
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    if float(np.mean(gray >= int(c["saturated_level"]))) > float(c["saturated_fraction_max"]):
+        return "glare"
+    if float(cv2.Laplacian(gray, cv2.CV_64F).var()) < float(c["laplacian_var_min"]):
+        return "lens_covered"
+    return None
+
+
 class FrameSource:
     """Yields (frame, t) pairs.
 

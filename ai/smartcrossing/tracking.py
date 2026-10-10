@@ -26,6 +26,17 @@ class TrackState:
     history: deque = field(default_factory=deque)  # (t, x_bottom_center, y_bottom) in frame pixels
     class_votes: Counter = field(default_factory=Counter)   # COCO class id per frame
     role_votes: Counter = field(default_factory=Counter)    # role per frame, see derive.py
+    # Metric state, filled only with a metric calibration (see geometry.Geometry).
+    ground: tuple[float, float] | None = None      # last position on the ground, metres
+    velocity: tuple[float, float] = (0.0, 0.0)     # smoothed, m/s in the ground frame
+    speed: float = 0.0                             # m/s
+    speed_samples: int = 0                         # speed measures taken so far
+    accel: float = 0.0                             # m/s^2 along the motion (negative = braking)
+    heights: deque = field(default_factory=deque)  # recent box heights in metres
+    length_m: float | None = None                  # last box width in metres
+    zone: str | None = None
+    zone_since: float = 0.0                        # time the track entered its current zone
+    attrs: dict = field(default_factory=dict)      # child / slow / aid / walk_speed, see attributes.py
 
     @property
     def role(self) -> str | None:
@@ -48,6 +59,10 @@ class Tracker:
         self.min_track_age = int(t["min_track_age"])
         self.history_len = int(t["history_len"])
         self.lost_track_buffer = int(t["lost_track_buffer"])
+        k = cfg["kinematics"]
+        self.ema_alpha = 2.0 / (int(k["ema_samples"]) + 1)
+        self.max_dt = float(k["max_dt_s"])
+        self.height_samples = int(cfg["attributes"]["height_samples"])
         with warnings.catch_warnings():
             # Known deprecation of sv.ByteTrack: the version is pinned, see the module docstring.
             warnings.simplefilter("ignore", FutureWarning)
@@ -61,25 +76,64 @@ class Tracker:
         self.tracks: dict[int, TrackState] = {}
         self._frame = 0
 
-    def update(self, detections: sv.Detections, t: float) -> sv.Detections:
-        """Feeds one frame of detections. Returns the tracked detections (with tracker_id)."""
+    def update(self, detections: sv.Detections, t: float, geometry=None) -> sv.Detections:
+        """Feeds one frame of detections. Returns the tracked detections (with tracker_id).
+
+        With a metric geometry, the ground position, speed, acceleration, size and zone of each
+        track are updated too.
+        """
         self._frame += 1
         tracked = self._bytetrack.update_with_detections(detections)
         if tracked.tracker_id is None:
             return tracked
+        metric = geometry is not None and geometry.metric
         for xyxy, class_id, track_id in zip(tracked.xyxy, tracked.class_id, tracked.tracker_id):
             track_id = int(track_id)
             state = self.tracks.get(track_id)
             if state is None:
-                state = TrackState(track_id=track_id, first_t=t, history=deque(maxlen=self.history_len))
+                state = TrackState(track_id=track_id, first_t=t, history=deque(maxlen=self.history_len),
+                                   heights=deque(maxlen=self.height_samples))
                 self.tracks[track_id] = state
+            foot = (float((xyxy[0] + xyxy[2]) / 2), float(xyxy[3]))   # bottom centre: on the ground
+            if metric:
+                self._update_metric(state, xyxy, foot, t, geometry)
             state.age += 1
             state.last_t = t
             state.last_frame = self._frame
-            state.history.append((t, float((xyxy[0] + xyxy[2]) / 2), float(xyxy[3])))
+            state.history.append((t, foot[0], foot[1]))
             state.class_votes[int(class_id)] += 1
         self._drop_stale()
         return tracked
+
+    def _update_metric(self, state: TrackState, xyxy, foot: tuple[float, float], t: float, geometry) -> None:
+        position = geometry.to_ground(*foot)
+        dt = t - state.last_t
+        if state.ground is not None and 0 < dt <= self.max_dt:
+            raw = ((position[0] - state.ground[0]) / dt, (position[1] - state.ground[1]) / dt)
+            if state.speed_samples == 0:
+                vx, vy = raw   # first measure: start from it, not from zero
+                speed = (vx * vx + vy * vy) ** 0.5
+            else:
+                # Exponential moving average over `ema_samples` samples.
+                vx = state.velocity[0] + self.ema_alpha * (raw[0] - state.velocity[0])
+                vy = state.velocity[1] + self.ema_alpha * (raw[1] - state.velocity[1])
+                speed = (vx * vx + vy * vy) ** 0.5
+                state.accel += self.ema_alpha * ((speed - state.speed) / dt - state.accel)
+            state.velocity, state.speed = (vx, vy), speed
+            state.speed_samples += 1
+        elif dt > self.max_dt:
+            # Too long a gap: start again.
+            state.velocity, state.speed, state.accel, state.speed_samples = (0.0, 0.0), 0.0, 0.0, 0
+        state.ground = position
+
+        height = geometry.size_in_metres(float(xyxy[3] - xyxy[1]), *foot)
+        if height is not None:
+            state.heights.append(height)
+        state.length_m = geometry.size_in_metres(float(xyxy[2] - xyxy[0]), *foot)
+
+        zone = geometry.zone_of(*position)
+        if zone != state.zone:
+            state.zone, state.zone_since = zone, t
 
     def vote_roles(self, tracked: sv.Detections, roles: list[str]) -> list[str]:
         """Adds this frame's role of each track and returns the majority role of each one."""

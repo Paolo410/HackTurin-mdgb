@@ -22,6 +22,7 @@ ROLE_GROUP = {
 }
 _DEFAULT_GROUP = "animal"
 _FONT = cv2.FONT_HERSHEY_SIMPLEX
+KMH = 3.6
 
 
 def draw_tracks(frame: np.ndarray, result: FrameResult, tracker: Tracker, cfg: dict) -> None:
@@ -40,6 +41,13 @@ def draw_tracks(frame: np.ndarray, result: FrameResult, tracker: Tracker, cfg: d
         x1, y1, x2, y2 = (int(v) for v in xyxy)
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
         label = f"#{int(track_id)} {name} {score:.2f}"
+        if state is not None and state.speed_samples > 0:
+            label += f" {state.speed * KMH:.0f}km/h"
+            flags = [flag for flag in ("child", "slow") if state.attrs.get(flag)]
+            if state.attrs.get("aid") not in (None, "normal"):
+                flags.append(state.attrs["aid"])
+            if flags:
+                label += " " + "+".join(flags)
         (tw, th), baseline = cv2.getTextSize(label, _FONT, scale, 1)
         top = max(y1 - th - baseline, 0)
         cv2.rectangle(frame, (x1, top), (x1 + tw, top + th + baseline), color, cv2.FILLED)
@@ -61,6 +69,43 @@ def draw_lines(frame: np.ndarray, counter, cfg: dict) -> None:
         tip = (int(mid[0] + dx * arrow), int(mid[1] + dy * arrow))
         cv2.arrowedLine(frame, mid, tip, color, thickness, tipLength=float(o["line_arrow_tip"]))
         cv2.putText(frame, f"{name} IN", (tip[0] + thickness, tip[1]), _FONT, scale, color, 1, cv2.LINE_AA)
+
+
+def draw_zones(frame: np.ndarray, geometry, cfg: dict) -> None:
+    """Outline of the zones of the metric calibration (stripes and waiting zones)."""
+    if geometry is None or not geometry.metric:
+        return
+    o = cfg["overlay"]
+    color = tuple(o["colors"]["zone"])
+    for name in o["zones"]:
+        polygon = geometry.zones.get(name)
+        if polygon:
+            points = np.array([geometry.to_image(x, y) for x, y in polygon], dtype=np.int32)
+            cv2.polylines(frame, [points], isClosed=True, color=color, thickness=1, lineType=cv2.LINE_AA)
+
+
+def draw_state(frame: np.ndarray, command: dict | None, cfg: dict, failsafe: bool = False) -> None:
+    """Banner at the bottom: state and lamp, the reason, the texts of the two displays and the requests."""
+    if command is None:
+        return
+    o = cfg["overlay"]
+    colors, scale = o["colors"], float(o["font_scale"])
+    req = command["req"]
+    lines = [
+        f"{command['state']}   LED {command['led']}" + ("   [FAIL-SAFE: no heartbeat]" if failsafe else ""),
+        command["reason"][:int(o["reason_max_chars"])],
+        f"LCD [{command['lcd']}]  OLED [{command['oled']}]  green {command['green_s']}s "
+        f"+{req['ped_green_extend_s']}s  red_hold={int(req['veh_red_hold'])} flash={int(req['flash'])}",
+    ]
+    (_, text_h), baseline = cv2.getTextSize("Ag", _FONT, scale, 1)
+    line_h = text_h + baseline + int(o["thickness"])
+    height, width = frame.shape[:2]
+    top = height - line_h * len(lines) - line_h // 2
+    cv2.rectangle(frame, (0, top), (width, height), tuple(colors["hud_bg"]), cv2.FILLED)
+    cv2.rectangle(frame, (0, top), (line_h // 2, height), tuple(colors["state"][command["state"]]), cv2.FILLED)
+    for i, line in enumerate(lines):
+        color = tuple(colors["state"][command["state"]]) if i == 0 else tuple(colors["text"])
+        cv2.putText(frame, line, (line_h, top + line_h * (i + 1)), _FONT, scale, color, 1, cv2.LINE_AA)
 
 
 def draw_hud(frame: np.ndarray, lines: list[str], cfg: dict) -> None:

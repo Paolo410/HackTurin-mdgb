@@ -216,3 +216,31 @@ con v_ped 0,3 → 25 s.
     - linea `ped`: `pedestrian`, `cyclist`, `animal`; linea `veh`: `car`, `bus`, `truck`, `motorcyclist`, `cyclist`;
     - una bici o una moto senza persona riconosciuta sopra non viene contata;
     - le linee stanno in `calib.json` in coordinate normalizzate (0–1), così non dipendono dalla risoluzione.
+17. **Scelte di AI-M3 da confermare con Salvatore e Lorenzo** (rispondono ai punti 4 e 5). Sono in `config.yaml`
+    (`rules`) e in `rules.py`:
+    - lampada per stato: IDLE `OFF`, PRESENCE `WHITE_ON`, WARN_DRIVER `AMBER_BLINK_2HZ`, WARN_PEDESTRIAN
+      `RED_GROUND_BLINK`, ANIMAL_WARN `AMBER_BLINK_2HZ`, ANIMAL_ALERT `AMBER_BLINK_4HZ`, DEGRADED `YELLOW_FAILSAFE`;
+    - `ped_green_extend_s` = `green_s` meno il verde standard `W/1,2 + 2`, arrotondato, al massimo 15 s
+      (con W = 12 m e 0,7 m/s dà 19 s e +7 s, come l'esempio di §4);
+    - `veh_red_hold` vero in WARN_DRIVER, in WARN_PEDESTRIAN e finché c'è qualcuno sulle strisce;
+    - `flash` vero solo in ANIMAL_ALERT;
+    - `lcd` su due righe da 16 caratteri ASCII: `PEDONE / IN ATTESA`, `PEDONE / SULLE STRISCE`,
+      `PEDONE  47 km/h / RALLENTA`, `FRENA!  47 km/h / PEDONE`; la velocità è quella del veicolo in arrivo;
+    - `oled`: `TEMPO VERDE 11 s` in PRESENCE, `ATTENDI auto 45km/h` in WARN_DRIVER, `FERMO! auto 45km/h` in
+      WARN_PEDESTRIAN. Mai un invito ad attraversare.
+18. **Altre scelte di AI-M3**:
+    - in WARN_PEDESTRIAN un veicolo vicino che frena (a ≤ −2 m/s²) è considerato uno che dà la precedenza: lo stato
+      resta PRESENCE;
+    - lo stato scende solo dopo 1 s (`rules.hold_s`);
+    - la velocità di camminata è la mediana delle velocità mentre il pedone cammina, non la media: così partenze e
+      arresti non la abbassano. Chi sta fermo al cordolo non risulta lento;
+    - altezza e lunghezza in metri vengono dalla scala locale dell'omografia nel punto d'appoggio: è
+      un'approssimazione, da tarare con `geometry.height_scale` su una persona di altezza nota;
+    - un veicolo conta per la regola solo se è in carreggiata e si sta avvicinando alle strisce a più di 1 m/s;
+    - zone d'attesa profonde 1,5 m e larghe quanto le strisce più 1 m per lato;
+    - soglie dell'autodiagnosi: varianza del Laplaciano sotto 15 = lente coperta, più del 50% di pixel saturi =
+      abbagliamento. Da tarare sulla camera vera;
+    - contratto del classificatore degli ausili (non ancora addestrato): ingresso 1x3x96x96, BGR, 0–255.
+19. **Chiuse dalla bozza di `docs/CONTRACTS.md` di Lorenzo** (branch `lorenzo/ble-backup`): punto 3 (dati dal
+    microcontrollore: contratto C5), punto 6 (C3 solo su file in `logs/c3/`), punto 7 (pedone solo termico:
+    `attrs.thermal_only`).
