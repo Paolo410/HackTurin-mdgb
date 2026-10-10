@@ -95,17 +95,21 @@ class McuLoraBackup:
 
 class BleBackup:
     """Backup via BLE advertising (beacon non connettibile) con la radio Bluetooth della UNO Q.
-    Usa `btmgmt` di BlueZ (serve root o CAP_NET_ADMIN). Il beacon resta attivo e viene
-    aggiornato a ogni nuovo messaggio; quando MQTT torna sano viene spento con idle()."""
+    Usa `btmgmt` di BlueZ (serve root o CAP_NET_ADMIN). Fino a tre beacon insieme, uno per tipo di messaggio
+    (istanza 1 = AGG, 2 = HB, 3 = allarmi), così un allarme non cancella l'ultimo HB o AGG: BlueZ li trasmette
+    a rotazione. Ogni beacon resta acceso e viene aggiornato a ogni nuovo messaggio del suo tipo; quando MQTT torna
+    stabile si spengono tutti con idle().
+    TODO(verify) sulla UNO Q: rotazione di più istanze con btmgmt add-adv sul controller della scheda."""
 
-    INSTANCE = "1"
+    INSTANCES = {1: "1", 2: "2"}       # type C4-B -> istanza; tutti gli altri tipi (allarmi) -> "3"
+    ALARM_INSTANCE = "3"
     kind = "ble"
 
     def __init__(self, sudo=False, runner=None):
         self.prefix = ["sudo"] if sudo else []
         self.run = runner or self._run
         self.active = False
-        self.last_frame = None
+        self.frames = {}                   # istanza -> frame in onda adesso
         self.run(["btmgmt", "power", "on"])
 
     def _run(self, args):
@@ -127,18 +131,24 @@ class BleBackup:
 
     def send(self, payload: bytes, port: int = PORT_AGGREGATE) -> bool:
         frame = ble_frame(payload, port)
-        self.run(["btmgmt", "rm-adv", self.INSTANCE])
-        ok = self.run(["btmgmt", "add-adv", "-d", self.adv_data(frame), self.INSTANCE])
+        inst = self.INSTANCES.get(port, self.ALARM_INSTANCE)
+        if inst in self.frames:
+            self.run(["btmgmt", "rm-adv", inst])
+        ok = self.run(["btmgmt", "add-adv", "-d", self.adv_data(frame), inst])
         if ok:
-            self.active, self.last_frame = True, frame
-            log.info("[BLE] beacon aggiornato (%d byte): %s", len(frame), frame.hex().upper())
+            self.active, self.frames[inst] = True, frame
+            log.info("[BLE] beacon %s aggiornato (type %d): %s", inst, port, frame.hex().upper())
+        else:
+            self.frames.pop(inst, None)
         return ok
 
     def idle(self):
         if self.active:
-            self.run(["btmgmt", "rm-adv", self.INSTANCE])
+            for inst in sorted(self.frames):
+                self.run(["btmgmt", "rm-adv", inst])
+            self.frames.clear()
             self.active = False
-            log.info("[BLE] beacon spento: MQTT di nuovo sano")
+            log.info("[BLE] beacon spenti: MQTT di nuovo stabile")
 
 
 class NoBackup:

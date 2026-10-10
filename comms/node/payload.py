@@ -104,3 +104,20 @@ def pack_hb(ts, mode="normal", state=None, backlog=0, batt=None, disk_free_pct=N
 
 def pack_alarm(ts, code) -> bytes:
     return struct.pack(ALARM_FMT, int(ts), int(code) & 0xFF)
+
+
+ALARM_TYPES = ("incident", "tamper", "lamp_fault", "failsafe")   # eventi che sul backup partono subito
+
+
+def alarm_to_c4b(ev: dict):
+    """Evento C3/C5 di allarme -> (type C4-B, corpo da 5 byte); None se non è un allarme."""
+    t, ts = ev.get("type"), ev.get("ts") or 0
+    if t == "incident":
+        return TYPE_INCIDENT, pack_alarm(ts, INCIDENT_CODES.get(ev.get("kind"), 0))
+    if t == "tamper":
+        return TYPE_TAMPER, pack_alarm(ts, ev.get("code", 0))
+    if t == "lamp_fault":
+        return TYPE_FAULT, pack_alarm(ts, FAULT_CODES["lamp_fault"])
+    if t == "failsafe":
+        return TYPE_FAULT, pack_alarm(ts, FAULT_CODES["firmware_failsafe"])
+    return None

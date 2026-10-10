@@ -69,6 +69,16 @@ class Outbox:
             self._db.executemany("UPDATE events SET sent=1 WHERE seq=?", [(s,) for s in seqs])
             self._db.execute("COMMIT")
 
+    def unsent_alarms(self, after_seq: int, types=("incident", "tamper", "lamp_fault", "failsafe"), limit=50):
+        """[(seq, body)] degli allarmi non ancora confermati via MQTT con seq > after_seq: i più recenti `limit`,
+        in ordine di seq (vanno subito sul canale di backup)."""
+        q = ",".join("?" * len(types))
+        with self._lock:
+            rows = self._db.execute(
+                f"SELECT seq,body FROM events WHERE sent=0 AND seq>? AND type IN ({q}) ORDER BY seq DESC LIMIT ?",
+                (after_seq, *types, limit)).fetchall()
+        return rows[::-1]
+
     def backlog(self) -> int:
         with self._lock:
             return self._db.execute("SELECT COUNT(*) FROM events WHERE sent=0").fetchone()[0]

@@ -43,6 +43,9 @@ AGG_PERIOD_S = _env("AGG_PERIOD_S", 900, int)     # 15 min in produzione, 60 s p
 # --- Canale di backup (attivo solo quando MQTT non è sano) ---
 BACKUP_LINK = _env("BACKUP_LINK", "ble")          # "ble" (prototipo, radio integrata) | "lora" (Wio-E5 via MCU) | "none"
 BLE_SUDO = _env("BLE_SUDO", False, bool)          # True se il processo non gira come root
+BACKUP_ON_AFTER_S = _env("BACKUP_ON_AFTER_S", 30, float)    # acceso dopo 30 s senza PUBACK positivi
+BACKUP_OFF_AFTER_S = _env("BACKUP_OFF_AFTER_S", 60, float)  # spento dopo 60 s di MQTT stabile
+BACKUP_HB_S = _env("BACKUP_HB_S", 300, float)               # HB sul backup: 5 min (nella demo anche 30 s)
 
 # --- Sorgente eventi ---
 EVENT_SOURCE = _env("EVENT_SOURCE", "sim")        # "sim" (simulatore interno) | "c3" (file JSONL scritti da ai/ e da Actuator)

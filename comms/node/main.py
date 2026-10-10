@@ -3,7 +3,10 @@
   file C3/C5 (o simulatore) ──► Outbox (eMMC)        ← SEMPRE per primo
   loop ogni 0,2 s:
       uplink.pump()        outbox ──MQTT/TLS──► AWS IoT Core   (backfill automatico quando torna la rete)
-      aggregator.tick()    online: MQTT `agg` | offline: `AGG` 26 byte ──► BLE (demo) o Bridge ► MCU ► LoRa
+      aggregator.tick()    MQTT `agg` (finestre esatte, anche quelle maturate durante un blackout)
+      failover.tick()      30 s senza conferme MQTT -> backup ACCESO (BLE nella demo, LoRa in produzione):
+                           HB + AGG subito, poi HB periodico, AGG a ogni finestra, allarmi subito;
+                           60 s di MQTT stabile -> backup SPENTO
       hb ogni 10 s         MQTT `hb` retained (+ Last Will): dà conferme anche senza eventi
 La sicurezza non passa da qui: il semaforo lo comanda ai/ tramite comms/actuators.py e il firmware.
 """
@@ -16,6 +19,7 @@ import config as cfg
 from aggregator import Aggregator
 from backup_link import ON_UNO_Q, make_backup, make_mcu
 from event_source import make_source
+from failover import Failover
 from outbox import Outbox
 from payload import C4_VERSION
 from uplink_mqtt import MqttUplink
@@ -73,7 +77,10 @@ class Node:
                              cfg.MQTT_BATCH, cfg.MQTT_ACK_TIMEOUT_S,
                              cfg.MQTT_CA, cfg.MQTT_CERT, cfg.MQTT_KEY, cfg.MQTT_SESSION_EXPIRY_S,
                              cfg.MQTT_ACK_WINDOW_S, cfg.MQTT_NACK_BACKOFF_MAX_S, hb_provider=self.hb)
-        self.agg = Aggregator(self.ob, self.up, self.backup, cfg.AGG_PERIOD_S, cfg.NODE_ID, self.state)
+        self.agg = Aggregator(self.ob, self.up, cfg.AGG_PERIOD_S, cfg.NODE_ID, self.state)
+        self.failover = Failover(self.ob, self.up, self.backup, self.agg, self.state,
+                                 cfg.BACKUP_ON_AFTER_S, cfg.BACKUP_OFF_AFTER_S, cfg.BACKUP_HB_S,
+                                 disk_free=lambda: disk_free_pct(cfg.DB_PATH))
         self.source = make_source(cfg.EVENT_SOURCE, cfg.SIM_RATE_HZ, cfg.C3_DIR, self.ob)
         self._t_hb = self._t_prune = 0.0
         log.info("nodo %s | UNO Q=%s | broker %s:%d | backup=%s | sorgente=%s | backlog iniziale %d",
@@ -102,6 +109,7 @@ class Node:
         now = time.time()
         self.up.pump()
         self.agg.tick(now)
+        self.failover.tick(now)
         if now - self._t_hb >= cfg.HB_PERIOD_S:
             hb = self.hb(now)
             self.up.publish("hb", hb, retain=True)
