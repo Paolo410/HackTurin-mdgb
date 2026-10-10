@@ -97,7 +97,7 @@ AHT20 e sensore di luce. Il modulo LoRa (Wio-E5) serve solo più avanti.
 | Chi | Cosa riceve | Come |
 |---|---|---|
 | Sviluppatori | tutto il repo | `git pull` |
-| Arduino UNO Q | solo il codice che gira sulla scheda: la rete in `~/mdgb/comms` (Lorenzo) e la visione in `~/mdgb/ai` (Paolo); il firmware sull'MCU (Salvatore) | `comms/deploy/push_to_arduino.sh` per la rete; Paolo e Salvatore per le loro parti |
+| Arduino UNO Q | solo il codice che gira sulla scheda: la rete in `~/HackTurin-mdgb/comms` (Lorenzo) e la visione in `~/HackTurin-mdgb/ai` (Paolo); il firmware sull'MCU (Salvatore) | `comms/deploy/push_to_arduino.sh` per la rete; Paolo e Salvatore per le loro parti |
 | Centralino (PC) | solo l'app, `MDGB-Centrale-mac.zip` (broker incluso) | `./app/desktop/build_mac.sh` sul Mac dello sviluppatore, poi lo zip via AirDrop/chiavetta |
 
 Il centralino apre l'app (la prima volta clic destro → Apri), consente Bluetooth e connessioni in entrata. In alto compare
@@ -111,25 +111,27 @@ L'UNO Q ha Linux (Debian) a bordo. Serve una volta sola:
    Sulla scheda `hostname -I` dice il suo indirizzo. Se la rete della sede isola i dispositivi (il PC non vede la scheda),
    usate l'hotspot di un telefono o un router vostro per PC e scheda.
 2. **Accesso**: dal PC `ssh arduino@<IP della scheda>` (utente e password scelti al primo avvio; `TODO(verify)` il nome utente).
-3. **Rete (Lorenzo)**: dal PC dello sviluppatore, nella cartella del repo. Copia in `~/mdgb/comms` solo i file della rete,
-   crea `~/venv` e installa le dipendenze (serve Internet sulla scheda la prima volta):
+   **Cartella comune: `~/HackTurin-mdgb`** (la usa anche la guida di Paolo, `ai/docs/DEPLOY_UNOQ.md`). La visione scrive
+   gli eventi in `~/HackTurin-mdgb/logs/c3/` e la rete li legge da lì: le due parti devono stare nella stessa cartella.
+3. **Rete (Lorenzo)**: se sulla scheda c'è già il repo clonato (guida di Paolo), `comms/` c'è già: basta installare le
+   dipendenze (`~/venv/bin/pip install -r ~/HackTurin-mdgb/comms/requirements.txt`). Altrimenti, o per aggiornare solo la
+   rete, dal PC dello sviluppatore nella cartella del repo (copia solo i file della rete, crea `~/venv`, installa le dipendenze):
    ```bash
    ./comms/deploy/push_to_arduino.sh arduino@<IP della scheda>
    ```
-   Senza ssh: `./comms/deploy/push_to_arduino.sh --pack` crea `mdgb-nodo.tar.gz` da copiare e scompattare in `~/mdgb`.
-4. **Visione (Paolo)**: il codice di `ai/` va in `~/mdgb/ai`, accanto a `comms`, con le sue dipendenze
-   (`~/venv/bin/pip install -r ~/mdgb/ai/requirements.txt`). Così scrive gli eventi in `~/mdgb/logs/c3/` e importa
-   `comms.actuators`. Il modello (`ai/models/`) si copia a parte.
-5. **Configurazione della rete**: `nano ~/mdgb/comms/.env` e in `MQTT_HOST` scrivi l'IP mostrato dall'app sul PC.
+   Senza ssh: `./comms/deploy/push_to_arduino.sh --pack` crea `mdgb-nodo.tar.gz` da copiare e scompattare in `~/HackTurin-mdgb`.
+4. **Visione (Paolo)**: segue `ai/docs/DEPLOY_UNOQ.md` (repo in `~/HackTurin-mdgb`, stesso `~/venv`, modello e
+   calibrazione copiati a parte, servizio `ai/deploy/mdgb-ai.service`).
+5. **Configurazione della rete**: `nano ~/HackTurin-mdgb/comms/.env` e in `MQTT_HOST` scrivi l'IP mostrato dall'app sul PC.
 6. **Prima prova del Bluetooth** (2 minuti): sulla scheda
-   `cd ~/mdgb && sudo ~/venv/bin/python -m comms.tools.ble_beacon_test --seconds 60`; sul PC dello sviluppatore, nello
+   `cd ~/HackTurin-mdgb && sudo ~/venv/bin/python -m comms.tools.ble_beacon_test --seconds 60`; sul PC dello sviluppatore, nello
    stesso momento, `python app/ble_receiver.py --node nodo01 --dry-run` deve stampare un heartbeat ogni 5 s.
 7. **Avvio**: tre programmi sulla scheda.
    - firmware sull'MCU: lo carica Salvatore (App Lab o Arduino IDE);
-   - visione: `cd ~/mdgb/ai && PYTHONPATH=.. ~/venv/bin/python -m smartcrossing.app --profile unoq --headless` (Paolo);
-   - rete: `sudo ~/venv/bin/python ~/mdgb/comms/node/main.py`.
+   - visione: `cd ~/HackTurin-mdgb/ai && PYTHONPATH=.. ~/venv/bin/python -m smartcrossing.app --profile unoq --headless` (Paolo);
+   - rete: `sudo ~/venv/bin/python ~/HackTurin-mdgb/comms/node/main.py`.
 
-   Finché la visione non scrive i suoi file, al suo posto: `cd ~/mdgb && ~/venv/bin/python -m comms.tools.c3_sim --rate 1 --duration 7200`.
+   Finché la visione non scrive i suoi file, al suo posto: `cd ~/HackTurin-mdgb && ~/venv/bin/python -m comms.tools.c3_sim --rate 1 --duration 7200`.
    Avvio automatico della rete all'accensione: `comms/deploy/mdgb-comms.service`.
 
 ## 8. Dal nodo simulato a quello vero
@@ -173,6 +175,10 @@ Per la demo davanti alla giuria si può anche spegnere davvero il Wi-Fi della sc
 
 ## 10. Cosa manca (comms)
 
+- **`BridgeActuator`**: il servizio della visione sulla scheda (`ai/deploy/mdgb-ai.service`) usa `--actuator bridge`, che
+  oggi non c'è (`comms/actuators.py` ha solo `sim` e `serial`). Va fatto con Salvatore appena il firmware espone le
+  funzioni Bridge (proposta: `mdgb_line` e `mcu_event`, vedi `docs/CONTRACTS.md`). Fino ad allora la visione sulla scheda
+  va lanciata con `--actuator sim`: rete e centrale funzionano lo stesso, il semaforo resta nel suo ciclo normale (fail-safe).
 - Prove su hardware vero: Bluetooth della UNO Q (permessi, portata), rete della sede.
 - `BridgeActuator` (comandi via Bridge sulla UNO Q), insieme a Salvatore.
 - Backup LoRa e broker in cloud: dopo l'hackathon, stesso codice.
