@@ -24,7 +24,13 @@ class TrackState:
     last_frame: int = 0
     age: int = 0                                   # frames in which the track was seen
     history: deque = field(default_factory=deque)  # (t, x_bottom_center, y_bottom) in frame pixels
-    class_votes: Counter = field(default_factory=Counter)
+    class_votes: Counter = field(default_factory=Counter)   # COCO class id per frame
+    role_votes: Counter = field(default_factory=Counter)    # role per frame, see derive.py
+
+    @property
+    def role(self) -> str | None:
+        """Majority role over the life of the track (pedestrian, cyclist, car, ...)."""
+        return self.role_votes.most_common(1)[0][0] if self.role_votes else None
 
     @property
     def class_id(self) -> int:
@@ -74,6 +80,23 @@ class Tracker:
             state.class_votes[int(class_id)] += 1
         self._drop_stale()
         return tracked
+
+    def vote_roles(self, tracked: sv.Detections, roles: list[str]) -> list[str]:
+        """Adds this frame's role of each track and returns the majority role of each one."""
+        if tracked.tracker_id is None:
+            return []
+        out = []
+        for track_id, role in zip(tracked.tracker_id, roles):
+            state = self.tracks[int(track_id)]
+            state.role_votes[role] += 1
+            out.append(state.role)
+        return out
+
+    def class_names(self, tracked: sv.Detections) -> list[str]:
+        """Majority COCO class name of each tracked detection."""
+        if tracked.tracker_id is None:
+            return []
+        return [self.tracks[int(i)].class_name for i in tracked.tracker_id]
 
     def is_valid(self, track_id: int) -> bool:
         """A track counts only after min_track_age frames."""
