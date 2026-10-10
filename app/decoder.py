@@ -1,5 +1,5 @@
 """Decoder lato centrale dei messaggi di backup C4-B (docs/CONTRACTS.md v1), stesso layout di
-comms/node/payload.py e di ttn_formatter.js. È volutamente indipendente dal codice del nodo: i test verificano
+comms/node/payload.py. È volutamente indipendente dal codice del nodo: i test verificano
 che coincidano. I frame BLE hanno zeri in coda: per ogni tipo si leggono solo i byte che servono."""
 import struct
 

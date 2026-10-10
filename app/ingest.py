@@ -39,7 +39,8 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _load_dotenv(path):
-    """Legge KEY=VALUE da app/.env (ignorato da git) senza sovrascrivere le variabili già impostate."""
+    """Facoltativo, solo da terminale: legge KEY=VALUE da app/.env (ignorato da git) senza sovrascrivere
+    le variabili già impostate. L'app per il PC usa invece il suo config.env (app/desktop/centrale_app.py)."""
     try:
         with open(path) as f:
             for line in f:
