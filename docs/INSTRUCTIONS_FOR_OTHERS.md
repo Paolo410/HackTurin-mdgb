@@ -132,7 +132,32 @@ L'UNO Q ha Linux (Debian) a bordo. Serve una volta sola:
    Finché la visione non scrive i suoi file, al suo posto: `cd ~/mdgb && ~/venv/bin/python -m comms.tools.c3_sim --rate 1 --duration 7200`.
    Avvio automatico della rete all'accensione: `comms/deploy/mdgb-comms.service`.
 
-## 8. Prova completa "Wi-Fi spento / riacceso"
+## 8. Dal nodo simulato a quello vero
+
+Il nodo vero è **`nodo01`**: in `app/nodes.json` è l'unica camera con `mock: false`, e sulla scheda `comms/.env` ha
+`NODE_ID=nodo01`. La sua posizione sulla mappa si cambia dall'app (pulsante **Cartella** → `nodes.json`, `lat`/`lon`).
+La rete e l'app restano uguali in tutte le fasi: cambia solo chi produce gli eventi.
+
+| Fase | Cosa gira sulla scheda | Cosa si vede nell'app |
+|---|---|---|
+| Oggi (sviluppo sul PC) | niente: nodo simulato sul PC (`EVENT_SOURCE=sim`) | `nodo01` verde, eventi finti |
+| Scheda con la rete, senza visione | `comms/node/main.py` + `comms.tools.c3_sim` | `nodo01` verde, eventi finti ma via Wi-Fi e Bluetooth veri |
+| Visione pronta (Paolo) | `comms/node/main.py` + `smartcrossing.app` (si toglie `c3_sim`) | conteggi, incidenti, near-miss, precedenza e stato del semaforo **veri** |
+| Firmware pronto (Salvatore) | in più l'MCU manda le righe C5 tramite `comms/actuators.py` | batteria, ambiente, manomissione, guasto lampada e fail-safe **veri** |
+
+Chi produce cosa nella dashboard:
+
+| Nella dashboard | Da dove arriva |
+|---|---|
+| traffico (pedoni, ciclisti, veicoli, animali), incidenti, near-miss, precedenza, pedoni vulnerabili | Paolo, righe C3 in `logs/c3/` |
+| stato del semaforo e FPS | Paolo, riga `status` ogni ~5 s |
+| batteria, temperatura/umidità/luce, manomissione, guasto lampada, fail-safe | Salvatore, righe C5 dell'MCU |
+| canale (Wi-Fi o Bluetooth), coda, eventi persi, doppioni, diagnosi "rete giù / nodo sano / ..." | Lorenzo, la rete |
+
+Le camere `nodo02`…`nodo05` sono il mockup: restano grigie ("mockup, nessun dato"). Per la demo si possono accendere con
+nodi simulati sul PC (vedi `app/README.md`) oppure togliere da `nodes.json`.
+
+## 9. Prova completa "Wi-Fi spento / riacceso"
 
 | Passo | Dove | Cosa | Cosa si vede nell'app |
 |---|---|---|---|
@@ -146,7 +171,7 @@ L'UNO Q ha Linux (Debian) a bordo. Serve una volta sola:
 Per la demo davanti alla giuria si può anche spegnere davvero il Wi-Fi della scheda (cade anche ssh):
 `sudo nohup sh -c 'nmcli radio wifi off; sleep 120; nmcli radio wifi on' &` (`TODO(verify)`: `nmcli` sulla UNO Q).
 
-## 9. Cosa manca (comms)
+## 10. Cosa manca (comms)
 
 - Prove su hardware vero: Bluetooth della UNO Q (permessi, portata), rete della sede.
 - `BridgeActuator` (comandi via Bridge sulla UNO Q), insieme a Salvatore.
