@@ -21,7 +21,7 @@ l'app della centrale. Il codice è lo stesso: in produzione basta puntare un bro
 | Diagnosi | Incrociando MQTT e backup: OK / rete giù, nodo sano / nodo guasto / Linux bloccato / manomissione / batteria scarica / nodo spento o distrutto |
 | Chi ha cosa | Sviluppatori: tutto il repo. Arduino: solo la rete (`comms/deploy/push_to_arduino.sh`) accanto alla visione di Paolo, in `~/HackTurin-mdgb`. Centralino: solo lo zip dell'app (Mac o Windows) |
 | Mappa | Vettoriale (MapLibre + OpenFreeMap, gratis, senza chiave), stile chiaro/scuro/dettagliato; senza Internet mappa schematica. Google Maps solo con una chiave (facoltativo) |
-| Privacy | Nessuna immagine esce dal nodo: solo metadati anonimi |
+| Privacy | Solo metadati anonimi verso la centrale. Unica eccezione (specifica §5.3): il video **dal vivo** della camera nell'app, in rete locale, se abilitato e mai registrato |
 | Fuori scope | 4G / seconda SIM (solo nel pitch); LoRa (dopo la demo) |
 
 ## 2. Parametri e numeri

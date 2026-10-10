@@ -11,6 +11,8 @@ Contratti: [`docs/CONTRACTS.md`](../docs/CONTRACTS.md). Cosa devono fare gli alt
 - clic su una camera: stato, canale (Wi-Fi o Bluetooth con il segnale), coda di eventi in attesa, batteria, semaforo,
   traffico per finestra di tempo, sicurezza (precedenza data, near-miss, pedoni vulnerabili), allarmi, link
   "Apri in Google Maps" e "Apri in Mappe";
+- **video dal vivo** della camera con i riconoscimenti, se la visione lo trasmette (campo `video` in `nodes.json`): si apre
+  solo con un clic, si chiude cambiando camera e non viene mai registrato;
 - tutti gli allarmi e i numeri della rete: eventi ricevuti, **eventi persi (deve restare 0)**, doppioni scartati;
 - in alto: MQTT connesso o no, Bluetooth in ascolto o no, e l'**indirizzo da dare all'Arduino** (`Arduino â†’ 192.168.x.y:1883`).
 
@@ -72,7 +74,7 @@ Pulsanti **Configurazione** e **Cartella** in alto nella finestra. La cartella Ã
 | File | Cosa |
 |---|---|
 | `config.env` | broker (locale o cloud), Bluetooth, porta della dashboard, chiave di Google Maps. Dopo una modifica, riapri l'app |
-| `nodes.json` | camere sulla mappa: `id` (= `NODE_ID` dell'Arduino), nome, `lat`, `lon`, profilo, `mock: true` per le camere di esempio. Si modifica anche ad app aperta |
+| `nodes.json` | camere sulla mappa: `id` (= `NODE_ID` dell'Arduino), nome, `lat`, `lon`, profilo, `mock: true` per le camere di esempio, `video` (facoltativo: indirizzo dello stream dal vivo, es. `http://192.168.1.50:8090/stream.mjpg`). Si modifica anche ad app aperta |
 | `certs/` | solo con un broker in cloud: certificati TLS della centrale |
 | `central.db`, `centrale.log` | database e log della centrale |
 
