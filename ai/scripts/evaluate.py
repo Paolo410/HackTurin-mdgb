@@ -32,6 +32,32 @@ SNAPSHOT_WIDTH = 960
 JPEG_QUALITY = 82
 
 
+class Stabilizer:
+    """Brings every frame of a hand-held video back onto the first one (shift, rotation, zoom).
+
+    The product has a fixed camera and one calibration; a test video shot by hand needs this first.
+    """
+
+    def __init__(self, reference: np.ndarray):
+        self.gray = cv2.cvtColor(reference, cv2.COLOR_BGR2GRAY)
+        self.points = cv2.goodFeaturesToTrack(self.gray, 500, 0.01, 8)
+        self.last = np.eye(2, 3, dtype=np.float64)
+        self.max_shift = 0.0
+
+    def apply(self, frame: np.ndarray) -> np.ndarray:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        moved, status, _ = cv2.calcOpticalFlowPyrLK(self.gray, gray, self.points, None, winSize=(31, 31), maxLevel=4)
+        good = status.ravel() == 1
+        if good.sum() >= 20:
+            matrix, _ = cv2.estimateAffinePartial2D(moved[good], self.points[good], method=cv2.RANSAC,
+                                                    ransacReprojThreshold=3.0)
+            if matrix is not None:
+                self.last = matrix
+        self.max_shift = max(self.max_shift, float(np.hypot(self.last[0, 2], self.last[1, 2])))
+        height, width = frame.shape[:2]
+        return cv2.warpAffine(frame, self.last, (width, height), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
+
+
 def percentile(values: list[float], q: float) -> float | None:
     return float(np.percentile(values, q)) if values else None
 
@@ -61,6 +87,11 @@ def main() -> int:
     p.add_argument("--site", choices=["urbano", "lungofiume", "collina"])
     p.add_argument("--snapshots", type=int, default=4, help="frames saved at regular intervals")
     p.add_argument("--max-event-snapshots", type=int, default=6, help="extra frames saved on state changes and events")
+    p.add_argument("--save-video", action="store_true",
+                   help="also write the annotated video (test footage only: it stores frames)")
+    p.add_argument("--video-step", type=int, default=2, help="write one frame out of N in the annotated video")
+    p.add_argument("--stabilize", action="store_true",
+                   help="hand-held video: align every frame to the first one before processing")
     p.add_argument("--set", action="append", default=[], metavar="section.key=value",
                    help="override a config value, e.g. --set model.conf=0.25")
     args = p.parse_args()
@@ -95,6 +126,8 @@ def main() -> int:
     frames_seen: Counter = Counter()
     valid_ids: set[int] = set()
     speed_samples: dict[int, list[float]] = {}
+    height_of: dict[int, float] = {}
+    box_px: dict[int, list[float]] = {}
     role_of: dict[int, str] = {}
     flags_of: dict[int, set] = {}
     first_box: dict[int, list[float]] = {}
@@ -107,12 +140,19 @@ def main() -> int:
     t0 = last_t = None
     last_state = None
     frames = 0
+    stabilizer = None
+    writer = None
 
     while True:
         item = source.read()
         if item is None:
             break
         frame, t = item
+        if args.stabilize:
+            if stabilizer is None:
+                stabilizer = Stabilizer(frame)
+            else:
+                frame = stabilizer.apply(frame)
         result = pipeline.step(frame, t)
         if t0 is None:
             t0 = t
@@ -139,11 +179,14 @@ def main() -> int:
                 if ok:
                     valid_ids.add(track_id)
                     role_of[track_id] = role
+                    box_px.setdefault(track_id, []).append(float(xyxy[3] - xyxy[1]))
                     state = pipeline.tracker.tracks.get(track_id)
                     if state is not None:
                         if state.speed_samples > 0:
                             speed_samples.setdefault(track_id, []).append(state.speed)
                         flags_of[track_id] = {flag for flag in ("child", "slow") if state.attrs.get(flag)}
+                        if state.heights:
+                            height_of[track_id] = float(median(state.heights))
         command = result.command
         if last_t is not None:
             state_time[last_state] += t - last_t
@@ -158,6 +201,12 @@ def main() -> int:
             if event["type"] != "crossing" or reason is None:
                 reason = reason or f"{event.get('kind', event['type'])}"
 
+        if args.save_video and frames % max(1, args.video_step) == 0:
+            view = annotate(frame, result, pipeline, cfg, f"{name}  t={rel:.1f}s  input {pipeline.detector.input_label}")
+            if writer is None:
+                writer = cv2.VideoWriter(str(out / f"{name}_annotato.mp4"), cv2.VideoWriter_fourcc(*"mp4v"),
+                                         (source.fps or 30.0) / max(1, args.video_step), (view.shape[1], view.shape[0]))
+            writer.write(view)
         save_regular = frames in regular
         if save_regular or (reason is not None and extra_left > 0 and frames > 0):
             if not save_regular:
@@ -171,18 +220,26 @@ def main() -> int:
                               "state": command["state"]})
         frames += 1
     source.release()
+    if writer is not None:
+        writer.release()
 
     lifetimes = [last_seen[i] - first_seen[i] for i in valid_ids]
     roles = Counter()
     speeds_by_role: dict[str, list[float]] = {}
+    heights_by_role: dict[str, list[float]] = {}
+    box_px_by_role: dict[str, list[float]] = {}
     attributes = Counter()
     for track_id in valid_ids:
         role = role_of.get(track_id, "?")
         roles[role] += 1
         if track_id in speed_samples and len(speed_samples[track_id]) >= 5:
             speeds_by_role.setdefault(role, []).append(median(speed_samples[track_id]) * KMH)
+        if track_id in height_of:
+            heights_by_role.setdefault(role, []).append(height_of[track_id])
+        box_px_by_role.setdefault(role, []).append(median(box_px[track_id]))
         for flag in flags_of.get(track_id, ()):
             attributes[flag] += 1
+    camera = pipeline.geometry.camera if pipeline.geometry and pipeline.geometry.metric else None
     duration = (last_t - t0) if frames > 1 else 0.0
     total_mean = float(np.mean(totals)) if totals else None
     report = {
@@ -193,7 +250,11 @@ def main() -> int:
                 "threads": int(cfg["model"]["intra_op_num_threads"]), "conf": cfg["model"]["conf"],
                 "frames_processed": frames, "processed_fps": round(source.fps, 1),
                 "calib": calib_path.name, "metric": bool(pipeline.geometry and pipeline.geometry.metric),
-                "site": pipeline.animals.site_name, "overrides": args.set},
+                "site": pipeline.animals.site_name, "overrides": args.set,
+                # Worked out from the calibration: a height or a focal length that make no sense = bad calibration.
+                "camera": {"height_m": round(camera["height_m"], 1), "focal_px": round(camera["focal_px"])} if camera else None,
+                "stabilized": args.stabilize,
+                "max_camera_shift_px": round(stabilizer.max_shift, 1) if stabilizer else None},
         "timing_ms": {phase: {"mean": round(float(np.mean(v)), 2), "p95": round(percentile(v, 95), 2)}
                       for phase, v in lat.items() if v},
         "total_ms": {"mean": round(total_mean, 2) if total_mean else None,
@@ -210,10 +271,17 @@ def main() -> int:
         "roles": dict(roles.most_common()),
         "speed_kmh": {role: {"n": len(v), "median": round(median(v), 1), "p95": round(percentile(v, 95), 1),
                              "max": round(max(v), 1)} for role, v in sorted(speeds_by_role.items())},
+        # Estimated height: adults around 1.7 m tell that the calibration is good.
+        "height_m": {role: {"n": len(v), "median": round(median(v), 2), "p10": round(percentile(v, 10), 2),
+                            "p90": round(percentile(v, 90), 2)} for role, v in sorted(heights_by_role.items())},
+        # Height of the boxes in pixels of the video: how large the objects are for the detector.
+        "box_height_px": {role: {"median": round(median(v)), "p10": round(percentile(v, 10)), "p90": round(percentile(v, 90))}
+                          for role, v in sorted(box_px_by_role.items())},
         "attributes": dict(attributes),
         "tracks": [{"id": i, "role": role_of.get(i, "?"), "t0": round(first_seen[i], 2), "t1": round(last_seen[i], 2),
                     "frames": frames_seen[i], "from": first_box[i], "to": last_box[i],
                     "kmh": round(median(speed_samples[i]) * KMH, 1) if len(speed_samples.get(i, [])) >= 5 else None,
+                    "height_m": round(height_of[i], 2) if i in height_of else None,
                     "flags": sorted(flags_of.get(i, ()))}
                    for i in sorted(valid_ids, key=lambda k: first_seen[k])],
         "counts": pipeline.counter.counts if pipeline.counter else {},
