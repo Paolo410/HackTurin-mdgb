@@ -17,11 +17,13 @@ App:           macOS  app/desktop/build_mac.sh -> "MDGB Centrale.app"
 Autotest:      "MDGB Centrale" --selftest   avvia broker, centrale e dashboard senza finestra, li controlla ed esce
                (codice 0 = tutto ok); usato dagli script di build.
 """
+import atexit
 import json
 import logging
 import os
 import re
 import shutil
+import signal
 import socket
 import subprocess
 import sys
@@ -125,8 +127,56 @@ def find_mosquitto():
     return None
 
 
+def _is_mosquitto(pid):
+    try:
+        if WINDOWS:
+            out = subprocess.run(["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True,
+                                 creationflags=subprocess.CREATE_NO_WINDOW).stdout
+        else:
+            out = subprocess.run(["ps", "-p", str(pid), "-o", "comm="], capture_output=True, text=True).stdout
+        return "mosquitto" in out.lower()
+    except OSError:
+        return False
+
+
+def stop_stale_broker(home):
+    """Se l'app era stata chiusa di colpo (Cmd-Q, uscita forzata, crash) il suo Mosquitto può essere rimasto acceso:
+    lo si ferma, dopo aver controllato che quel processo sia davvero Mosquitto."""
+    pidf = os.path.join(home, "mosquitto.pid")
+    try:
+        with open(pidf) as f:
+            pid = int(f.read().strip())
+    except (OSError, ValueError):
+        return
+    if _is_mosquitto(pid):
+        try:
+            os.kill(pid, signal.SIGTERM)
+            log.info("fermato il broker rimasto acceso dall'avvio precedente (pid %d)", pid)
+            time.sleep(0.5)
+        except OSError:
+            pass
+    try:
+        os.remove(pidf)
+    except OSError:
+        pass
+
+
+def stop_broker(proc, home):
+    if proc is not None and proc.poll() is None:
+        proc.terminate()
+        try:
+            proc.wait(5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+    try:
+        os.remove(os.path.join(home, "mosquitto.pid"))
+    except OSError:
+        pass
+
+
 def ensure_local_broker(home, port):
     """Modalità locale: se nessun broker risponde sulla porta, avvia Mosquitto (aperto alla rete locale, per i nodi)."""
+    stop_stale_broker(home)
     if port_open(port):
         log.info("broker locale già attivo sulla porta %d", port)
         return None
@@ -143,6 +193,9 @@ def ensure_local_broker(home, port):
     flags = subprocess.CREATE_NO_WINDOW if WINDOWS else 0           # su Windows niente finestra nera
     proc = subprocess.Popen([exe, "-c", conf], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                             creationflags=flags)
+    with open(os.path.join(home, "mosquitto.pid"), "w") as f:
+        f.write(str(proc.pid))
+    atexit.register(stop_broker, proc, home)          # anche se l'uscita non passa dalla finestra
     for _ in range(30):
         if port_open(port):
             break
@@ -230,9 +283,7 @@ def main():
     finally:
         log.info("chiusura: fermo la centrale")
         c.stop()
-        if broker is not None:
-            broker.terminate()
-            broker.wait(5)
+        stop_broker(broker, home)
     return 0 if ok else 1
 
 
