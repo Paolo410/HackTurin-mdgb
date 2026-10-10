@@ -15,6 +15,7 @@ import supervision as sv
 from .detector import COCO_CLASSES
 from .geometry import Geometry, build_metric_calib
 from .pipeline import Pipeline
+from .thermal import SimThermalSource, ThermalFusion
 
 FRAME_SIZE = (1281, 721)   # width, height of the virtual camera
 # The stripes as the virtual camera sees them from the pavement: near kerb (1, 2), far kerb (3, 4).
@@ -130,19 +131,38 @@ def car_yields() -> tuple[list[Actor], float]:
     return [Actor("person", 1.75, 0.5, lambda t: (2.0, -0.7)), Actor("car", 1.5, 4.4, car)], 16.0
 
 
+def night_pedestrian_seen_by_heat() -> tuple[list[Actor], float, dict]:
+    """At night the camera misses a pedestrian at the kerb; the thermal camera sees him, then a car arrives."""
+    car = Actor("car", 1.5, 4.4, drive(x0=-110.0, y=1.75, speed=50 / KMH, t0=8.0, x_end=40.0))
+    warm = lambda t: [2, 3] if t >= 6.0 else []          # somebody in the near waiting zone from t = 6 s
+    return [car], 20.0, {"thermal_script": warm, "luminance": 12.0}
+
+
 SCENARIOS = {
     "elderly_fast_car": elderly_and_fast_car,
     "pedestrian_crossing": pedestrian_crossing,
     "loose_dog_and_leashed_dog": loose_dog_and_leashed_dog,
     "car_yields": car_yields,
+    "night_pedestrian_seen_by_heat": night_pedestrian_seen_by_heat,
 }
 
 
 def run_actors(cfg: dict, actors: list[Actor], duration: float, fps: float = 10.0, actuator=None,
                realtime: bool = False, site: str | None = None,
-               on_step: Callable[[float, "object", Pipeline], None] | None = None) -> Pipeline:
-    """Runs the actors through the pipeline (no detector). on_step gets (t, FrameResult, pipeline)."""
-    pipeline = Pipeline(cfg, frame_rate=fps, calib=demo_calib(cfg), actuator=actuator, load_detector=False, site=site)
+               on_step: Callable[[float, "object", Pipeline], None] | None = None,
+               thermal_script: Callable[[float], list[int]] | None = None,
+               luminance: float | None = None) -> Pipeline:
+    """Runs the actors through the pipeline (no detector). on_step gets (t, FrameResult, pipeline).
+
+    thermal_script(t) -> warm columns of the thermal camera; luminance = brightness of the virtual image.
+    """
+    clock = {"t": 0.0}
+    thermal = None
+    if thermal_script is not None:
+        source = SimThermalSource(cfg, script=thermal_script, clock=lambda: clock["t"])
+        thermal = ThermalFusion(cfg, source)
+    pipeline = Pipeline(cfg, frame_rate=fps, calib=demo_calib(cfg), actuator=actuator, load_detector=False,
+                        site=site, thermal=thermal)
     pipeline._setup_size(*FRAME_SIZE)
     if pipeline.commander is not None and realtime:
         pipeline.commander.start()
@@ -153,7 +173,8 @@ def run_actors(cfg: dict, actors: list[Actor], duration: float, fps: float = 10.
             delay = start + t - time.monotonic()
             if delay > 0:
                 time.sleep(delay)
-        result = pipeline.process(detections_at(actors, t, pipeline.geometry), t, FRAME_SIZE)
+        clock["t"] = t
+        result = pipeline.process(detections_at(actors, t, pipeline.geometry), t, FRAME_SIZE, luminance=luminance)
         if on_step is not None:
             on_step(t, result, pipeline)
     return pipeline
@@ -162,6 +183,8 @@ def run_actors(cfg: dict, actors: list[Actor], duration: float, fps: float = 10.
 def run_scenario(cfg: dict, name: str, fps: float = 10.0, actuator=None, realtime: bool = False,
                  site: str | None = None, on_step: Callable[[float, dict, Pipeline], None] | None = None) -> Pipeline:
     """Runs a named scenario. on_step gets (t, C1 command, pipeline). Returns the pipeline for inspection."""
-    actors, duration = SCENARIOS[name]()
+    made = SCENARIOS[name]()
+    actors, duration = made[0], made[1]
+    extra = made[2] if len(made) > 2 else {}
     step = (lambda t, result, pipeline: on_step(t, result.command, pipeline)) if on_step else None
-    return run_actors(cfg, actors, duration, fps, actuator, realtime, site, step)
+    return run_actors(cfg, actors, duration, fps, actuator, realtime, site, step, **extra)

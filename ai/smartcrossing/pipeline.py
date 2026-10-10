@@ -15,7 +15,7 @@ from .detector import Detector
 from .events import EventDetector, approach_distance
 from .geometry import Geometry
 from .rules import WAITING_ZONES, PedestrianInfo, RuleEngine, Scene, VehicleInfo
-from .sources import frame_fault
+from .sources import frame_fault, mean_luminance
 from .tracking import Tracker
 
 # Phases reported on screen and in the C3 status event.
@@ -70,10 +70,12 @@ def build_scene(tracker: Tracker, tracked: sv.Detections, roles: list[str], vali
 
 class Pipeline:
     def __init__(self, cfg: dict, frame_rate: float = 0.0, calib: dict | None = None, actuator=None,
-                 detector: Detector | None = None, load_detector: bool = True, site: str | None = None):
+                 detector: Detector | None = None, load_detector: bool = True, site: str | None = None,
+                 thermal=None):
         """calib: content of calib.json (None = no counting, no rules geometry).
         actuator: where C1/C2 go (None = decide but do not send).
         site: urbano | lungofiume | collina (None = the default of config.yaml).
+        thermal: a thermal.ThermalFusion, or None without a thermal camera.
         """
         from .actuator import Commander   # local import: actuator.py does not depend on the pipeline
 
@@ -89,6 +91,8 @@ class Pipeline:
         self.rules = RuleEngine(cfg)
         self.animals = AnimalMonitor(cfg, site)
         self.events = EventDetector(cfg)
+        self.thermal = thermal
+        self.luminance: float | None = None       # mean brightness of the last checked frame
         self.commander = Commander(actuator, cfg) if actuator is not None else None
         self.selfcheck_every = max(1, int(cfg["selfcheck"]["every_n_frames"]))
         self.fault: str | None = None             # last result of the camera self-check
@@ -114,6 +118,7 @@ class Pipeline:
         run_detector = self._frame % self.detect_every_n == 0
         if self._frame % self.selfcheck_every == 0:
             self.fault = frame_fault(frame, self.cfg)
+            self.luminance = mean_luminance(frame)
         detections, detect_ms = None, None
         if run_detector:
             t0 = perf_counter()
@@ -122,8 +127,11 @@ class Pipeline:
         return self.process(detections, t, (width, height), frame, detect_ms)
 
     def process(self, detections: sv.Detections | None, t: float, frame_size: tuple[int, int],
-                frame: np.ndarray | None = None, detect_ms: float | None = None) -> FrameResult:
+                frame: np.ndarray | None = None, detect_ms: float | None = None,
+                luminance: float | None = None) -> FrameResult:
         """Everything after the detector. detections=None holds the last tracks (detector skipped)."""
+        if luminance is not None:
+            self.luminance = luminance
         self._setup_size(*frame_size)
         self._frame += 1
         self._last_frame_t = t
@@ -155,6 +163,8 @@ class Pipeline:
             events += self.events.update(self.tracker, self._last, self._last_roles, valid, self.geometry, t)
         else:
             self.scene.animals, self.scene.animal_margin_m = self._animals, self.animals.margin_m
+        if self.thermal is not None:
+            self.thermal.update(self.scene, t, self.luminance)   # adds who only the thermal camera sees
         self._command = self.rules.step(self.scene, t)
         t3 = perf_counter()
         sent = self.commander.update(self._command) if self.commander is not None else False

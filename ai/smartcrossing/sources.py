@@ -37,6 +37,11 @@ def frame_fault(frame: np.ndarray, cfg: dict) -> str | None:
     return None
 
 
+def mean_luminance(frame: np.ndarray) -> float:
+    """Mean grey level of the frame, 0..255: how bright the scene is."""
+    return float(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).mean())
+
+
 class FrameSource:
     """Yields (frame, t) pairs.
 

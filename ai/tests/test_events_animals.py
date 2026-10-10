@@ -73,7 +73,7 @@ def test_small_cat_is_only_logged():
 def test_dog_next_to_a_person_raises_no_alarm():
     leashed_seen = []
     from smartcrossing.sim import SCENARIOS
-    actors, _ = SCENARIOS["loose_dog_and_leashed_dog"]()
+    actors = SCENARIOS["loose_dog_and_leashed_dog"]()[0]
     states = []
 
     def on_step(t, result, pipeline):
@@ -86,7 +86,7 @@ def test_dog_next_to_a_person_raises_no_alarm():
 
 def run_args(name, until):
     from smartcrossing.sim import SCENARIOS
-    actors, _ = SCENARIOS[name]()
+    actors = SCENARIOS[name]()[0]
     return actors, until
 
 

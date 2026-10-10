@@ -132,6 +132,23 @@ logger:
   rotate_s: 3600                  # a new file every hour
   status_every_s: 5.0             # period of the "status" event
 
+thermal:                          # optional, --thermal; sensor in the kit: Grove MLX90621, 16x4
+  rows: 4
+  columns: 16
+  warm_delta_c: 3.0               # (spec) a column is warm above ambient + 3 C
+  night_luminance: 50             # mean grey level (0-255) below which the image is dark
+  night_after_s: 5.0              # (spec) dark for longer than this = night mode (same delay to leave it)
+  recover_after_s: 0.5            # (spec) heat with no RGB person for this long = unclassified pedestrian
+  drop_unconfirmed: false         # true = ignore RGB persons with no heat at night (posters, reflections)
+  max_frame_age_s: 2.0            # older thermal frames are not trusted
+  calib_path: calib_thermal.json  # which columns look at which zone
+  example_calib_path: calib_thermal.example.json
+  sim_ambient_c: 14.0             # --thermal sim: background temperature ...
+  sim_body_c: 30.0                # ... temperature of the simulated person ...
+  sim_columns: [2, 3]             # ... who stands in these columns ...
+  sim_period_s: 20.0              # ... for sim_present_s seconds out of every sim_period_s
+  sim_present_s: 8.0
+
 selfcheck:
   every_n_frames: 10              # how often a frame is checked
   laplacian_var_min: 15.0         # below this sharpness the lens is covered
@@ -167,6 +184,7 @@ overlay:
   line_arrow_tip: 0.3             # arrow head, as a fraction of its length
   zones: [crosswalk, waiting_zone_left, waiting_zone_right]   # zones drawn on screen
   reason_max_chars: 110           # longer reasons are cut on screen
+  thermal_cell_px: 14             # size of one thermal column on screen
   colors:                         # BGR
     person: [80, 200, 80]
     two_wheeler: [0, 200, 255]
@@ -175,6 +193,8 @@ overlay:
     pending: [150, 150, 150]      # track younger than min_track_age, or two-wheeler with a rider
     line: [0, 255, 255]           # counting lines
     zone: [255, 200, 0]           # zones of the metric calibration
+    thermal_warm: [0, 80, 255]
+    thermal_cold: [90, 60, 40]
     state:                        # banner colour of each state
       IDLE: [90, 90, 90]
       PRESENCE: [200, 200, 200]
