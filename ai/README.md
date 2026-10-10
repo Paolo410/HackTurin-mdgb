@@ -21,7 +21,7 @@ Specifica completa: [`PROMPT_SMART_CROSSING.md`](../PROMPT_SMART_CROSSING.md), �
 
 | Milestone | Contenuto | Stato |
 |---|---|---|
-| AI-M1 | sorgente video + detector + tracker + overlay, `bench.py` | da fare |
+| AI-M1 | sorgente video + detector + tracker + overlay, `bench.py` | fatto |
 | AI-M2 | conteggio per direzione + ciclista/motociclista | da fare |
 | AI-M3 | calibrazione, velocità, attributi, regole, `SimActuator` | da fare |
 | AI-M4 | eventi, animali, logger, output C3 | da fare |
@@ -30,35 +30,67 @@ Specifica completa: [`PROMPT_SMART_CROSSING.md`](../PROMPT_SMART_CROSSING.md), �
 
 ## Come si avvia
 
-Non c'è ancora codice: i comandi qui sotto valgono da AI-M1 in poi.
+Prima volta:
 
 ```bash
 cd ai
 python3.12 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
-bash scripts/get_model.sh          # scarica yolox_nano.onnx in ai/models/ (ignorata da git)
-python -m smartcrossing.app --source 0 --profile pc --site urbano
+pip install -r requirements-dev.txt
+bash scripts/get_model.sh          # scarica yolox_nano.onnx (3,7 MB) in ai/models/, ignorata da git
 ```
 
-Opzioni previste: `--source 0|file.mp4|rtsp://…`, `--profile pc|unoq`, `--site urbano|lungofiume|collina`,
-`--headless`, `--emulate-unoq` (10 FPS, input 320, 4 thread), `--actuator sim|serial|bridge`, `--thermal`.
+Poi, con il virtualenv attivo e dentro `ai/`:
 
-Video di test: in `ai/samples/` (ignorata da git). Se è vuota si usa la webcam con `--source 0`.
+```bash
+python -m smartcrossing.app --source 0                     # webcam, finestra con l'overlay (q o Esc per uscire)
+python -m smartcrossing.app --source samples/video.mp4     # file video
+python -m smartcrossing.app --source 0 --emulate-unoq      # limiti della UNO Q: 10 FPS, 4 thread
+python -m smartcrossing.app --source 0 --headless          # senza finestra, una riga di stato al secondo
+python scripts/bench.py samples/video.mp4                  # ms medi e p95 per fase
+pytest                                                     # test, senza hardware
+```
 
-Test: `pytest` dentro `ai/`, senza hardware.
+- Senza `--source` si usa il primo video in `ai/samples/` (ignorata da git); se è vuota, la webcam.
+- Su macOS la prima volta va autorizzato il terminale: Impostazioni di Sistema > Privacy e sicurezza > Fotocamera.
+- `--site`, `--actuator` e `--thermal` sono già accettati ma non hanno effetto fino alle rispettive milestone.
+- **Non tenere il repo in una cartella sincronizzata** (Desktop o Documenti con iCloud, OneDrive, Dropbox): il
+  virtualenv e `.git` vengono spostati nel cloud e l'avvio resta bloccato.
+
+A schermo: un box per traccia con `#ID classe punteggio` (grigio finché la traccia non ha 5 frame), FPS e
+millisecondi per fase. `rules` e `act` mostrano `-` fino ad AI-M3.
+
+## Prestazioni misurate
+
+Su PC (Apple M1, onnxruntime solo CPU, input 416 px, clip sintetica 960x540 con 2 oggetti):
+
+| Modalità | detect (media / p95) | track (media / p95) | FPS end-to-end |
+|---|---|---|---|
+| profilo `pc` | 10,8 / 11,6 ms | 0,5 / 0,6 ms | 30 (limite del video) |
+| `--emulate-unoq` | 18,1 / 18,3 ms | 0,7 / 0,8 ms | 10 (limite imposto) |
+
+`--emulate-unoq` limita FPS e thread ma non rallenta i core: questi numeri **non** prevedono la velocità sulla UNO Q.
+I numeri veri arrivano con AI-M6, sulla scheda.
+
+Il file ufficiale `yolox_nano.onnx` ha l'input **fisso a 416 px**: l'impostazione `input_size: 320` viene ignorata
+con un avviso. Vedi la questione aperta 13 in DECISIONS.md.
 
 ## Dipendenze
 
-A runtime: numpy, opencv-python (headless sulla UNO Q), onnxruntime, supervision, pyyaml, pyserial.
-Niente torch né ultralytics. Le versioni sono fissate in `requirements.txt` (arriva con AI-M1); ogni pacchetto deve
-avere la wheel per Linux aarch64.
+A runtime (`requirements.txt`, versioni fissate): numpy 2.4.6, onnxruntime 1.30.0, opencv-python 4.14.0.94
+(variante headless su Linux aarch64, scelta in automatico), supervision 0.30.5, pyyaml 6.0.3.
+Niente torch né ultralytics. Ogni pacchetto ha la wheel per Linux aarch64.
 
-Per lo sviluppo: pytest.
+- supervision installa anche scipy, matplotlib, pillow, av, requests e tqdm: l'ambiente pesa circa 490 MB.
+- supervision va tenuto sotto la 0.31: lì `sv.ByteTrack` viene rimosso.
+- pyserial arriva quando serve (attuatore seriale).
+
+Per lo sviluppo (`requirements-dev.txt`): pytest 9.1.1.
 
 ## Versione di Python
 
 - Sviluppo: Python 3.12 su macOS Apple Silicon.
+- Le versioni fissate funzionano con Python 3.11, 3.12 e 3.13.
 - UNO Q: il `python3` di Debian dentro un venv (il pip di sistema è bloccato). La versione va letta sulla scheda:
   è la questione aperta 9 in DECISIONS.md.
 
