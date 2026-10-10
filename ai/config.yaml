@@ -3,8 +3,8 @@
 # "(spec)" = value fixed by PROMPT_SMART_CROSSING.md. The others are tunable defaults.
 
 model:
-  path: models/yolox_nano.onnx    # relative to ai/, downloaded by scripts/get_model.sh
-  input_size: 416                 # (spec) 320 is the target, 416 optional. The official ONNX is fixed at 416.
+  path: models/yolox_nano_dynamic.onnx   # relative to ai/, made by scripts/get_model.sh (free input size)
+  input_size: 320                 # (spec) 320, 416 optional. Must be a multiple of the largest stride.
   conf: 0.30                      # minimum score (objectness * class probability)
   nms: 0.45                       # IoU threshold of the per-class NMS
   nms_cross_class: 0.85           # boxes of different classes above this IoU are one object: keep the best

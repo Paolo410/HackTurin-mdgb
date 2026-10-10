@@ -7,6 +7,7 @@ def test_default_profile_has_spec_values():
     cfg = load_config()
     assert cfg["profile"] == "pc"
     assert cfg["model"]["pad_value"] == 114
+    assert cfg["model"]["input_size"] == 320   # (spec) 320, 416 optional
     assert cfg["tracking"]["min_track_age"] == 5
     assert set(cfg["model"]["keep_classes"]) == {
         "person", "bicycle", "car", "motorcycle", "bus", "truck",
