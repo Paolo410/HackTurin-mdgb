@@ -1,13 +1,14 @@
-"""Subscriber di backend: riceve tutto, deduplica, salva, rileva perdite.
+"""Subscriber della centrale: riceve tutto, deduplica, salva, rileva perdite (docs/CONTRACTS.md v1, C4 e C4-B).
 
 Fonti:
-  1. Broker principale (Mosquitto/HiveMQ...):  {prefix}/+/events | agg | alert | status | agg/backup
-  2. (opzionale) broker MQTT di The Things Network: v3/{app}@ttn/devices/+/up   (aggregati via LoRaWAN)
+  1. Broker principale (AWS IoT Core / Mosquitto):  {prefix}/+/events | agg | hb | backup
+  2. (opzionale) broker MQTT di The Things Network: v3/{app}@ttn/devices/+/up   (backup via LoRaWAN)
 
 Garanzie:
   - dedup: PRIMARY KEY(node, seq) + INSERT OR IGNORE  -> i reinvii dopo un blackout non creano doppioni
   - perdita dati visibile: per ogni nodo confronta max(seq) con il numero di seq ricevuti ("buchi")
-  - aggregati LoRa marcati come provvisori: vengono superati da quelli calcolati sugli eventi reali
+  - aggregati del backup marcati come provvisori: vengono superati da quelli calcolati sugli eventi reali
+  - messaggi di backup deduplicati su (node, type, ts): lo stesso beacon visto da più ricevitori conta una volta
 
 Uso:
   python ingest.py                 # ascolta e stampa statistiche ogni 10 s
@@ -34,13 +35,13 @@ log = logging.getLogger("ingest")
 
 MQTT_HOST = os.environ.get("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", 1883))
-PREFIX = os.environ.get("TOPIC_PREFIX", "torino/crosswalk")
-DB_PATH = os.environ.get("INGEST_DB", os.path.join(os.path.dirname(os.path.abspath(__file__)), "backend.db"))
+PREFIX = os.environ.get("TOPIC_PREFIX", "mdgb")
+DB_PATH = os.environ.get("INGEST_DB", os.path.join(os.path.dirname(os.path.abspath(__file__)), "central.db"))
 MQTT_TLS = os.environ.get("MQTT_TLS", "0").lower() in ("1", "true", "yes")
 MQTT_CA = os.environ.get("MQTT_CA", "")
 MQTT_CERT = os.environ.get("MQTT_CERT", "")
 MQTT_KEY = os.environ.get("MQTT_KEY", "")
-CLIENT_ID = os.environ.get("INGEST_CLIENT_ID", "crosswalk-ingest")
+CLIENT_ID = os.environ.get("INGEST_CLIENT_ID", "mdgb-ingest")
 
 
 def tls_context():
@@ -59,14 +60,15 @@ class Store:
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.executescript("""
             CREATE TABLE IF NOT EXISTS events(
-                node TEXT, seq INTEGER, ts REAL, cat TEXT, dir INTEGER, conf REAL, rx_at REAL,
+                node TEXT, seq INTEGER, ts REAL, type TEXT, body TEXT, rx_at REAL,
                 PRIMARY KEY(node, seq));
             CREATE TABLE IF NOT EXISTS aggregates(
                 node TEXT, window_start INTEGER, source TEXT, provisional INTEGER, data TEXT, rx_at REAL,
                 PRIMARY KEY(node, window_start, source));
-            CREATE TABLE IF NOT EXISTS status(node TEXT PRIMARY KEY, data TEXT, rx_at REAL);
-            CREATE TABLE IF NOT EXISTS alerts(node TEXT, seq INTEGER, data TEXT, rx_at REAL,
-                PRIMARY KEY(node, seq));
+            CREATE TABLE IF NOT EXISTS hb(node TEXT PRIMARY KEY, data TEXT, rx_at REAL);
+            CREATE TABLE IF NOT EXISTS backup(
+                node TEXT, type INTEGER, ts INTEGER, via TEXT, data TEXT, rx_at REAL,
+                PRIMARY KEY(node, type, ts));
         """)
         self.dups = 0
 
@@ -76,8 +78,8 @@ class Store:
             self.db.execute("BEGIN")
             new = 0
             for e in events:
-                cur = self.db.execute("INSERT OR IGNORE INTO events VALUES(?,?,?,?,?,?,?)",
-                                      (node, e["seq"], e["ts"], e["cat"], e["dir"], e["conf"], now))
+                cur = self.db.execute("INSERT OR IGNORE INTO events VALUES(?,?,?,?,?,?)",
+                                      (node, e["seq"], e.get("ts"), e.get("type"), json.dumps(e), now))
                 new += cur.rowcount
             self.db.execute("COMMIT")
             self.dups += len(events) - new
@@ -88,14 +90,20 @@ class Store:
             self.db.execute("INSERT OR REPLACE INTO aggregates VALUES(?,?,?,?,?,?)",
                             (node, int(window_start), source, int(provisional), json.dumps(data), time.time()))
 
-    def set_status(self, node, data):
+    def set_hb(self, node, data):
         with self.lock:
-            self.db.execute("INSERT OR REPLACE INTO status VALUES(?,?,?)", (node, json.dumps(data), time.time()))
+            self.db.execute("INSERT OR REPLACE INTO hb VALUES(?,?,?)", (node, json.dumps(data), time.time()))
 
-    def add_alert(self, node, data):
+    def add_backup(self, node, type_, data, via):
+        """Ritorna True se il messaggio è nuovo (non già visto da un altro ricevitore)."""
+        now = time.time()
+        ts = data.get("t0") or data.get("ts") or int(now // 60) * 60     # DEAD non ha ts: chiave al minuto
         with self.lock:
-            self.db.execute("INSERT OR IGNORE INTO alerts VALUES(?,?,?,?)",
-                            (node, data.get("seq", -1), json.dumps(data), time.time()))
+            new = self.db.execute("INSERT OR IGNORE INTO backup VALUES(?,?,?,?,?,?)",
+                                  (node, type_, int(ts), via, json.dumps(data), now)).rowcount
+        if new and data.get("kind") == "agg":
+            self.add_aggregate(node, data["t0"], via, True, data)
+        return bool(new)
 
     def report(self):
         with self.lock:
@@ -104,19 +112,32 @@ class Store:
             out = []
             for node, n, smin, smax in rows:
                 gaps = (smax - smin + 1) - n
-                by_cat = dict(self.db.execute(
-                    "SELECT cat, COUNT(*) FROM events WHERE node=? GROUP BY cat", (node,)).fetchall())
-                lora = self.db.execute(
+                by_type = dict(self.db.execute(
+                    "SELECT type, COUNT(*) FROM events WHERE node=? GROUP BY type", (node,)).fetchall())
+                prov = self.db.execute(
                     "SELECT COUNT(*) FROM aggregates WHERE node=? AND provisional=1", (node,)).fetchone()[0]
                 out.append({"node": node, "events": n, "seq_range": [smin, smax], "gaps": gaps,
-                            "by_cat": by_cat, "lora_aggregates": lora, "duplicates_dropped": self.dups})
+                            "by_type": by_type, "backup_aggregates": prov, "duplicates_dropped": self.dups})
         return out
+
+
+def handle_backup(store, node, type_, raw: bytes, via, rssi=None):
+    data = decode(type_, raw)
+    if not store.add_backup(node, type_, data, via):
+        return
+    if data["kind"] == "alarm":
+        log.warning("%s: ALLARME %s %s via %s (RSSI %s)", node, data["alarm"], data.get("detail", ""), via, rssi)
+    elif data["kind"] == "agg":
+        log.info("%s: aggregato provvisorio via %s, backlog sul nodo=%d", node, via, data["backlog"])
+    else:
+        log.info("%s: hb via %s, mode=%s, backlog=%d, %d min senza conferme MQTT",
+                 node, via, data["mode"], data["backlog"], data["offline_min"])
 
 
 def main_loop(store):
     def on_connect(c, u, flags, rc, props):
         log.info("connesso al broker %s:%d (sessione esistente=%s)", MQTT_HOST, MQTT_PORT, flags.session_present)
-        for t in ("events", "agg", "alert", "status", "agg/backup"):
+        for t in ("events", "agg", "hb", "backup"):
             c.subscribe(f"{PREFIX}/+/{t}", qos=1)
 
     def on_message(c, u, msg):
@@ -125,26 +146,19 @@ def main_loop(store):
             node = parts[len(PREFIX.split("/"))]
             kind = "/".join(parts[len(PREFIX.split("/")) + 1:])
             body = json.loads(msg.payload) if msg.payload else {}
+            if body.get("node_id", node) != node:
+                log.warning("node_id %s diverso dal topic %s: vale il topic", body.get("node_id"), msg.topic)
             if kind == "events":
-                new = store.add_events(node, body["events"])
-                log.info("%s: +%d eventi (batch %d, seq %d..%d)", node, new, len(body["events"]),
-                         body["events"][0]["seq"], body["events"][-1]["seq"])
+                evs = body["events"]
+                new = store.add_events(node, evs)
+                log.info("%s: +%d eventi (batch %d, seq %d..%d)", node, new, len(evs), evs[0]["seq"], evs[-1]["seq"])
             elif kind == "agg":
-                store.add_aggregate(node, body["window_start"], "mqtt", False, body)
-            elif kind == "agg/backup":                       # dal ricevitore LoRa P2P / ESP-NOW
-                port = body.get("port", 1)
-                data = decode(bytes.fromhex(body["hex"]), port)
-                if "alarm" in data:
-                    log.warning("%s: ALLARME %s via %s", node, data["alarm"], body.get("via"))
-                else:
-                    store.add_aggregate(node, data["window_start"], body.get("via", "backup"), True, data)
-                    log.info("%s: aggregato provvisorio via %s, backlog sul nodo=%d",
-                             node, body.get("via"), data["backlog"])
-            elif kind == "alert":
-                store.add_alert(node, body)
-                log.info("%s: ALERT utente lento (%s)", node, body.get("cat"))
-            elif kind == "status":
-                store.set_status(node, body)
+                store.add_aggregate(node, body["t0"], "mqtt", False, body)
+            elif kind == "backup":                       # dai ricevitori BLE / LoRa P2P / ESP-NOW
+                handle_backup(store, node, int(body["type"]), bytes.fromhex(body["hex"]), body.get("via", "backup"),
+                              body.get("rssi"))
+            elif kind == "hb":
+                store.set_hb(node, body)
         except Exception as e:
             log.error("messaggio non valido su %s: %s", msg.topic, e)
 
@@ -162,7 +176,7 @@ def main_loop(store):
 
 
 def ttn_loop(store):
-    """Aggregati che arrivano via LoRaWAN attraverso The Things Network."""
+    """Backup C4-B che arriva via LoRaWAN attraverso The Things Network (device_id = node_id, fPort = type)."""
     app, key = os.environ.get("TTN_APP_ID"), os.environ.get("TTN_API_KEY")
     if not (app and key):
         log.info("TTN non configurato (TTN_APP_ID/TTN_API_KEY): salto")
@@ -174,18 +188,12 @@ def ttn_loop(store):
             up = json.loads(msg.payload)
             dev = up["end_device_ids"]["device_id"]
             um = up["uplink_message"]
-            port = um.get("f_port", 1)
-            data = um.get("decoded_payload") or decode(base64.b64decode(um["frm_payload"]), port)
-            if port == 9:
-                log.warning("%s: ALLARME watchdog via LoRaWAN", dev)
-            else:
-                store.add_aggregate(dev, data["window_start"], "lorawan", True, data)
-                rssi = um.get("rx_metadata", [{}])[0].get("rssi")
-                log.info("%s: aggregato provvisorio via LoRaWAN (RSSI %s dBm), backlog=%s", dev, rssi, data["backlog"])
+            rssi = um.get("rx_metadata", [{}])[0].get("rssi")
+            handle_backup(store, dev, um.get("f_port", 1), base64.b64decode(um.get("frm_payload", "")), "lorawan", rssi)
         except Exception as e:
             log.error("uplink TTN non valido: %s", e)
 
-    c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"crosswalk-ingest-ttn")
+    c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=f"{CLIENT_ID}-ttn")
     c.username_pw_set(f"{app}@ttn", key)
     c.tls_set()
     c.on_connect = lambda cl, u, f, rc, p: cl.subscribe(f"v3/{app}@ttn/devices/+/up", qos=1)
@@ -209,7 +217,7 @@ if __name__ == "__main__":
         while True:
             time.sleep(10)
             for r in store.report():
-                log.info("RIEPILOGO %s: %d eventi, buchi=%d, duplicati scartati=%d, aggregati LoRa=%d",
-                         r["node"], r["events"], r["gaps"], r["duplicates_dropped"], r["lora_aggregates"])
+                log.info("RIEPILOGO %s: %d eventi, buchi=%d, duplicati scartati=%d, aggregati di backup=%d",
+                         r["node"], r["events"], r["gaps"], r["duplicates_dropped"], r["backup_aggregates"])
     except KeyboardInterrupt:
         pass

@@ -1,12 +1,12 @@
 """Ricevitore del canale di backup BLE (gira sul laptop, o su qualsiasi PC con Bluetooth).
 
-Ascolta i beacon del nodo (manufacturer data, company ID 0xFFFF, frame da 27 byte), elimina le
+Ascolta i beacon del nodo (manufacturer data, company ID 0xFFFF, frame C4-B da 27 byte), elimina le
 ripetizioni (un beacon viene ritrasmesso più volte al secondo) e ripubblica ogni messaggio NUOVO su
-    {prefix}/{node}/agg/backup     {"port", "hex", "via": "ble", "rssi", "rx_at"}
-convertendo l'aggregato nel formato standard da 28 byte: ingest.py e la dashboard non cambiano.
+    {prefix}/{node}/backup     {"v": 1, "node_id", "via": "ble", "type", "hex", "rssi", "rx_at"}
+Non decodifica: decodifica la centrale (un solo decoder, docs/CONTRACTS.md v1).
 
-Uso:   python ble_receiver.py --node xw-001
-       python ble_receiver.py --node xw-001 --addr AA:BB:CC:DD:EE:FF     # filtra un solo nodo
+Uso:   python ble_receiver.py --node nodo01
+       python ble_receiver.py --node nodo01 --addr AA:BB:CC:DD:EE:FF     # filtra un solo nodo
 Richiede: pip install bleak paho-mqtt     (+ le variabili MQTT_* se il broker è AWS IoT Core)
 """
 import argparse
@@ -19,10 +19,10 @@ import paho.mqtt.publish as publish
 
 COMPANY_ID = 0xFFFF
 FRAME_SIZE = 27
-PREFIX = os.environ.get("TOPIC_PREFIX", "torino/crosswalk")
+PREFIX = os.environ.get("TOPIC_PREFIX", "mdgb")
 MQTT_HOST = os.environ.get("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", 1883))
-CLIENT_ID = os.environ.get("BLE_CLIENT_ID", "crosswalk-ble-gw")
+CLIENT_ID = os.environ.get("BLE_CLIENT_ID", "mdgb-ble-gw")
 TLS = None
 if os.environ.get("MQTT_TLS", "0").lower() in ("1", "true", "yes"):
     TLS = {"ca_certs": os.environ.get("MQTT_CA") or None,
@@ -31,22 +31,17 @@ if os.environ.get("MQTT_TLS", "0").lower() in ("1", "true", "yes"):
 
 
 def frame_to_message(frame: bytes):
-    """Frame BLE da 27 byte -> (port, payload) nel formato del backend.
-    Aggregato: ricostruisce i 28 byte standard (flag = versione 1, offline; disco = 0 non trasmesso)."""
+    """Frame BLE da 27 byte -> (type, corpo). Gli zeri in coda restano: il decoder legge solo i byte del tipo."""
     if len(frame) != FRAME_SIZE:
         raise ValueError(f"frame di {len(frame)} byte, attesi {FRAME_SIZE}")
-    port = frame[0]
-    if port == 1:
-        flags = (1 << 4) | (1 << 2)
-        return port, bytes([flags]) + frame[1:27] + b"\x00"
-    return port, frame[1:]
+    return frame[0], frame[1:]
 
 
 def main():
     from bleak import BleakScanner
 
     ap = argparse.ArgumentParser()
-    ap.add_argument("--node", default=os.environ.get("NODE_ID", "xw-001"))
+    ap.add_argument("--node", default=os.environ.get("NODE_ID", "nodo01"))
     ap.add_argument("--addr", default=None, help="indirizzo BLE del nodo (opzionale)")
     a = ap.parse_args()
     seen = set()
@@ -61,16 +56,16 @@ def main():
         if key in seen:                     # stesso beacon ripetuto: già inoltrato
             return
         seen.add(key)
-        port, payload = frame_to_message(bytes(frame))
-        msg = {"port": port, "hex": payload.hex().upper(), "via": "ble",
+        type_, body = frame_to_message(bytes(frame))
+        msg = {"v": 1, "node_id": a.node, "via": "ble", "type": type_, "hex": body.hex().upper(),
                "rssi": adv.rssi, "rx_at": time.time(), "ble_addr": device.address}
-        publish.single(f"{PREFIX}/{a.node}/agg/backup", json.dumps(msg), qos=1,
+        publish.single(f"{PREFIX}/{a.node}/backup", json.dumps(msg), qos=1,
                        hostname=MQTT_HOST, port=MQTT_PORT, client_id=CLIENT_ID, tls=TLS)
         print("BLE RX", msg)
 
     async def run():
         async with BleakScanner(detection_callback=on_adv):
-            print(f"in ascolto dei beacon BLE (company 0x{COMPANY_ID:04X}) -> {PREFIX}/{a.node}/agg/backup")
+            print(f"in ascolto dei beacon BLE (company 0x{COMPANY_ID:04X}) -> {PREFIX}/{a.node}/backup")
             await asyncio.Future()
 
     asyncio.run(run())

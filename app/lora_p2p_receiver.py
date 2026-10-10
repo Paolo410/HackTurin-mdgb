@@ -1,5 +1,5 @@
 """Mini-gateway per i Piani B e C: legge il ricevitore radio collegato al laptop via USB
-e ripubblica i pacchetti sul broker in {prefix}/{node}/agg/backup.
+e ripubblica i pacchetti C4-B sul broker in {prefix}/{node}/backup (docs/CONTRACTS.md v1).
 
   Piano B (LoRa P2P):  secondo Wio-E5 tramite adattatore USB-TTL   -> --mode wioe5   (9600 baud)
   Piano C (ESP-NOW):   ESP32 ricevitore via USB                     -> --mode espnow  (115200 baud)
@@ -9,7 +9,7 @@ Esempi:
   python lora_p2p_receiver.py --port /dev/tty.usbserial-0002 --mode espnow
 Richiede: pip install pyserial paho-mqtt
 Con AWS IoT Core: stesse variabili del backend (MQTT_HOST/PORT/TLS/CA/CERT/KEY) e P2P_CLIENT_ID
-= nome di un Thing dedicato (es. crosswalk-gw, creato con aws/ingest-policy.json).
+= nome di un Thing dedicato (es. mdgb-gw, creato con comms/aws/ingest-policy.json).
 """
 import argparse
 import json
@@ -20,9 +20,9 @@ import time
 import paho.mqtt.publish as publish
 import serial
 
-PREFIX = os.environ.get("TOPIC_PREFIX", "torino/crosswalk")
+PREFIX = os.environ.get("TOPIC_PREFIX", "mdgb")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", 1883))
-CLIENT_ID = os.environ.get("P2P_CLIENT_ID", "crosswalk-gw")
+CLIENT_ID = os.environ.get("P2P_CLIENT_ID", "mdgb-gw")
 TLS = None
 if os.environ.get("MQTT_TLS", "0").lower() in ("1", "true", "yes"):
     TLS = {"ca_certs": os.environ.get("MQTT_CA") or None,
@@ -38,7 +38,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", required=True)
     ap.add_argument("--mode", choices=["wioe5", "espnow"], default="wioe5")
-    ap.add_argument("--node", default=os.environ.get("NODE_ID", "xw-001"))
+    ap.add_argument("--node", default=os.environ.get("NODE_ID", "nodo01"))
     ap.add_argument("--broker", default=os.environ.get("MQTT_HOST", "localhost"))
     a = ap.parse_args()
 
@@ -49,7 +49,7 @@ def main():
             time.sleep(0.5)
             print(cmd, "->", s.read_all().decode(errors="ignore").strip())
 
-    print(f"in ascolto ({a.mode}) ... pubblico su {PREFIX}/{a.node}/agg/backup")
+    print(f"in ascolto ({a.mode}) ... pubblico su {PREFIX}/{a.node}/backup")
     last_rssi = None
     while True:
         line = s.readline().decode(errors="ignore").strip()
@@ -69,9 +69,9 @@ def main():
             if not m:
                 continue
             port, hexdata = int(m.group(1)), m.group(2)
-        msg = {"port": port, "hex": hexdata, "via": "lora-p2p" if a.mode == "wioe5" else "esp-now",
-               "rssi": last_rssi, "rx_at": time.time()}
-        publish.single(f"{PREFIX}/{a.node}/agg/backup", json.dumps(msg), qos=1, hostname=a.broker,
+        msg = {"v": 1, "node_id": a.node, "via": "lora-p2p" if a.mode == "wioe5" else "esp-now", "type": port,
+               "hex": hexdata, "rssi": last_rssi, "rx_at": time.time()}
+        publish.single(f"{PREFIX}/{a.node}/backup", json.dumps(msg), qos=1, hostname=a.broker,
                        port=MQTT_PORT, client_id=CLIENT_ID, tls=TLS)
         print("RX", msg)
 
