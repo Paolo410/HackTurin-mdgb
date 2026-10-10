@@ -303,6 +303,9 @@ fair use di 30 s di airtime al giorno: rispettato solo con SF bassi (ADR); con u
 - `node_id`: per il BLE dal MAC del nodo (tabella nella configurazione del ricevitore, `TODO(verify)` che l'indirizzo BLE
   della UNO Q sia stabile); per LoRaWAN dal `device_id` di TTN (= `node_id`).
 - Il ricevitore BLE inoltra un frame solo la prima volta che lo vede (il beacon si ripete più volte al secondo).
+- Nella demo il ricevitore BLE è dentro la centrale (`app/central.py`) e scrive direttamente nel suo database: il
+  backup non passa da Internet. Il topic `backup` serve ai ricevitori remoti (gateway LoRaWAN, ricevitori BLE lontani).
+- BLE: il nodo tiene in onda fino a tre beacon insieme (istanza 1 `AGG`, 2 `HB`, 3 allarmi), a rotazione.
 
 ---
 

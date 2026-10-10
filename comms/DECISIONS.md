@@ -177,15 +177,18 @@ Codice nel repo:
 | `app/` | ingest v1 (dedup, buchi), decoder C4-B, ricevitori BLE / LoRa P2P, formatter TTN | CM-M2 |
 | `comms/tests/test_offline.py` | C4-B, BLE, conferme MQTT, file C3, end-to-end con Mosquitto (guasto di rete e PUBACK 0x87) | CM-M2 |
 
-Fatto in CM-M2 (10/10/2026): un PUBACK negativo (≥ 0x80) non marca inviato e fa riprovare con attesa crescente
-(provato con Mosquitto che risponde 0x87); `online()` = PUBACK positivo negli ultimi 30 s; `stable_s()` pronto per l'isteresi.
-Esito: 18 test verdi; demo locale con i veri entry point 199/199 eventi, 0 buchi dopo un guasto del broker.
+Fatto (10/10/2026):
+- un PUBACK negativo (≥ 0x80) non marca inviato e fa riprovare con attesa crescente (provato con Mosquitto che risponde 0x87);
+  `online()` = PUBACK positivo negli ultimi 30 s;
+- backup BLE (`comms/node/failover.py`): acceso dopo 30 s senza conferme MQTT con HB + AGG subito, HB periodico, AGG a ogni
+  finestra, allarmi subito, spento dopo 60 s di MQTT stabile; un beacon per tipo (AGG, HB, allarmi);
+- centrale unica `app/central.py`: MQTT + BLE nello stesso database, il BLE non passa da Internet; diagnosi dei nodi;
+- corretto un deadlock (già presente nel codice importato) tra l'invio MQTT e la ricezione dei PUBACK;
+- 26 test verdi, tra cui la prova "Wi-Fi spento / riacceso" (connessione che tace senza chiudersi): BLE acceso, diagnosi
+  "rete giù, nodo sano", allarme via BLE in 0,4 s, backfill, BLE spento, 345/345 eventi, 0 buchi.
 
-Cosa manca rispetto alle decisioni di §1:
-1. manca l'isteresi 30 s / 60 s: il backup si accende e si spegne seguendo `online()`;
-2. manca "primo pacchetto subito": offline l'aggregatore manda solo quando si chiude una finestra (fino a 15 min);
-3. manca l'heartbeat sul backup, manca il test LoRa ogni 6 h e non c'è ancora chi produce gli allarmi;
-4. manca la diagnosi in centrale e manca la dashboard.
+Cosa manca: dashboard web; prove su UNO Q, AWS reale e BLE vero (guida: `comms/RILASCIO.md`); test LoRa ogni 6 h e
+backup LoRa (dopo).
 
 ## 4. Cosa mi serve dagli altri
 

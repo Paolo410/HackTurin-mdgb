@@ -3,6 +3,9 @@
 **Owner:** Lorenzo Dragoni (communication engineer). Contratti: [`docs/CONTRACTS.md`](../docs/CONTRACTS.md).
 Decisioni, numeri e questioni aperte: [DECISIONS.md](DECISIONS.md).
 
+Il codice che gira **sull'Arduino UNO Q** è `comms/node/` (`python comms/node/main.py`); quello del **PC** è in
+`app/` (`python app/central.py`). Come rilasciare e provare tutto: [RILASCIO.md](RILASCIO.md).
+
 ## Scopo
 
 - Trasporto dei comandi verso l'MCU: interfaccia `Actuator` per C1 (comando) e C2 (heartbeat), righe C5 dall'MCU.
@@ -17,7 +20,7 @@ La centrale (ingest, diagnosi, dashboard) sta in `app/`.
 |---|---|---|
 | CM-M1 | `docs/CONTRACTS.md` v1, `actuators.py` (sim, serial), `tools/c1_send.py` | fatto |
 | CM-M2 | MQTT/AWS IoT Core + Store & Forward (codice già testato) + dedup in centrale | fatto (non ancora provato su UNO Q e AWS reale) |
-| CM-M3 | backup BLE con isteresi, diagnosi, dashboard | da fare |
+| CM-M3 | backup BLE con isteresi 30/60 s, allarmi, diagnosi, centrale unica | fatto (dashboard da fare) |
 | CM-M4 | `BridgeActuator` | da fare |
 
 ## Rete (CM-M2)
@@ -32,7 +35,8 @@ MCU ──► logs/c3/mcu-*.jsonl ─┴► comms/node: C3FileSource ─► Outb
 |---|---|
 | `node/outbox.py` | Store & Forward: ogni evento su disco prima dell'invio; cursore dei file C3 nella stessa transazione |
 | `node/uplink_mqtt.py` | MQTT 5 + TLS, batch da 50, inviato solo con PUBACK positivo, attesa crescente dopo un PUBACK negativo, `online()` sulle conferme |
-| `node/aggregator.py` | aggregati esatti per finestra su MQTT; offline `AGG` da 26 byte al backup |
+| `node/aggregator.py` | aggregati esatti per finestra su MQTT |
+| `node/failover.py` | backup: acceso dopo 30 s senza conferme MQTT (HB + AGG subito), HB periodico, AGG a ogni finestra, allarmi subito, spento dopo 60 s di MQTT stabile |
 | `node/backup_link.py` | backup BLE (`btmgmt`) o LoRa (Bridge → MCU → Wio-E5) |
 | `node/event_source.py` | `C3FileSource` (file di `ai/` e dell'MCU) e simulatore |
 | `node/main.py`, `node/config.py` | orchestrazione, `hb` ogni 10 s, configurazione con variabili d'ambiente (`.env.example`) |

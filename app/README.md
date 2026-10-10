@@ -4,14 +4,17 @@
 
 ## Scopo
 
-Riceve dai nodi via MQTT (AWS IoT Core) e dai canali di backup (BLE nella demo, LoRaWAN in produzione), deduplica,
-rileva i dati persi e, da CM-M3, fa la diagnosi dei nodi e mostra la dashboard.
+Il codice che gira **sul tuo PC**. Riceve dai nodi via MQTT (AWS IoT Core) e via BLE (Bluetooth del PC, senza
+Internet), deduplica, rileva i dati persi e fa la diagnosi di ogni nodo. Si lancia **un solo programma**:
+`python app/central.py`. Guida completa: [comms/RILASCIO.md](../comms/RILASCIO.md).
 
 | File | Cosa fa |
 |---|---|
+| `central.py` | **il programma della centrale**: MQTT + BLE nello stesso database, stato dei nodi ogni 10 s |
+| `diagnosis.py` | la regola della diagnosi (OK, rete giù, guasto, Linux bloccato, manomissione, batteria, distrutto) |
 | `ingest.py` | subscriber con sessione persistente su `mdgb/+/events\|agg\|hb\|backup`; dedup su `(node, seq)`, buchi nei `seq`, aggregati provvisori dal backup; opzionale TTN |
 | `decoder.py` | decoder unico dei messaggi C4-B (`AGG`, `HB`, allarmi) |
-| `ble_receiver.py` | ricevitore BLE (laptop): inoltra i beacon del nodo su `mdgb/<node>/backup` |
+| `ble_receiver.py` | logica del ricevitore BLE (usata da `central.py`); da solo: `--dry-run` per la prima prova radio, oppure gateway remoto che inoltra su `mdgb/<node>/backup` |
 | `lora_p2p_receiver.py` | mini-gateway LoRa P2P / ESP-NOW (piani B e C) |
 | `ttn_formatter.js` | formatter da incollare su TTN (solo per leggere i messaggi nella console) |
 | `mosquitto.conf` | broker locale per lo sviluppo |
@@ -20,20 +23,18 @@ rileva i dati persi e, da CM-M3, fa la diagnosi dei nodi e mostra la dashboard.
 
 ```bash
 pip install -r app/requirements.txt
-python app/ingest.py                    # ascolta; ogni 10 s stampa il riepilogo
-python app/ingest.py --report           # riepilogo dal DB (app/central.db, ignorato da git)
-python app/ble_receiver.py --node nodo01
+cp app/.env.example app/.env            # endpoint AWS e certificato mdgb-ingest (oppure Mosquitto locale)
+python app/central.py                   # MQTT + BLE; ogni 10 s riepilogo e STATO di ogni nodo
+python app/central.py --report          # riepilogo dal DB (app/central.db, ignorato da git)
 ```
-
-Con AWS IoT Core: stesse variabili `MQTT_*` del nodo, con il certificato del Thing `mdgb-ingest`
-(`INGEST_CLIENT_ID=mdgb-ingest`); il ricevitore BLE usa un Thing suo (`mdgb-ble-gw`, policy `ingest-policy.json`).
 
 ## Stato
 
 | Milestone | Contenuto | Stato |
 |---|---|---|
 | CM-M2 | ingest v1 con dedup e buchi, decoder C4-B, ricevitori | fatto |
-| CM-M3 | diagnosi dei nodi, dashboard flask | da fare |
+| CM-M3 | programma unico `central.py` (MQTT + BLE diretto), diagnosi dei nodi | fatto |
+| CM-M3 | dashboard web | da fare |
 
 ## Dipendenze e Python
 
