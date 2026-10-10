@@ -23,7 +23,7 @@ Specifica completa: [`PROMPT_SMART_CROSSING.md`](../PROMPT_SMART_CROSSING.md), �
 |---|---|---|
 | AI-M1 | sorgente video + detector + tracker + overlay, `bench.py` | fatto |
 | AI-M2 | conteggio per direzione + ciclista/motociclista | fatto |
-| AI-M3 | calibrazione, velocità, attributi, regole, `SimActuator` | da fare |
+| AI-M3 | calibrazione, velocità, attributi, regole, `SimActuator` | fatto |
 | AI-M4 | eventi, animali, logger, output C3 | da fare |
 | AI-M5 | termocamera | da fare |
 | AI-M6 | profilo `unoq`, prova sulla scheda, benchmark | da fare |
@@ -47,20 +47,66 @@ python -m smartcrossing.app --source 0                     # webcam, finestra co
 python -m smartcrossing.app --source samples/video.mp4     # file video
 python -m smartcrossing.app --source 0 --emulate-unoq      # limiti della UNO Q: 10 FPS, 4 thread
 python -m smartcrossing.app --source 0 --headless          # senza finestra, una riga di stato al secondo
-python scripts/calibrate.py --source samples/video.mp4     # disegna le due linee di conteggio e salva calib.json
+python scripts/calibrate.py --source samples/video.mp4     # calibra l'inquadratura e salva calib.json (vedi sotto)
+python scripts/scenario.py elderly_fast_car                # scena simulata senza camera: regole e attuatore
 python scripts/bench.py samples/video.mp4                  # ms medi e p95 per fase
 pytest                                                     # test, senza hardware
 ```
 
 - Senza `--source` si usa il primo video in `ai/samples/` (ignorata da git); se è vuota, la webcam.
 - Su macOS la prima volta va autorizzato il terminale: Impostazioni di Sistema > Privacy e sicurezza > Fotocamera.
-- `--site`, `--actuator` e `--thermal` sono già accettati ma non hanno effetto fino alle rispettive milestone.
+- `--actuator sim` (default) non richiede hardware. `--actuator serial --port ...` usa `comms/actuators.py`.
+- `--site` e `--thermal` sono già accettati ma non hanno effetto fino alle rispettive milestone.
 - **Non tenere il repo in una cartella sincronizzata** (Desktop o Documenti con iCloud, OneDrive, Dropbox): il
   virtualenv e `.git` vengono spostati nel cloud e l'avvio resta bloccato.
 
-A schermo: un box per traccia con `#ID ruolo punteggio` (grigio finché la traccia non ha 5 frame), le linee di
-conteggio con la freccia del verso IN, i conteggi, FPS e millisecondi per fase. `rules` e `act` mostrano `-` fino
-ad AI-M3. Ogni attraversamento contato viene anche stampato sul terminale.
+A schermo: un box per traccia con `#ID ruolo punteggio velocità attributi` (grigio finché la traccia non ha
+5 frame), le zone e le linee di conteggio con la freccia del verso IN, i conteggi, FPS e millisecondi per fase. In
+basso lo stato, la lampada, il motivo della decisione, i testi dei due display e le richieste alla centralina.
+Ogni attraversamento e ogni cambio di stato vengono anche stampati sul terminale.
+
+## Calibrazione
+
+Si fa una volta per ogni posizione della camera, con `scripts/calibrate.py`:
+
+1. si cliccano i quattro angoli delle strisce: prima i due sul cordolo vicino (1, 2), poi i due sul cordolo
+   lontano girando intorno (3 di fronte a 2, 4 di fronte a 1);
+2. si danno due misure in metri: `--along` è la distanza 1–2 (le strisce misurate lungo la strada), `--width` è la
+   distanza 2–3 (la strada da cordolo a cordolo). Senza le opzioni lo script le chiede;
+3. lo script mostra zone e linee ricavate: `s` salva `calib.json`, `r` ricomincia.
+
+Da questi dati vengono ricavati: i metri e le velocità, le due zone d'attesa sui marciapiedi, le strisce, la
+carreggiata e le due linee di conteggio. I margini stanno in `config.yaml` (`geometry`).
+Con `--lines-only` si disegnano solo le due linee di conteggio, senza misure: basta per contare, non per le regole.
+Senza una calibrazione in metri lo stato resta `IDLE`.
+
+## Regola
+
+`rules.py` è una macchina a stati in puro Python. Ogni decisione riporta in `reason` i numeri che l'hanno prodotta.
+
+| Stato | Quando | Lampada |
+|---|---|---|
+| `IDLE` | nessun pedone in attesa o sulle strisce | `OFF` |
+| `PRESENCE` | pedone in attesa o sulle strisce, nessun veicolo pericoloso | `WHITE_ON` |
+| `WARN_DRIVER` | pedone che vuole attraversare, `TTC < T_need` e veicolo oltre `d_stop + 10 m` | `AMBER_BLINK_2HZ` |
+| `WARN_PEDESTRIAN` | veicolo entro `d_stop + 10 m` che non frena (`a > −2 m/s²`) | `RED_GROUND_BLINK` |
+| `DEGRADED` | video assente da più di 1 s, lente coperta, camera abbagliata | `YELLOW_FAILSAFE` |
+
+- `d_stop = v·1,0 + v²/(2·7,0)`, `T_need = W/v_ped + 1,0`, `TTC = d/v`, `green_s = min(25, max(W/1,2, W/v_ped) + 2)`.
+- `v_ped`: 1,2 m/s; 0,8 per bambino, pedone lento o con ausilio; la velocità misurata se è più bassa.
+- Il pedone "vuole attraversare" se è sulle strisce, oppure in zona d'attesa da più di 1 s o in cammino verso la strada.
+- Lo stato sale subito e scende solo dopo 1 s, per non far tremolare le lampade.
+- Il comando C1 parte a ogni cambio e viene ripetuto almeno ogni secondo. L'heartbeat C2 parte ogni 100 ms da un
+  thread separato, ma solo se il ciclo della visione è vivo: se la visione si blocca l'heartbeat si ferma e il
+  firmware va in fail-safe da solo.
+- Sul display dei pedoni l'AI non scrive mai di attraversare: non conosce la fase del semaforo.
+
+Attributi del pedone, decisi una volta per traccia: `child` (altezza mediana su 5 frame sotto 1,30 m), `slow`
+(velocità di camminata sotto 0,9 m/s, misurata per almeno 2 s mentre cammina), `aid` (classificatore opzionale
+`models/aid_cls.onnx`: se manca resta sconosciuto).
+
+Scene simulate (`scripts/scenario.py`): fanno girare tracker, geometria, regole e attuatore senza camera. Con
+`--realtime --actuator serial --port ...` muovono lampade e display veri.
 
 ## Conteggio
 
