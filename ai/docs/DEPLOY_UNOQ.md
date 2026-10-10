@@ -124,6 +124,11 @@ la visione gira lo stesso, il semaforo fa il suo ciclo normale e badge e antifur
 
 ## 7. Accendere e spegnere la visione
 
+**Sulla scheda della demo la visione è un servizio dall'11/10** (`mdgb-ai`, parte da sola all'accensione):
+`sudo systemctl restart mdgb-ai` (o `stop` / `start`), log con `journalctl -u mdgb-ai -f`. Dopo un aggiornamento
+del codice: `push_to_arduino.sh ... --bridge --applab mdgb`, poi `sudo sh ~/mdgb-tools/installa_servizio_visione.sh`.
+`run_vision.sh` serve solo dove il servizio non è installato: se il servizio è attivo, non parte.
+
 A mano, senza `sudo`, in background (resta accesa anche chiudendo ssh):
 
 ```bash

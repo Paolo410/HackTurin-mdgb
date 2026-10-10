@@ -451,4 +451,21 @@ con v_ped 0,3 → 25 s.
     nessun programma apre la camera (`Failed to start streaming: Operation already in progress`), nemmeno
     `cam`. Si sblocca solo controllando il cavo e riavviando la scheda. La visione intanto era in DEGRADED
     ("video assente").
+40. **Prova di tutto sulla scheda (11/10, 01:30-01:40)**, dopo il riavvio che ha sbloccato la camera (punto 39):
+    - **avvio automatico:** visione come servizio `mdgb-ai` (si ferma con SIGINT come Ctrl+C, righe di stato in
+      `journalctl`), rete `mdgb-comms`, app `mdgb` come app predefinita di App Lab. Provato con un riavvio: tutto
+      riparte da solo. Al primo avvio la camera non è ancora pronta: systemd riavvia la visione dopo 2 s;
+    - **comandi accorciati** (punto 38) provati sul Bridge: la riga completa da 366 byte viene rifiutata, quella
+      accorciata da 234 byte arriva e lo sketch la accetta;
+    - **visione interrotta:** fail-safe del semaforo dopo 485 ms; systemd la riavvia in 3,8 s; la camera si
+      riapre; lo sketch torna "visione collegata" dopo 7,5 s;
+    - **rete tagliata 100 s:** la centrale passa a "rete giù, nodo sano" via Bluetooth (−41 dBm). Alla
+      riapertura torna su Wi-Fi in 18 s, con coda 0, 0 eventi persi e 0 doppioni;
+    - **da sistemare in centrale (Lorenzo):**
+      - all'inizio del taglio, per circa 5 s, compare "nodo distrutto": il Last Will MQTT arriva prima del
+        primo beacon;
+      - il fail-safe dello sketch non arriva in centrale quando la visione è spenta: `mcu_event` non ha più
+        chi lo riceve;
+    - **non ancora provati:** badge, login e cicalino muto dal telefono (serve qualcuno con il badge);
+      calibrazione e richieste nate da una scena vera.
 
