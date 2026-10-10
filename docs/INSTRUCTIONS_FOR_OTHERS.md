@@ -69,6 +69,11 @@ act.heartbeat(seq)               # ogni 100 ms: senza, dopo 500 ms il firmware v
 ```
 
 `SimActuator().failsafe` ti dice se il firmware vero sarebbe in fail-safe (utile per l'overlay).
+
+**Video dal vivo nell'app (facoltativo, specifica §5.3: solo live, solo in locale, solo se abilitato).** Se la visione
+espone uno stream **MJPEG** con l'overlay (riquadri e classi), per esempio `http://<IP scheda>:8090/stream.mjpg`
+(`Content-Type: multipart/x-mixed-replace`), nell'app basta mettere quell'indirizzo nel campo `video` della camera in
+`nodes.json`: compare "Guarda dal vivo". Lo stream non va mai salvato su disco e va acceso solo con un'opzione esplicita.
 Da `ai/` lancia con la root del repo nel path: `PYTHONPATH=.. python -m smartcrossing.app ...`.
 
 ## 4. Salvatore (`firmware/`)
