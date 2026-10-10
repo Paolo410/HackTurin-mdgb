@@ -81,6 +81,7 @@ resta un servizio sul Linux della scheda, e l'app di App Lab le passa i dati del
 | `sensor_env`, `sensor_light`, `sensor_air` (ogni 300 ms) | `env` ogni 10 s: `t_c`, `rh` (più `light` grezzo 0–1023, `eco2_ppm`, `tvoc_ppb`) |
 | `alarm_status` (tentato furto) | `tamper` code 1, al massimo uno ogni 10 s |
 | `rfid_status` "ACCESSO CONSENTITO" | `tamper` code 3 (badge del tecnico, informazione) |
+| `led_status` "FAIL-SAFE: ..." | `failsafe` (la visione non risponde: arriva anche a visione spenta), al massimo uno ogni 10 s |
 | `led_status`, `sensor_movement`, `rfid_data`, accesso negato | niente (debug; il codice del badge non esce dalla scheda) |
 
 ## Configurazione (`comms/.env` sulla scheda)

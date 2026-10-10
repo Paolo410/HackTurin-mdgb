@@ -14,6 +14,7 @@ def alarm_status(msg: str):
 
 def led_status(status_msg: str):
     logger.info(f"LED        -> {status_msg}")
+    mdgb_link.led_status(status_msg)
 
 def sensor_movement(x: float, y: float, z: float):
     logger.info(f"ACCEL      -> X={x:.2f}g Y={y:.2f}g Z={z:.2f}g")
