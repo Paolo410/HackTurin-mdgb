@@ -22,7 +22,7 @@ Dettagli: [`comms/README.md`](../comms/README.md) (Arduino), [`app/README.md`](.
 - La **sicurezza resta sulla scheda**: `ai/` decide, il firmware comanda il semaforo. La rete serve solo a portare i dati
   alla centrale: se cade, il semaforo funziona lo stesso.
 - **Demo in locale**: il broker MQTT è dentro l'app sul PC, PC e Arduino stanno sulla stessa rete Wi-Fi.
-  **In produzione** al posto del PC ci sarà un broker in cloud (AWS IoT Core o un altro broker MQTT 5) con TLS e un
+  **In produzione** al posto del PC ci sarà un broker MQTT 5 in cloud con TLS e un
   certificato per nodo: stesso codice, cambia solo la configurazione. Il backup BLE diventerà LoRaWAN.
 
 ## 2. Dopo il merge (tutti)
