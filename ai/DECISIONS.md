@@ -200,10 +200,9 @@ con v_ped 0,3 → 25 s.
 11. **Esempio di C1 in §4.** `green_s: 19` non corrisponde allo scenario della sua `reason` (W = 7 m e v_ped 0,8 danno
     10,75 s). È solo illustrativo: fanno fede i valori dei test di §8.
 12. **`docs/CONTRACTS.md` non esiste ancora.** Finché Lorenzo non lo pubblica, `ai/` lavora contro la bozza di §4.
-13. **Il modello ufficiale ha l'input fisso a 416 px** (verificato in AI-M1: ingresso `[1, 3, 416, 416]`). La specifica
-    punta a 320 px per arrivare a 8 FPS sulla scheda. Per avere il 320 serve un file diverso: o si modifica la
-    dimensione d'ingresso dell'ONNX, o lo si riesporta dai pesi ufficiali (torch solo sul PC, mai a runtime).
-    Fino ad allora tutto gira a 416.
+13. **Input a 320 px: risolto.** Il modello ufficiale dichiara un input fisso a 416 px, ma la rete non ha dimensioni
+    fisse al suo interno. `scripts/make_dynamic_model.py` ne crea una copia a input libero (stessi pesi, output
+    identico a 416 px). Il default è ora 320 px, come da specifica; il 416 resta disponibile da `config.yaml`.
 14. **`sv.ByteTrack` è deprecato** in supervision e sparisce dalla 0.31. Con la versione fissata (0.30.5) funziona:
     il pin non va alzato senza cambiare tracker.
 15. **Valori scelti in AI-M1** per i parametri non specificati (punto 8), tutti in `config.yaml` e da tarare su un
