@@ -32,30 +32,55 @@ COCO_CLASSES = (
 _EPS = 1e-9  # avoids a division by zero in the IoU
 
 
-def letterbox(frame: np.ndarray, size: int, pad_value: int) -> tuple[np.ndarray, float]:
+def _width_height(size) -> tuple[int, int]:
+    """Input size as (width, height): an int means a square."""
+    if isinstance(size, (int, np.integer)):
+        return int(size), int(size)
+    return int(size[0]), int(size[1])
+
+
+def letterbox(frame: np.ndarray, size, pad_value: int) -> tuple[np.ndarray, float]:
     """YOLOX preprocess: resize keeping the aspect ratio, pad bottom/right, keep BGR, no normalization.
 
-    Returns the (1, 3, size, size) float32 blob and the resize ratio.
+    size: an int (square input) or (width, height).
+    Returns the (1, 3, height, width) float32 blob and the resize ratio.
     """
+    in_w, in_h = _width_height(size)
     h, w = frame.shape[:2]
-    ratio = min(size / h, size / w)
-    new_w, new_h = int(w * ratio), int(h * ratio)
-    padded = np.full((size, size, 3), pad_value, dtype=np.uint8)
+    ratio = min(in_h / h, in_w / w)
+    new_w, new_h = max(1, int(w * ratio)), max(1, int(h * ratio))
+    padded = np.full((in_h, in_w, 3), pad_value, dtype=np.uint8)
     padded[:new_h, :new_w] = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
     blob = np.ascontiguousarray(padded.transpose(2, 0, 1), dtype=np.float32)[None]
     return blob, ratio
 
 
-def make_grids(size: int, strides: list[int]) -> tuple[np.ndarray, np.ndarray]:
-    """Grid cell offsets (N, 2) and the stride of each cell (N, 1), for all head levels."""
+def make_grids(size, strides: list[int]) -> tuple[np.ndarray, np.ndarray]:
+    """Grid cell offsets (N, 2) and the stride of each cell (N, 1), for all head levels.
+
+    size: an int (square input) or (width, height).
+    """
+    in_w, in_h = _width_height(size)
     grids, expanded = [], []
     for stride in strides:
-        n = size // stride
-        xv, yv = np.meshgrid(np.arange(n), np.arange(n))
+        xv, yv = np.meshgrid(np.arange(in_w // stride), np.arange(in_h // stride))
         grid = np.stack((xv, yv), axis=2).reshape(-1, 2)
         grids.append(grid)
         expanded.append(np.full((grid.shape[0], 1), stride))
     return np.concatenate(grids).astype(np.float32), np.concatenate(expanded).astype(np.float32)
+
+
+def fit_input(width: int, height: int, budget: int, multiple: int) -> tuple[int, int]:
+    """Input (width, height) with the shape of the image and about budget x budget pixels.
+
+    A 16:9 frame letterboxed into a square wastes almost half of the input on padding. With the same
+    number of pixels (so the same cost) shaped like the image, every object is seen larger.
+    """
+    aspect = width / height
+    area = budget * budget
+    in_w = max(multiple, round((area * aspect) ** 0.5 / multiple) * multiple)
+    in_h = max(multiple, round((area / aspect) ** 0.5 / multiple) * multiple)
+    return int(in_w), int(in_h)
 
 
 def decode_outputs(raw: np.ndarray, grids: np.ndarray, strides: np.ndarray) -> np.ndarray:
@@ -147,31 +172,74 @@ class Detector:
         self.input_name = model_input.name
 
         self.input_size = int(m["input_size"])
-        strides = list(m["strides"])
-        if self.input_size % max(strides) != 0:
-            raise ValueError(f"input_size={self.input_size} must be a multiple of {max(strides)}")
+        self.strides = list(m["strides"])
+        if self.input_size % max(self.strides) != 0:
+            raise ValueError(f"input_size={self.input_size} must be a multiple of {max(self.strides)}")
         # The official file has a fixed 416 px input; scripts/make_dynamic_model.py frees it.
         fixed = model_input.shape[2]
-        if isinstance(fixed, int) and fixed != self.input_size:
+        self.free_size = not isinstance(fixed, int)
+        if not self.free_size and fixed != self.input_size:
             warnings.warn(
                 f"{path.name} has a fixed {fixed} px input: ignoring input_size={self.input_size}.",
                 stacklevel=2,
             )
             self.input_size = fixed
+        # Same pixel budget, shaped like the image (needs the free-size model).
+        self.match_aspect = bool(m["match_aspect"]) and self.free_size
 
         self.pad_value = int(m["pad_value"])
         self.conf = float(m["conf"])
         self.nms_threshold = float(m["nms"])
         self.cross_class_threshold = float(m["nms_cross_class"])
         self.keep_ids = np.array([COCO_CLASSES.index(name) for name in m["keep_classes"]], dtype=np.int64)
-        self._grids, self._strides = make_grids(self.input_size, strides)
+        self.roi: tuple[float, float, float, float] | None = None   # normalized x0, y0, x1, y1
+        self.input_wh = (self.input_size, self.input_size)          # size used on the last frame
+        self._grid_cache: dict[tuple[int, int], tuple[np.ndarray, np.ndarray]] = {}
+
+    @property
+    def input_label(self) -> str:
+        """The input actually used, for the screen: '320' or '416x256'."""
+        w, h = self.input_wh
+        return str(w) if w == h else f"{w}x{h}"
+
+    def set_roi(self, roi) -> None:
+        """Region of interest of the camera (normalized x0, y0, x1, y1), or None for the whole frame."""
+        if roi is None:
+            self.roi = None
+            return
+        x0, y0, x1, y1 = (float(v) for v in roi)
+        if not (0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1):
+            raise ValueError(f"roi must be x0 < x1 and y0 < y1 within 0..1, got {roi}")
+        self.roi = (x0, y0, x1, y1)
+
+    def _grids_for(self, width: int, height: int) -> tuple[np.ndarray, np.ndarray]:
+        if self.match_aspect:
+            self.input_wh = fit_input(width, height, self.input_size, max(self.strides))
+        else:
+            self.input_wh = (self.input_size, self.input_size)
+        if self.input_wh not in self._grid_cache:
+            self._grid_cache[self.input_wh] = make_grids(self.input_wh, self.strides)
+        return self._grid_cache[self.input_wh]
+
+    def infer(self, image: np.ndarray) -> tuple[np.ndarray, float]:
+        """Runs the network on an image. Returns the decoded predictions and the resize ratio."""
+        grids, strides = self._grids_for(image.shape[1], image.shape[0])
+        blob, ratio = letterbox(image, self.input_wh, self.pad_value)
+        raw = self.session.run(None, {self.input_name: blob})[0][0]
+        return decode_outputs(raw, grids, strides), ratio
 
     def detect(self, frame: np.ndarray) -> sv.Detections:
-        blob, ratio = letterbox(frame, self.input_size, self.pad_value)
-        raw = self.session.run(None, {self.input_name: blob})[0][0]
-        decoded = decode_outputs(raw, self._grids, self._strides)
+        x_off = y_off = 0
+        image = frame
+        if self.roi is not None:
+            h, w = frame.shape[:2]
+            x_off, y_off = int(self.roi[0] * w), int(self.roi[1] * h)
+            image = frame[y_off:int(self.roi[3] * h), x_off:int(self.roi[2] * w)]
+        decoded, ratio = self.infer(image)
         xyxy, scores, class_ids = postprocess(
-            decoded, ratio, frame.shape[:2], self.conf, self.nms_threshold, self.keep_ids,
+            decoded, ratio, image.shape[:2], self.conf, self.nms_threshold, self.keep_ids,
             self.cross_class_threshold,
         )
+        if x_off or y_off:
+            xyxy = xyxy + np.array([x_off, y_off, x_off, y_off], dtype=xyxy.dtype)
         return sv.Detections(xyxy=xyxy, confidence=scores, class_id=class_ids)

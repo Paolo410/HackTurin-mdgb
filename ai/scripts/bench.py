@@ -58,7 +58,7 @@ def main() -> int:
     total = stats.total_mean()
     print(f"source={source.name} profile={cfg['profile']} emulate_unoq={cfg['emulate_unoq']}")
     print(stats.table(float(cfg["bench"]["percentile"])))
-    print(f"frames={measured} input={pipeline.detector.input_size}px threads={threads or 'auto'} "
+    print(f"frames={measured} input={pipeline.detector.input_label} threads={threads or 'auto'} "
           f"pipeline FPS={1000.0 / total:.1f}")
     return 0
 

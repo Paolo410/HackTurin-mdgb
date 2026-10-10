@@ -19,7 +19,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from smartcrossing.config import load_config  # noqa: E402
-from smartcrossing.detector import COCO_CLASSES, Detector, decode_outputs, letterbox  # noqa: E402
+from smartcrossing.detector import COCO_CLASSES, Detector  # noqa: E402
 
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 NO_FINETUNING_ABOVE = 0.70   # (spec)
@@ -27,9 +27,7 @@ NO_FINETUNING_ABOVE = 0.70   # (spec)
 
 def probe(detector: Detector, image: np.ndarray, animal_ids: np.ndarray) -> tuple[str, float, str | None, float]:
     """Best class over all of COCO, and best kept animal class (None below the confidence threshold)."""
-    blob, _ = letterbox(image, detector.input_size, detector.pad_value)
-    raw = detector.session.run(None, {detector.input_name: blob})[0][0]
-    decoded = decode_outputs(raw, detector._grids, detector._strides)
+    decoded, _ = detector.infer(image)
     scores = (decoded[:, 4:5] * decoded[:, 5:]).max(axis=0)
     best = int(scores.argmax())
     best_animal = int(animal_ids[scores[animal_ids].argmax()])
@@ -70,7 +68,7 @@ def main() -> int:
     recall = hits / len(images)
     verdict = "no fine-tuning needed" if recall > NO_FINETUNING_ABOVE else "fine-tuning to consider"
     print(f"\nrecall 'at least one animal': {hits}/{len(images)} = {recall:.0%} -> {verdict} "
-          f"(threshold {NO_FINETUNING_ABOVE:.0%}, input {detector.input_size}px, conf {detector.conf})")
+          f"(threshold {NO_FINETUNING_ABOVE:.0%}, input {detector.input_label}, conf {detector.conf})")
     return 0
 
 
