@@ -1,7 +1,13 @@
-"""Lines of the microcontroller (C5): shock, technician's badge, sensors; the status page; the app on a video."""
+"""Lines of the microcontroller (C5): technician's badge, anti-theft shock, sensors; the technician's page
+(badge, login, live view that can be switched off); the app on a video."""
+import http.client
+import importlib.util
 import json
-import urllib.error
-import urllib.request
+import secrets
+import stat
+import threading
+import time
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -12,11 +18,12 @@ from smartcrossing.config import load_config
 from smartcrossing.mcu import C5FileTail, McuState
 from smartcrossing.pipeline import Pipeline
 from smartcrossing.sim import FRAME_SIZE, demo_calib
-from smartcrossing.status_page import PAGE, OperatorPage
+from smartcrossing.status_page import HASH_VAR, USER_VAR, OperatorPage, check_password, hash_password, load_credentials
 
 CFG = load_config()
 SHOCK = {"v": 1, "src": "mcu", "type": "tamper", "code": 1}
 BADGE = {"v": 1, "src": "mcu", "type": "tamper", "code": 3}
+USER, PASSWORD = "tecnico", secrets.token_urlsafe(12)     # made up for each run: never a real password
 
 
 class Clock:
@@ -27,41 +34,57 @@ class Clock:
         return self.t
 
 
-def get(port, path):
-    try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}{path}", timeout=5) as response:
-            return response.status, response.read()
-    except urllib.error.HTTPError as err:
-        return err.code, err.read()
+def request(port, method, path, body=None, cookie=None):
+    """(status, body, Set-Cookie) of one request to the page."""
+    conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+    headers = {"Cookie": cookie} if cookie else {}
+    conn.request(method, path, body=body, headers=headers)
+    response = conn.getresponse()
+    data = response.read()
+    conn.close()
+    return response.status, data, (response.getheader("Set-Cookie") or "").split(";")[0]
 
 
-def test_a_shock_means_degraded_for_a_while_and_the_badge_clears_it():
+def page_with_login(monkeypatch, images=True, mcu=None):
+    cfg = load_config()
+    cfg["operator"]["share_images"] = images
+    monkeypatch.setenv(USER_VAR, USER)
+    monkeypatch.setenv(HASH_VAR, hash_password(PASSWORD, iterations=1000))   # few iterations: fast tests
+    mcu = mcu or McuState(cfg)
+    return OperatorPage(0, mcu, cfg, host="127.0.0.1"), mcu                  # port 0: any free port
+
+
+def login(page, user=USER, password=PASSWORD):
+    return request(page.port, "POST", "/login", body=f"user={user}&password={password}")
+
+
+def test_a_shock_is_the_anti_theft_alarm_and_does_not_change_the_vision():
     clock = Clock()
     mcu = McuState(CFG, monotonic=clock)
-    assert mcu.fault() is None and not mcu.unlocked()
+    assert mcu.fault() is None and mcu.snapshot()["shock_s_ago"] is None
     mcu.on_line(SHOCK)
-    assert mcu.fault() == "tamper"
-    clock.t += CFG["mcu"]["tamper_hold_s"] - 1
-    assert mcu.fault() == "tamper"
-    clock.t += 2
-    assert mcu.fault() is None                      # the hold time is over
-    mcu.on_line(SHOCK)
-    mcu.on_line(BADGE)
-    assert mcu.fault() is None and mcu.unlocked()   # the technician checked: cleared at once
-    clock.t += CFG["operator"]["unlock_s"] + 1
-    assert not mcu.unlocked()                       # the page closes by itself
+    clock.t += 7
+    assert mcu.fault() is None                      # the vision keeps working: the alarm is for the central
+    assert mcu.snapshot()["shock_s_ago"] == 7       # the technician sees it
 
 
-def test_without_a_hold_time_only_the_badge_clears_a_shock():
-    cfg = load_config()
-    cfg["mcu"]["tamper_hold_s"] = None
+def test_the_badge_opens_a_window_and_a_second_badge_only_adds_time():
     clock = Clock()
-    mcu = McuState(cfg, monotonic=clock)
-    mcu.on_line(SHOCK)
-    clock.t += 86400
-    assert mcu.fault() == "tamper"
+    mcu = McuState(CFG, monotonic=clock)
+    assert not mcu.unlocked() and mcu.window == 0
     mcu.on_line(BADGE)
-    assert mcu.fault() is None
+    assert mcu.unlocked() and mcu.window == 1
+    clock.t += CFG["operator"]["unlock_s"] - 10
+    mcu.on_line(BADGE)                              # still open: same window, more time
+    assert mcu.window == 1
+    clock.t += 20
+    assert mcu.unlocked()
+    clock.t += CFG["operator"]["unlock_s"]
+    assert not mcu.unlocked()                       # it closes by itself
+    mcu.on_line(BADGE)
+    assert mcu.window == 2                          # a new window: old sessions do not come back to life
+    mcu.lock()
+    assert not mcu.unlocked()
 
 
 def test_sensors_lamp_fault_and_lines_we_do_not_know():
@@ -98,31 +121,151 @@ def test_file_reader_skips_the_past_and_follows_new_lines_and_new_files(tmp_path
     assert tail.poll() == 0
 
 
-def test_status_page_answers_only_after_the_badge_and_never_shows_images():
-    mcu = McuState(CFG)
-    page = OperatorPage(0, mcu, host="127.0.0.1")      # port 0: any free port
+def test_password_is_stored_only_as_a_salted_hash(tmp_path, monkeypatch):
+    stored = hash_password(PASSWORD, iterations=1000)
+    assert PASSWORD not in stored and check_password(PASSWORD, stored)
+    assert not check_password(PASSWORD + "x", stored) and not check_password(PASSWORD, "not a hash")
+    assert hash_password(PASSWORD, iterations=1000) != stored            # a new salt every time
+
+    spec = importlib.util.spec_from_file_location(
+        "operator_login", Path(__file__).resolve().parent.parent / "scripts" / "operator_login.py")
+    tool = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tool)
+    path = tmp_path / ".env"
+    path.write_text("OTHER=1\n" + USER_VAR + "=old\n")
+    tool.write_credentials(path, USER, PASSWORD)
+    text = path.read_text()
+    assert "OTHER=1" in text and "old" not in text and PASSWORD not in text
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600                    # readable by the owner only
+
+    monkeypatch.delenv(USER_VAR, raising=False)
+    monkeypatch.delenv(HASH_VAR, raising=False)
+    cfg = load_config()
+    cfg["operator"]["credentials_file"] = str(path)
+    user, stored = load_credentials(cfg)
+    assert user == USER and check_password(PASSWORD, stored)
+    cfg["operator"]["credentials_file"] = str(tmp_path / "missing")
+    assert load_credentials(cfg) is None
+
+
+def test_technician_page_needs_the_badge_and_then_the_login(monkeypatch):
+    page, mcu = page_with_login(monkeypatch)
     try:
         page.update({"state": "PRESENCE", "reason": "pedone in attesa", "fps": 9.5})
-        assert get(page.port, "/")[0] == 200
-        code, body = get(page.port, "/status.json")
-        assert code == 403 and json.loads(body) == {"locked": True}
+        assert request(page.port, "GET", "/")[0] == 200                   # the page itself holds no data
+        assert request(page.port, "GET", "/status.json")[0] == 403        # no badge
+        assert login(page)[0] == 403                                      # right password, no badge: no
         mcu.on_line(BADGE)
-        code, body = get(page.port, "/status.json")
+        assert request(page.port, "GET", "/status.json")[0] == 401        # badge, not logged in
+        assert login(page, password="wrong")[0] == 401
+        assert login(page, user="someone")[0] == 401
+        code, _, cookie = login(page)
+        assert code == 200 and cookie.startswith("mdgb_session=")
+        code, body, _ = request(page.port, "GET", "/status.json", cookie=cookie)
         status = json.loads(body)
-        assert code == 200 and status["state"] == "PRESENCE" and status["mcu"]["unlock_s_left"] > 0
-        assert get(page.port, "/frame.jpg")[0] == 404
+        assert code == 200 and status["state"] == "PRESENCE" and status["session_s_left"] > 0
+        assert request(page.port, "GET", "/status.json", cookie="mdgb_session=guess")[0] == 401
+        request(page.port, "POST", "/logout", cookie=cookie)
+        assert request(page.port, "GET", "/status.json", cookie=cookie)[0] == 401
+        _, _, cookie = login(page)
+        mcu.lock()                                                        # the time of the badge is over
+        assert request(page.port, "GET", "/status.json", cookie=cookie)[0] == 403
+        mcu.on_line(BADGE)                                                # next badge: the old session is dead
+        assert request(page.port, "GET", "/status.json", cookie=cookie)[0] == 401
     finally:
         page.close()
-    for tag in ("<img", "<video", "<canvas"):
-        assert tag not in PAGE
+
+
+def test_too_many_wrong_passwords_close_the_page_until_the_next_badge(monkeypatch):
+    page, mcu = page_with_login(monkeypatch)
+    try:
+        mcu.on_line(BADGE)
+        for _ in range(CFG["operator"]["max_failed_logins"]):
+            assert login(page, password="wrong")[0] == 401
+        assert login(page)[0] == 403 and not mcu.unlocked()               # even the right one: badge again
+        mcu.on_line(BADGE)
+        assert login(page)[0] == 200
+    finally:
+        page.close()
+
+
+def test_without_credentials_on_the_board_nobody_gets_in(monkeypatch, tmp_path):
+    monkeypatch.delenv(USER_VAR, raising=False)
+    monkeypatch.delenv(HASH_VAR, raising=False)
+    cfg = load_config()
+    cfg["operator"]["credentials_file"] = str(tmp_path / "missing")
+    mcu = McuState(cfg)
+    page = OperatorPage(0, mcu, cfg, host="127.0.0.1")
+    try:
+        mcu.on_line(BADGE)
+        assert login(page, user="", password="")[0] == 503
+        assert request(page.port, "GET", "/status.json")[0] == 401
+    finally:
+        page.close()
+
+
+def test_live_view_only_for_a_logged_in_technician_who_is_watching(monkeypatch):
+    page, mcu = page_with_login(monkeypatch, images=True)
+    frame = np.full((480, 640, 3), 90, dtype=np.uint8)
+    try:
+        mcu.on_line(BADGE)
+        assert request(page.port, "GET", "/stream.mjpg")[0] == 401
+        assert not page.wants_frame()                                     # nobody watching: no frame is made
+        _, _, cookie = login(page)
+        stop = threading.Event()
+
+        def vision_loop():
+            while not stop.is_set():
+                if page.wants_frame():
+                    page.push_frame(frame)
+                time.sleep(0.01)
+
+        feeder = threading.Thread(target=vision_loop)
+        feeder.start()
+        conn = http.client.HTTPConnection("127.0.0.1", page.port, timeout=5)
+        conn.request("GET", "/stream.mjpg", headers={"Cookie": cookie})
+        response = conn.getresponse()
+        assert response.status == 200 and "multipart/x-mixed-replace" in response.getheader("Content-Type")
+        data = response.read(3000)
+        start = data.index(b"\xff\xd8")                                 # a JPEG starts here
+        assert b"Content-Type: image/jpeg" in data[:start]
+        length = int(data[:start].split(b"Content-Length: ")[1].split(b"\r\n")[0])
+        jpeg = (data + response.read(max(0, start + length - len(data))))[start:start + length]
+        image = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
+        assert image.shape[1] == CFG["operator"]["stream_width"]          # reduced for the phone
+        mcu.lock()                                                        # badge time over: the stream ends
+        response.read()
+        conn.close()
+        stop.set()
+        feeder.join()
+        deadline = time.monotonic() + 3
+        while page._viewers and time.monotonic() < deadline:
+            time.sleep(0.02)
+        assert page._viewers == 0 and page._jpeg is None                  # no image is kept once nobody watches
+    finally:
+        page.close()
+
+
+def test_with_images_switched_off_only_the_statistics_remain(monkeypatch):
+    page, mcu = page_with_login(monkeypatch, images=False)
+    try:
+        mcu.on_line(BADGE)
+        _, _, cookie = login(page)
+        page.update({"state": "IDLE"})
+        code, body, _ = request(page.port, "GET", "/status.json", cookie=cookie)
+        assert code == 200 and json.loads(body)["images"] is False
+        assert request(page.port, "GET", "/stream.mjpg", cookie=cookie)[0] == 404
+        assert not page.wants_frame()                                     # the vision never draws or encodes a frame
+    finally:
+        page.close()
 
 
 def test_a_fault_of_the_microcontroller_puts_the_rule_in_degraded():
     pipeline = Pipeline(CFG, frame_rate=10, calib=demo_calib(CFG), load_detector=False)
     assert pipeline.process(sv.Detections.empty(), 0.0, FRAME_SIZE).command["state"] == "IDLE"
-    pipeline.external_fault = "tamper"
+    pipeline.external_fault = "lamp_fault"
     command = pipeline.process(sv.Detections.empty(), 0.1, FRAME_SIZE).command
-    assert command["state"] == "DEGRADED" and "urtato" in command["reason"]
+    assert command["state"] == "DEGRADED" and "lampada" in command["reason"]
     assert pipeline.no_frame(0.2)["state"] == "DEGRADED"
     pipeline.external_fault = None
     for i in range(3, 30):                               # back to normal after the hold time of the rule
@@ -130,7 +273,9 @@ def test_a_fault_of_the_microcontroller_puts_the_rule_in_degraded():
     assert command["state"] == "IDLE"
 
 
-def test_the_app_reads_the_files_of_the_sketch_app_and_serves_the_page(tmp_path, capsys):
+def test_the_app_reads_the_files_of_the_sketch_app_and_serves_the_page(tmp_path, capsys, monkeypatch):
+    monkeypatch.delenv(USER_VAR, raising=False)
+    monkeypatch.delenv(HASH_VAR, raising=False)
     video = str(tmp_path / "grey.avi")
     writer = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*"MJPG"), 10.0, (320, 240))
     rng = np.random.default_rng(0)
@@ -141,4 +286,4 @@ def test_the_app_reads_the_files_of_the_sketch_app_and_serves_the_page(tmp_path,
                      "--operator-port", "0", "--max-frames", "8"])
     out = capsys.readouterr().out
     assert code == 0
-    assert f"mcu_files={tmp_path}/applab-*.jsonl" in out and "operator_page=:" in out
+    assert f"mcu_files={tmp_path}/applab-*.jsonl" in out and "operator_page=:" in out and "images=on" in out

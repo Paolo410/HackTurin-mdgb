@@ -9,11 +9,13 @@ The lines arrive from two places, and both end in McuState.on_line:
   badge reach the vision with the sketch as it is, and nothing is reported twice to the central.
 
 What the vision does with them:
-- shock or open case (tamper code 1, 2): the camera may have moved, so the calibration is not trusted and
-  the state is DEGRADED, for mcu.tamper_hold_s or until the badge;
-- badge of the technician (tamper code 3): clears the tamper and opens the status page for operator.unlock_s;
+- badge of the technician (tamper code 3): opens the technician's page for operator.unlock_s (then the
+  technician logs in with user name and password, see status_page.py);
+- shock or open case (tamper code 1, 2): it is the anti-theft alarm of the node. The vision keeps working
+  as before and only shows it on the technician's page. Telling the central that the node was tampered
+  with is the job of the network part (comms/), to be wired when the two parts are merged;
 - lamp_fault: DEGRADED while the firmware keeps reporting it;
-- env, failsafe: only shown on the status page.
+- env, failsafe: only shown on the technician's page.
 """
 from __future__ import annotations
 
@@ -29,16 +31,14 @@ _NOT_VALUES = ("v", "src", "type", "ts")
 
 class McuState:
     def __init__(self, cfg: dict, monotonic: Callable[[], float] = time.monotonic):
-        hold = cfg["mcu"]["tamper_hold_s"]
-        self.tamper_hold_s = None if hold is None else float(hold)
         self.lamp_fault_hold_s = float(cfg["mcu"]["lamp_fault_hold_s"])
         self.unlock_s = float(cfg["operator"]["unlock_s"])
         self._monotonic = monotonic
         self._lock = threading.Lock()     # lines arrive from the Bridge thread and from the file reader
         self.env: dict = {}
         self.badges = 0
-        self._tamper_at: float | None = None
-        self._tamper_code: int | None = None
+        self.window = 0                   # counts the periods opened by a badge: a session belongs to one of them
+        self._shock_at: float | None = None
         self._lamp_fault_at: float | None = None
         self._unlocked_until = -float("inf")
         self._failsafe: tuple[float, str] | None = None
@@ -55,10 +55,11 @@ class McuState:
             elif kind == "tamper":
                 if line.get("code") == BADGE_CODE:
                     self.badges += 1
-                    self._tamper_at = self._tamper_code = None
+                    if now >= self._unlocked_until:
+                        self.window += 1          # a badge while still open only adds time
                     self._unlocked_until = now + self.unlock_s
                 else:
-                    self._tamper_at, self._tamper_code = now, line.get("code")
+                    self._shock_at = now
             elif kind == "lamp_fault":
                 self._lamp_fault_at = now
             elif kind == "failsafe":
@@ -68,8 +69,6 @@ class McuState:
         """The reason for DEGRADED that comes from the microcontroller, None when there is none."""
         now = self._monotonic()
         with self._lock:
-            if self._tamper_at is not None and (self.tamper_hold_s is None or now - self._tamper_at < self.tamper_hold_s):
-                return "tamper"
             if self._lamp_fault_at is not None and now - self._lamp_fault_at < self.lamp_fault_hold_s:
                 return "lamp_fault"
         return None
@@ -77,6 +76,11 @@ class McuState:
     def unlocked(self) -> bool:
         """True for operator.unlock_s after the technician's badge."""
         return self._monotonic() < self._unlocked_until
+
+    def lock(self) -> None:
+        """Closes the technician's page until the next badge (too many wrong passwords)."""
+        with self._lock:
+            self._unlocked_until = -float("inf")
 
     def snapshot(self) -> dict:
         """What the status page shows about the microcontroller."""
@@ -86,8 +90,7 @@ class McuState:
             return {
                 "env": dict(self.env),
                 "fault": fault,
-                "tamper_code": self._tamper_code if fault == "tamper" else None,
-                "tamper_s_ago": round(now - self._tamper_at) if self._tamper_at is not None else None,
+                "shock_s_ago": round(now - self._shock_at) if self._shock_at is not None else None,
                 "firmware_failsafe": ({"reason": self._failsafe[1], "s_ago": round(now - self._failsafe[0])}
                                       if self._failsafe else None),
                 "unlock_s_left": round(max(0.0, self._unlocked_until - now)),

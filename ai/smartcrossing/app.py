@@ -49,8 +49,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--calib", help="path to a calib.json (default: ai/calib.json, else ai/calib.example.json)")
     p.add_argument("--c3-dir", help="folder of the C3 event files (default: $MDGB_C3_DIR, else logs/c3 in the repo)")
     p.add_argument("--no-c3", action="store_true", help="do not write the C3 event files")
-    p.add_argument("--operator-port", type=int, help="status page for the technician on this port (numbers only, "
-                                                     "open for a few minutes after the badge)")
+    p.add_argument("--operator-port", type=int, help="page for the technician on this port: after the badge and "
+                                                     "a login it shows the numbers and, if enabled, a live view")
     return p.parse_args(argv)
 
 
@@ -77,7 +77,7 @@ def main(argv: list[str] | None = None) -> int:
         actuator.set_listener(lambda line: [handle(line) for handle in handlers])
         events_dir = args.c3_dir or c3_dir(cfg)
         mcu_files = C5FileTail(events_dir, cfg["mcu"]["applab_series"], mcu.on_line, cfg["mcu"]["poll_s"])
-        operator = OperatorPage(args.operator_port, mcu) if args.operator_port is not None else None
+        operator = OperatorPage(args.operator_port, mcu, cfg) if args.operator_port is not None else None
         source = FrameSource(args.source or default_source(cfg), cfg)
         pipeline = Pipeline(cfg, source.fps, calib, actuator, site=args.site, thermal=thermal)
     except (FileNotFoundError, RuntimeError, TypeError, OSError) as exc:
@@ -92,8 +92,10 @@ def main(argv: list[str] | None = None) -> int:
              f"max_fps={cfg['source']['max_fps'] or 'unlimited'} actuator={args.actuator} "
              f"site={pipeline.animals.site_name}")
     print(setup)
-    print(f"c3={log.dir if log else 'off'}  mcu_files={events_dir}/{cfg['mcu']['applab_series']}-*.jsonl"
-          + (f"  operator_page=:{operator.port}" if operator else ""))
+    print(f"c3={log.dir if log else 'off'}  mcu_files={events_dir}/{cfg['mcu']['applab_series']}-*.jsonl")
+    if operator is not None:
+        print(f"operator_page=:{operator.port} images={'on' if operator.share_images else 'off'} "
+              f"login={'set' if operator.credentials else 'NOT SET (run scripts/operator_login.py): nobody can log in'}")
     metric = pipeline.geometry is not None and pipeline.geometry.metric
     print(f"calib={calib_path}" + ("" if metric else
                                   "  (no metric calibration: no speeds and no rule; run scripts/calibrate.py)"))
@@ -111,6 +113,16 @@ def main(argv: list[str] | None = None) -> int:
     page_lat = dict.fromkeys(PHASES, "-")
     # The clock starts at the first frame: opening the camera is not part of the frame rate.
     first = last = last_status = perf_counter()
+
+    def annotate(view) -> None:
+        """What the vision sees, drawn on the frame: for the window and for the technician's live view."""
+        draw_zones(view, pipeline.geometry, cfg)
+        draw_lines(view, pipeline.counter, cfg)
+        draw_tracks(view, result, pipeline.tracker, cfg)
+        draw_hud(view, [f"FPS {fps:.1f}   tracks {n_valid}/{n_tracks}", f"ms  {lat}", counts,
+                        pipeline.events.summary(), setup], cfg)
+        draw_thermal(view, pipeline.thermal, cfg)
+
     pipeline.commander.start()   # heartbeat every 100 ms, only while this loop is alive
     mcu_files.start()
     try:
@@ -174,21 +186,24 @@ def main(argv: list[str] | None = None) -> int:
                     "link_failsafe": getattr(actuator, "connected", None) is False
                                      or bool(getattr(actuator, "failsafe", False)),
                 })
+            # Live view for the technician: drawn only when a logged-in technician is watching and images are on.
+            share = operator is not None and result is not None and operator.wants_frame()
             if args.headless:
                 if result is not None and now - last_status >= float(o["status_every_s"]):
                     print(f"t={now - first:6.1f}s frame={frames} fps={fps:.1f} ms[{lat}] "
                           f"tracks={n_tracks} valid={n_valid} state={command['state']} | {counts}")
                     last_status = now
+                if share:
+                    annotate(last_frame)
+                    draw_state(last_frame, command, cfg, failsafe=bool(getattr(actuator, "failsafe", False)))
+                    operator.push_frame(last_frame)
             else:
                 view = last_frame if result is not None else last_frame.copy()
                 if result is not None:
-                    draw_zones(view, pipeline.geometry, cfg)
-                    draw_lines(view, pipeline.counter, cfg)
-                    draw_tracks(view, result, pipeline.tracker, cfg)
-                    draw_hud(view, [f"FPS {fps:.1f}   tracks {n_valid}/{n_tracks}", f"ms  {lat}", counts,
-                                    pipeline.events.summary(), setup], cfg)
-                    draw_thermal(view, pipeline.thermal, cfg)
+                    annotate(view)
                 draw_state(view, command, cfg, failsafe=bool(getattr(actuator, "failsafe", False)))
+                if share:
+                    operator.push_frame(view)
                 cv2.imshow(o["window_name"], view)
                 if cv2.waitKey(1) & 0xFF in quit_keys:
                     break

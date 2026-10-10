@@ -186,14 +186,19 @@ actuator:
 
 mcu:                              # what the microcontroller tells the vision (C5 lines of CONTRACTS.md)
   applab_series: applab           # files <series>-*.jsonl written in the C3 folder by the App Lab app of the
-                                  # sketch (comms/applab/mdgb_link.py): sensors, shock alarm, technician's badge
+                                  # sketch (comms/applab/mdgb_link.py), when that part is on the board
   poll_s: 0.5                     # how often those files are read
-  tamper_hold_s: 30               # after a shock the camera may have moved: DEGRADED for this long.
-                                  # null = until the technician's badge. The badge always clears it at once
   lamp_fault_hold_s: 5            # DEGRADED while the firmware keeps reporting a lamp fault this often
 
-operator:                         # status page for the technician (--operator-port): numbers only, no images
-  unlock_s: 600                   # the page answers for this long after the badge (tamper code 3)
+operator:                         # page for the technician (--operator-port): badge first, then login
+  unlock_s: 600                   # after the badge: time to log in, and how long the session lasts
+  max_failed_logins: 5            # wrong passwords before the page closes until the next badge
+  credentials_file: .env          # relative to ai/, ignored by git; written by scripts/operator_login.py
+  share_images: true              # live view of what the vision sees, for the logged-in technician.
+                                  # false = statistics only: no image leaves the vision process (privacy)
+  stream_fps: 5                   # live view: frames per second,
+  stream_width: 480               # width in pixels
+  jpeg_quality: 70                # and JPEG quality
 
 derive:
   rider_iou: 0.3                  # (spec) person/two-wheeler IoU above which the person is the rider
