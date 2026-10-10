@@ -81,12 +81,17 @@ class Actuator:
 
 ## Bridge — funzioni RPC sulla UNO Q
 
-Libreria [Arduino_RouterBridge](https://github.com/arduino-libraries/Arduino_RouterBridge) (MessagePack-RPC).
-Lato MCU: `Bridge.begin()`, `Bridge.provide(...)`, `Bridge.provide_safe(...)`, `Bridge.call(...)`, `Bridge.notify(...)`.
-Lato Python: `from arduino.app_utils import Bridge` (usato nel codice testato: `Bridge.call(name, *args)`).
-`TODO(verify)`: `Bridge.notify` e `Bridge.provide` lato Python, e se più processi Linux possono usare il Bridge insieme.
+MessagePack-RPC attraverso il servizio `arduino-router` della scheda (socket `unix:///var/run/arduino-router.sock`).
+- Lato MCU: libreria [Arduino_RouterBridge](https://github.com/arduino-libraries/Arduino_RouterBridge):
+  `Bridge.begin()`, `Bridge.provide(...)`, `Bridge.provide_safe(...)`, `Bridge.call(...)`, `Bridge.notify(...)`.
+- Lato Linux: libreria ufficiale [arduino-router-bridge](https://github.com/arduino/arduino-router-bridge-py)
+  (`pip install arduino-router-bridge`, in `comms/requirements.txt`), la stessa che App Lab usa dentro
+  `arduino.app_utils.Bridge`: funziona anche da un venv normale o da un servizio systemd, senza App Lab. La usa
+  `BridgeActuator` in `comms/actuators.py`.
+- Più processi Linux possono usare il router insieme (la visione e, in produzione, il nodo per LoRa): ogni funzione
+  esposta con `provide` appartiene a un solo processo.
 
-**[da confermare: Salvatore]**
+**[da confermare: Salvatore]** (lato Linux già fatto e provato con la libreria ufficiale)
 
 | Funzione | Chi la espone | Argomenti | Ritorno | Uso |
 |---|---|---|---|---|
@@ -345,3 +350,5 @@ Da compilare. Pin che servono alla comunicazione:
 - v1 (10/10/2026): prima versione da §4 di `PROMPT_SMART_CROSSING.md` con le decisioni di `comms/DECISIONS.md`.
 - v1, stesso giorno (formati invariati): broker locale sul PC per la demo, broker generico in cloud per la produzione
   (niente più AWS IoT Core); ricevitore BLE dentro la centrale.
+- v1, stesso giorno (formati e nomi delle funzioni invariati): lato Linux del Bridge con la libreria ufficiale
+  `arduino-router-bridge` (verificata), al posto di `arduino.app_utils` che esiste solo dentro App Lab.
