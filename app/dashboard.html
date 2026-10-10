@@ -227,7 +227,7 @@ document.querySelectorAll("button, h2").forEach(el => {
   el.innerHTML = el.innerHTML.replace(/__IC_(\w+)__/g, (_, n) => ic(n));
 });
 
-const DIAG = { ok: "ok-b", network_down: "warn-b", battery_low: "warn-b", faulty: "bad-b", linux_hung: "bad-b",
+const DIAG = { ok: "ok-b", network_down: "warn-b", checking: "warn-b", battery_low: "warn-b", faulty: "bad-b", linux_hung: "bad-b",
                tampered: "bad-b", destroyed: "bad-b", unknown: "neutral" };
 const DOT = { "ok-b": "#16a34a", "warn-b": "#d97706", "bad-b": "#dc2626", neutral: "#9ca3af", ok: "#16a34a" };
 const STATE_IT = { IDLE: "Nessuno in zona", PRESENCE: "Presenza", WARN_DRIVER: "Avviso ai conducenti",
@@ -253,7 +253,7 @@ function select(id) { picked = id; if (S) render(S); }
 const MAPLIBRE = "https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl";
 const STYLES = { light: "https://tiles.openfreemap.org/styles/positron", dark: "https://tiles.openfreemap.org/styles/dark",
                  detailed: "https://tiles.openfreemap.org/styles/liberty" };
-const PULSE = new Set(["network_down", "faulty", "linux_hung", "tampered", "destroyed", "battery_low"]);
+const PULSE = new Set(["network_down", "checking", "faulty", "linux_hung", "tampered", "destroyed", "battery_low"]);
 const darkMq = window.matchMedia("(prefers-color-scheme: dark)");
 let gmap = null, gmarkers = {}, styleChoice = "auto";
 try { styleChoice = localStorage.getItem("mdgb-map-style") || "auto"; } catch (e) {}
@@ -461,7 +461,7 @@ function detailView(n, s) {
        "Wi-Fi è il canale normale; il Bluetooth si accende da solo se il Wi-Fi del nodo è giù da 30 s"),
     kv("clock", "Ultimo contatto", ago(n.last_contact_s)),
   ];
-  if (n.diagnosis.code === "network_down" && n.mqtt_silent_s != null) items.push(kv("wifi", "Senza Wi-Fi da", dur(n.mqtt_silent_s)));
+  if ((n.diagnosis.code === "network_down" || n.diagnosis.code === "checking") && n.mqtt_silent_s != null) items.push(kv("wifi", "Senza Wi-Fi da", dur(n.mqtt_silent_s)));
   items.push(kv("light", "Semaforo", esc(STATE_IT[n.state] || n.state || "n.d."), `Modalità ${MODE_IT[n.mode] || n.mode || "n.d."}${n.fps ? ` · ${n.fps} fotogrammi/s` : ""}`));
   items.push(kv("queue", "Eventi in attesa", num(n.queue), "Eventi salvati sul nodo e non ancora confermati dalla centrale: si svuota da solo quando torna la rete"));
   items.push(kv("battery", "Batteria", n.batt == null ? "n.d." : n.batt + "%"));

@@ -5,6 +5,7 @@ TEXT = {
     "ok": "nodo OK",
     "faulty": "nodo guasto",
     "network_down": "rete giù, nodo sano",
+    "checking": "Wi-Fi perso, attendo il Bluetooth",
     "linux_hung": "Linux bloccato, MCU vivo",
     "tampered": "manomissione (probabile)",
     "battery_low": "batteria scarica (probabile)",
@@ -31,7 +32,8 @@ def _result(code, via=None, detail=None, last_contact=None):
             "last_contact": last_contact}
 
 
-def diagnose(now, hb=None, hb_rx=None, backup=(), mqtt_window_s=30, backup_window_s=660, alarm_window_s=600):
+def diagnose(now, hb=None, hb_rx=None, backup=(), mqtt_window_s=30, backup_window_s=660, alarm_window_s=600,
+             backup_grace_s=20):
     """hb: ultimo `hb` MQTT (dict) ricevuto all'istante hb_rx (Last Will compreso: online = false).
     backup: [(rx_at, via, decoded)] dei messaggi di backup recenti. Ritorna {"code", "text", "via", "last_contact"}."""
     backup = sorted(backup, key=lambda x: x[0])
@@ -56,6 +58,13 @@ def diagnose(now, hb=None, hb_rx=None, backup=(), mqtt_window_s=30, backup_windo
         return _result("ok", "mqtt", last_contact=last_contact)
     if recent:
         return _result("network_down", recent[-1][1], last_contact=last_contact)
+    # MQTT appena perso e ancora niente dal backup: il nodo accende il backup dopo 30 s senza conferme MQTT e il
+    # Last Will del broker può arrivare prima del primo beacon (provato sulla UNO Q: 5 s prima). Prima di dire
+    # "distrutto" si aspettano backup_grace_s dal momento in cui MQTT è stato perso.
+    if hb and hb_rx is not None:
+        lost_at = hb_rx if hb.get("online") is False else hb_rx + mqtt_window_s
+        if now - lost_at <= backup_grace_s:
+            return _result("checking", last_contact=last_contact)
 
     # entrambi i canali muti: si guarda cosa è successo prima del silenzio
     before = [(t, d) for t, d in alarms if last_contact - t <= alarm_window_s]
