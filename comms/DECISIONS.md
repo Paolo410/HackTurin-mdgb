@@ -136,7 +136,7 @@ le 5 categorie person, wheelchair, bicycle, stroller, other e frame BLE da 27 by
 
 ## 3. Codice già scritto o testato
 
-Tutto in `~/Desktop/HACKATHLON`, non ancora nel repo. Si integra in CM-M2/CM-M3 **senza riscriverlo**.
+Origine: `~/Desktop/HACKATHLON`. Importato invariato nel repo (commit `dea7f50`), poi adattato a CONTRACTS v1 con diff piccoli.
 
 | File | Cosa fa | Destinazione |
 |---|---|---|
@@ -171,14 +171,21 @@ Codice nel repo:
 | `comms/actuators.py` | interfaccia `Actuator` (C1/C2) con `SimActuator`, `SerialActuator`; righe C5 dall'MCU | CM-M1 |
 | `comms/jsonl.py` | scrittura dei file JSONL con rotazione (regole di C3) | CM-M1 |
 | `comms/tools/c1_send.py` | manda C1 e C2 al firmware da PC, anche togliendo l'heartbeat per provare il fail-safe | CM-M1 |
+| `comms/node/` | nodo: Store & Forward, uplink MQTT v1, aggregati, backup BLE/LoRa, lettura dei file C3/C5 | CM-M2 |
+| `comms/aws/` | policy IoT su `mdgb/` e `setup_thing.sh` | CM-M2 |
+| `comms/tools/c3_sim.py` | scrive righe C3 finte come farà `ai/` | CM-M2 |
+| `app/` | ingest v1 (dedup, buchi), decoder C4-B, ricevitori BLE / LoRa P2P, formatter TTN | CM-M2 |
+| `comms/tests/test_offline.py` | C4-B, BLE, conferme MQTT, file C3, end-to-end con Mosquitto (guasto di rete e PUBACK 0x87) | CM-M2 |
+
+Fatto in CM-M2 (10/10/2026): un PUBACK negativo (≥ 0x80) non marca inviato e fa riprovare con attesa crescente
+(provato con Mosquitto che risponde 0x87); `online()` = PUBACK positivo negli ultimi 30 s; `stable_s()` pronto per l'isteresi.
+Esito: 18 test verdi; demo locale con i veri entry point 199/199 eventi, 0 buchi dopo un guasto del broker.
 
 Cosa manca rispetto alle decisioni di §1:
-1. un PUBACK **negativo** (reason code ≥ 0x80) oggi marca l'evento come inviato: `_on_publish` non guarda il reason code;
-2. "online" oggi è `is_connected()`: deve basarsi sulle conferme (PUBACK);
-3. manca l'isteresi 30 s / 60 s: il backup si accende e si spegne seguendo `is_connected()`;
-4. manca "primo pacchetto subito": offline l'aggregatore manda solo quando si chiude una finestra (fino a 15 min);
-5. manca l'heartbeat sul backup, manca il test LoRa ogni 6 h e non c'è ancora chi produce gli allarmi;
-6. manca la diagnosi in centrale e manca la dashboard.
+1. manca l'isteresi 30 s / 60 s: il backup si accende e si spegne seguendo `online()`;
+2. manca "primo pacchetto subito": offline l'aggregatore manda solo quando si chiude una finestra (fino a 15 min);
+3. manca l'heartbeat sul backup, manca il test LoRa ogni 6 h e non c'è ancora chi produce gli allarmi;
+4. manca la diagnosi in centrale e manca la dashboard.
 
 ## 4. Cosa mi serve dagli altri
 
