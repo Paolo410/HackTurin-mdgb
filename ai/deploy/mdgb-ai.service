@@ -11,7 +11,8 @@ User=arduino
 WorkingDirectory=/home/arduino/HackTurin-mdgb/ai
 # Folder of the events (C3). With the App Lab app of the sketch: /home/arduino/ArduinoApps/<app>/data/c3
 Environment=MDGB_C3_DIR=/home/arduino/HackTurin-mdgb/logs/c3
-ExecStart=/home/arduino/venv/bin/python -m smartcrossing.app --source 0 --profile unoq --headless --actuator bridge --operator-port 8090
+# libcamerify: the camera of the board is a CSI sensor read by libcamera; this makes OpenCV see it as /dev/video0.
+ExecStart=/usr/bin/libcamerify /home/arduino/venv/bin/python -m smartcrossing.app --source 0 --profile unoq --headless --actuator bridge --operator-port 8090
 Restart=always
 RestartSec=2
 

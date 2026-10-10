@@ -39,7 +39,7 @@ pack() {   # tar without the hidden files of macOS (._*) and without Python cach
         || { echo "comms/actuators.py non c'è nel repo né in $COMMS_REF (git fetch origin?)" >&2; rm -rf "$stage"; return 1; }
     fi
   fi
-  (cd "$stage" && COPYFILE_DISABLE=1 tar --no-mac-metadata -czf - *)
+  (cd "$stage" && COPYFILE_DISABLE=1 tar --no-mac-metadata --no-xattrs -czf - *)
   rm -rf "$stage"
 }
 
@@ -70,10 +70,20 @@ echo "2/3 preparo Python sulla scheda (~/venv, serve Internet la prima volta: ci
 ssh "$TARGET" "APPLAB='$APPLAB' BRIDGE='$BRIDGE' BRIDGE_PACKAGE='$BRIDGE_PACKAGE' bash -s" <<'REMOTE'
 set -e
 cd ~/HackTurin-mdgb
-[ -x ~/venv/bin/python ] || python3 -m venv ~/venv \
-  || { echo "Manca python3-venv sulla scheda: sudo apt install python3-venv, poi rilancia"; exit 1; }
-~/venv/bin/pip install -q -r ai/requirements.txt
-[ "$BRIDGE" = 1 ] && ~/venv/bin/pip install -q "$BRIDGE_PACKAGE"
+# The board image has pip but not python3-venv (it needs sudo): then the environment is made without its
+# own pip and the pip of the system installs into it. Nothing is installed outside ~/venv.
+if [ ! -x ~/venv/bin/python ]; then
+  python3 -m venv ~/venv 2>/dev/null || { rm -rf ~/venv; python3 -m venv --without-pip ~/venv; }
+fi
+if ~/venv/bin/python -m pip --version >/dev/null 2>&1; then
+  venv_pip() { ~/venv/bin/python -m pip "$@"; }
+else
+  python3 -m pip --version >/dev/null 2>&1 \
+    || { echo "Sulla scheda mancano python3-venv e pip: sudo apt install python3-venv, poi rilancia"; exit 1; }
+  venv_pip() { python3 -m pip --python ~/venv/bin/python "$@"; }
+fi
+venv_pip install -q -r ai/requirements.txt
+[ "$BRIDGE" = 1 ] && venv_pip install -q "$BRIDGE_PACKAGE"
 # Where the events go: the folder of the App Lab app when there is one, else ~/HackTurin-mdgb/logs/c3.
 C3_DIR="$HOME/HackTurin-mdgb/logs/c3"
 if [ -n "$APPLAB" ]; then
@@ -87,7 +97,11 @@ echo "   eventi in $C3_DIR"
 [ -f ai/calib.json ] || echo "   NOTA: manca ai/calib.json (camera non calibrata): si contano i passaggi, niente velocità né regole"
 [ -f comms/actuators.py ] || echo "   NOTA: manca comms/actuators.py: per comandare il semaforo rilancia con --bridge (per ora solo --actuator sim)"
 [ -f ai/.env ] || echo "   NOTA: credenziali del tecnico non impostate: sulla scheda, cd ~/HackTurin-mdgb/ai && ~/venv/bin/python scripts/operator_login.py"
-ls /dev/video* >/dev/null 2>&1 || echo "   ATTENZIONE: nessuna camera in /dev/video*"
+# The camera of the board is a CSI sensor seen by libcamera (a USB webcam would be a plain /dev/video*).
+if command -v cam >/dev/null; then
+  timeout 10 cam -l 2>/dev/null | grep -q "^[0-9]*:" || echo "   ATTENZIONE: libcamera non vede nessuna camera (cam -l)"
+  command -v libcamerify >/dev/null || echo "   ATTENZIONE: manca libcamerify (pacchetto libcamera-v4l2): OpenCV non può aprire la camera CSI"
+fi
 [ -S /var/run/arduino-router.sock ] || echo "   ATTENZIONE: arduino-router non attivo (serve per comandare il semaforo)"
 [ -r /var/run/arduino-router.sock ] && [ -w /var/run/arduino-router.sock ] \
   || echo "   ATTENZIONE: $USER non può usare /var/run/arduino-router.sock: ls -l /var/run/arduino-router.sock"
@@ -110,8 +124,8 @@ if [ "$SERVICE" = 1 ]; then
 else
   echo "3/3 (avvio automatico non richiesto: aggiungi --service quando la prova a mano funziona)"
   echo
-  echo "Fatto. Prova a mano sulla scheda (ssh $TARGET), con la camera libera:"
-  echo '  cd ~/HackTurin-mdgb/ai && ~/venv/bin/python scripts/bench.py 0 --profile unoq'
-  echo '  MDGB_C3_DIR=$(cat .c3_dir) ~/venv/bin/python -m smartcrossing.app --source 0 --profile unoq --headless \'
-  echo '      --actuator bridge --operator-port 8090'
+  echo "Fatto. Prova a mano sulla scheda (ssh $TARGET), con la camera libera (libcamerify: camera CSI):"
+  echo '  cd ~/HackTurin-mdgb/ai && libcamerify ~/venv/bin/python scripts/bench.py 0 --profile unoq'
+  echo '  MDGB_C3_DIR=$(cat .c3_dir) libcamerify ~/venv/bin/python -m smartcrossing.app --source 0 --profile unoq \'
+  echo '      --headless --actuator bridge --operator-port 8090'
 fi
