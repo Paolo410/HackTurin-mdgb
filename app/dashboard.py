@@ -102,6 +102,7 @@ def state(store, config=None, now=None, windows=12, **diag_windows):
         nodes.append({
             "node": node, "name": names.get(node, ""), "diagnosis": diag,
             "lat": cfg.get("lat"), "lon": cfg.get("lon"), "site": cfg.get("site"), "mock": bool(cfg.get("mock")),
+            "video": cfg.get("video"),          # stream MJPEG dal vivo della visione (facoltativo, mai registrato)
             "channel": {"mqtt": "Wi-Fi/MQTT", "ble": "BLE", "lorawan": "LoRaWAN"}.get(diag["via"]) if diag["via"] else None,
             "last_contact_s": None if diag["last_contact"] is None else round(now - diag["last_contact"], 1),
             "mqtt_silent_s": None if hb_rx is None else round(now - hb_rx, 1),
