@@ -70,6 +70,9 @@ sulla scheda finirebbero anche l'app del PC e la documentazione (e il repo è pr
 Proposta: copiare dal PC solo `ai/`, come faccio io con `comms/`, per esempio
 `rsync -a --exclude __pycache__ ai arduino@<IP>:~/HackTurin-mdgb/` (modello e `calib.json` compresi). Decidi tu.
 
+**Se sulla scheda gira anche l'app di App Lab di Salvatore**, gli eventi vanno nella sua cartella, dove li legge la rete:
+nel tuo servizio `Environment=MDGB_C3_DIR=/home/arduino/ArduinoApps/<cartella>/data/c3` (oppure `--c3-dir`).
+
 **Video dal vivo nell'app (facoltativo, specifica §5.3: solo live, solo in locale, solo se abilitato).** Se la visione
 espone uno stream **MJPEG** con l'overlay, per esempio `http://<IP scheda>:8090/stream.mjpg`
 (`Content-Type: multipart/x-mixed-replace`), nell'app basta mettere quell'indirizzo nel campo `video` della camera in
@@ -77,8 +80,20 @@ espone uno stream **MJPEG** con l'overlay, per esempio `http://<IP scheda>:8090/
 
 ## 4. Salvatore (`firmware/`)
 
-Sulla UNO Q i comandi passano dal **Bridge**: il lato Linux è pronto, nel tuo sketch servono due cose
-(libreria [Arduino_RouterBridge](https://github.com/arduino-libraries/Arduino_RouterBridge), nomi in `docs/CONTRACTS.md`):
+**Con la tua app di App Lab (sketch + `main.py`)**, per mandare sensori e allarmi alla centrale:
+
+1. trascina `comms/applab/mdgb_link.py` e `comms/applab/main.py` nella cartella `python/` della tua app in App Lab
+   (il `main.py` è il tuo, uguale, con 5 righe in più che inoltrano i dati a `mdgb_link`); lo sketch non cambia;
+2. avvia l'app; sulla scheda `ls ~/ArduinoApps` dice il nome della sua cartella;
+3. Lorenzo: `./comms/deploy/push_to_arduino.sh arduino@<IP> --service --applab <cartella>`.
+
+Il Bluetooth di backup non può girare dentro App Lab (container senza Bluetooth): per questo la rete è un servizio a
+parte sulla stessa scheda, che legge quello che scrive `mdgb_link.py`. Cosa arriva in centrale: ambiente ogni 10 s,
+"manomissione: urto" per il tentato furto, "badge del tecnico" per l'accesso consentito (`comms/README.md`).
+Attenzione: il tuo `main.py` apre la camera, che serve anche alla visione di Paolo: nella demo finale va deciso chi la usa.
+
+**Per il semaforo comandato dalla visione** servono in più due cose nello sketch (libreria
+[Arduino_RouterBridge](https://github.com/arduino-libraries/Arduino_RouterBridge), nomi in `docs/CONTRACTS.md`):
 
 ```cpp
 #include <Arduino_RouterBridge.h>
