@@ -147,6 +147,10 @@ class Detector:
         self.input_name = model_input.name
 
         self.input_size = int(m["input_size"])
+        strides = list(m["strides"])
+        if self.input_size % max(strides) != 0:
+            raise ValueError(f"input_size={self.input_size} must be a multiple of {max(strides)}")
+        # The official file has a fixed 416 px input; scripts/make_dynamic_model.py frees it.
         fixed = model_input.shape[2]
         if isinstance(fixed, int) and fixed != self.input_size:
             warnings.warn(
@@ -160,7 +164,7 @@ class Detector:
         self.nms_threshold = float(m["nms"])
         self.cross_class_threshold = float(m["nms_cross_class"])
         self.keep_ids = np.array([COCO_CLASSES.index(name) for name in m["keep_classes"]], dtype=np.int64)
-        self._grids, self._strides = make_grids(self.input_size, list(m["strides"]))
+        self._grids, self._strides = make_grids(self.input_size, strides)
 
     def detect(self, frame: np.ndarray) -> sv.Detections:
         blob, ratio = letterbox(frame, self.input_size, self.pad_value)

@@ -37,7 +37,7 @@ cd ai
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements-dev.txt
-bash scripts/get_model.sh          # scarica yolox_nano.onnx (3,7 MB) in ai/models/, ignorata da git
+bash scripts/get_model.sh          # scarica yolox_nano.onnx (3,7 MB) in ai/models/ e ne crea la copia a input libero
 ```
 
 Poi, con il virtualenv attivo e dentro `ai/`:
@@ -62,18 +62,31 @@ millisecondi per fase. `rules` e `act` mostrano `-` fino ad AI-M3.
 
 ## Prestazioni misurate
 
-Su PC (Apple M1, onnxruntime solo CPU, input 416 px, clip sintetica 960x540 con 2 oggetti):
+Su PC (Apple M1, onnxruntime solo CPU). `--emulate-unoq` limita FPS e thread ma non rallenta i core: questi numeri
+**non** prevedono la velocità sulla UNO Q. I numeri veri arrivano con AI-M6, sulla scheda.
 
-| Modalità | detect (media / p95) | track (media / p95) | FPS end-to-end |
-|---|---|---|---|
-| profilo `pc` | 10,8 / 11,6 ms | 0,5 / 0,6 ms | 30 (limite del video) |
-| `--emulate-unoq` | 18,1 / 18,3 ms | 0,7 / 0,8 ms | 10 (limite imposto) |
+Detector, 4 thread, stessi 300 frame alternati tra le due dimensioni:
 
-`--emulate-unoq` limita FPS e thread ma non rallenta i core: questi numeri **non** prevedono la velocità sulla UNO Q.
-I numeri veri arrivano con AI-M6, sulla scheda.
+| Input | detect (mediana / p95) |
+|---|---|
+| 320 px (default) | 11,5 / 15,3 ms |
+| 416 px | 17,6 / 24,3 ms |
 
-Il file ufficiale `yolox_nano.onnx` ha l'input **fisso a 416 px**: l'impostazione `input_size: 320` viene ignorata
-con un avviso. Vedi la questione aperta 13 in DECISIONS.md.
+Il 320 costa il 65% del 416. Il tracker pesa 0,5–0,7 ms.
+
+Webcam, input 416 px (prima del passaggio a 320):
+
+| Modalità | detect (media / p95) | FPS end-to-end |
+|---|---|---|
+| profilo `pc` | 12,7 / 17,4 ms | 26,6 (la webcam ne dà circa 30) |
+| `--emulate-unoq` | 16,9 / 24,0 ms | 9,8 (limite imposto: 10) |
+
+## Modello
+
+`scripts/get_model.sh` scarica il file ufficiale `yolox_nano.onnx`, che dichiara un input fisso a 416 px, e crea
+`yolox_nano_dynamic.onnx` con `scripts/make_dynamic_model.py`. La copia ha gli stessi pesi e la dimensione d'ingresso
+libera: a 416 px dà un output identico all'originale, e accetta anche 320 px (`model.input_size` in `config.yaml`,
+multiplo di 32). Sulla UNO Q si copia la cartella `models/` già pronta dal PC.
 
 ## Dipendenze
 
@@ -85,7 +98,7 @@ Niente torch né ultralytics. Ogni pacchetto ha la wheel per Linux aarch64.
 - supervision va tenuto sotto la 0.31: lì `sv.ByteTrack` viene rimosso.
 - pyserial arriva quando serve (attuatore seriale).
 
-Per lo sviluppo (`requirements-dev.txt`): pytest 9.1.1.
+Per lo sviluppo (`requirements-dev.txt`): pytest 9.1.1 e onnx 1.23.0 (serve solo a preparare il modello, non va sulla scheda).
 
 ## Versione di Python
 

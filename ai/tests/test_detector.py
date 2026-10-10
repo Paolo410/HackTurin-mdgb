@@ -96,9 +96,43 @@ def test_postprocess_without_detections_is_empty():
     assert boxes.shape == (0, 4) and scores.shape == (0,) and class_ids.shape == (0,)
 
 
-@pytest.mark.skipif(not resolve_path(load_config()["model"]["path"]).is_file(),
-                    reason="model not downloaded (bash scripts/get_model.sh)")
-def test_model_runs_on_a_blank_frame():
-    detector = Detector(load_config())
-    detections = detector.detect(np.full((480, 640, 3), 114, dtype=np.uint8))
-    assert len(detections) == 0
+needs_model = pytest.mark.skipif(not resolve_path(load_config()["model"]["path"]).is_file(),
+                                 reason="model not prepared (bash scripts/get_model.sh)")
+
+
+@needs_model
+@pytest.mark.parametrize("size, rows", [(320, 2100), (416, 3549)])
+def test_model_accepts_both_input_sizes(size, rows):
+    cfg = load_config()
+    cfg["model"]["input_size"] = size
+    detector = Detector(cfg)
+    assert detector.input_size == size
+    blob, _ = letterbox(np.full((480, 640, 3), 114, dtype=np.uint8), size, 114)
+    raw = detector.session.run(None, {detector.input_name: blob})[0]
+    assert raw.shape == (1, rows, 85)
+    assert len(detector.detect(np.full((480, 640, 3), 114, dtype=np.uint8))) == 0
+
+
+@needs_model
+def test_input_size_must_be_a_multiple_of_the_largest_stride():
+    cfg = load_config()
+    cfg["model"]["input_size"] = 330
+    with pytest.raises(ValueError):
+        Detector(cfg)
+
+
+@needs_model
+def test_free_size_model_matches_the_official_one_at_416():
+    official = resolve_path("models/yolox_nano.onnx")
+    if not official.is_file():
+        pytest.skip("official model not downloaded")
+    import onnxruntime as ort
+    cfg = load_config()
+    cfg["model"]["input_size"] = 416
+    detector = Detector(cfg)
+    rng = np.random.default_rng(0)
+    blob = (rng.random((1, 3, 416, 416)) * 255).astype(np.float32)
+    reference = ort.InferenceSession(str(official), providers=["CPUExecutionProvider"])
+    expected = reference.run(None, {reference.get_inputs()[0].name: blob})[0]
+    actual = detector.session.run(None, {detector.input_name: blob})[0]
+    assert np.array_equal(actual, expected)

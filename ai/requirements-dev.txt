@@ -1,3 +1,5 @@
-# Development only (tests). Not needed on the board.
+# Development only (tests and model preparation). Not needed on the board.
 -r requirements.txt
 pytest==9.1.1
+# Only for scripts/make_dynamic_model.py (frees the input size of the ONNX model).
+onnx==1.23.0
