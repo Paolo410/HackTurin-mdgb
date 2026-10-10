@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MDGB</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>🚦 MDGB</h1>
+      <span id="link" class="pill off">non collegato</span>
+    </header>
+
+    <main>
+      <section class="view">
+        <canvas id="canvas" width="640" height="480"></canvas>
+        <p id="noimage" class="hint" hidden>Vista dal vivo disattivata (MDGB_LIVE_VIEW=0): solo i riquadri.</p>
+      </section>
+
+      <aside>
+        <div id="state" class="state">—</div>
+        <p id="reason" class="reason"></p>
+        <dl>
+          <dt>LED</dt><dd id="led">—</dd>
+          <dt>Verde pedonale</dt><dd id="green">—</dd>
+          <dt>Richieste</dt><dd id="req">—</dd>
+          <dt>LCD / OLED</dt><dd id="texts">—</dd>
+          <dt>FPS</dt><dd id="fps">—</dd>
+          <dt>ms per fase</dt><dd id="lat">—</dd>
+          <dt>Riconosciuti</dt><dd id="tracks">—</dd>
+          <dt>Conteggi</dt><dd id="counts">—</dd>
+          <dt>Eventi</dt><dd id="events">—</dd>
+        </dl>
+        <p class="hint">Le immagini non vengono mai salvate: si producono solo mentre questa pagina è aperta.</p>
+      </aside>
+    </main>
+
+    <script src="libs/socket.io.min.js"></script>
+    <script src="libs/arduino.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
