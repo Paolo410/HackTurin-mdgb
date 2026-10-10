@@ -2,7 +2,8 @@
 import numpy as np
 import pytest
 
-from smartcrossing.actuator import Commander, SimActuator, make_actuator
+from smartcrossing.actuator import Commander, SimActuator, fit_line, make_actuator
+from smartcrossing.actuator import _size as fit_size
 from smartcrossing.attributes import AidClassifier, AttributeEstimator, public_attrs
 from smartcrossing.config import load_config
 from smartcrossing.geometry import (
@@ -11,7 +12,7 @@ from smartcrossing.geometry import (
 from smartcrossing.sim import (
     virtual_camera_config,
     DEMO_ALONG_M, DEMO_CORNERS, DEMO_WIDTH_M, FRAME_SIZE, Actor, demo_calib, detections_at, drive,
-    run_scenario, walk_then_wait,
+    SCENARIOS, run_scenario, walk_then_wait,
 )
 from smartcrossing.sources import frame_fault
 from smartcrossing.tracking import Tracker
@@ -342,8 +343,9 @@ def test_scenario_elderly_and_fast_car_warns_driver_then_pedestrian():
     # Every command went through the actuator as a full C1 line, in order.
     assert [c["seq"] for c in sim.sent] == sorted(c["seq"] for c in sim.sent)
     assert {c["state"] for c in sim.sent} >= {"PRESENCE", "WARN_DRIVER", "WARN_PEDESTRIAN"}
-    assert all({"v", "seq", "t_ms", "state", "led", "green_s", "req", "lcd", "oled", "reason", "tech"} == set(c)
-               for c in sim.sent)
+    # What the traffic light must do is always in the line, and the line fits the link of the UNO Q.
+    assert all({"v", "seq", "state", "req", "tech"} <= set(c) for c in sim.sent)
+    assert all(fit_size(c) <= CFG["actuator"]["max_line_bytes"] for c in sim.sent)
     assert not any(c["tech"] for c in sim.sent)        # no technician at the node in the scenario
     assert pipeline.counter.totals("veh") in ({"in": 1, "out": 0}, {"in": 0, "out": 1})
 
@@ -361,3 +363,31 @@ def test_scenario_pedestrian_crossing_counts_one_and_asks_nothing_of_the_signal(
     assert not any(cmd["req"]["veh_red_hold"] or cmd["req"]["veh_red_now"] or cmd["req"]["ped_green_extend_s"]
                    for cmd in on_stripes)
     assert timeline[-1][1]["state"] == "IDLE"
+
+
+def test_c1_lines_fit_the_bridge_of_the_uno_q_and_keep_what_the_sketch_needs():
+    """The arduino-router refuses mdgb_line calls longer than 238 bytes (measured on the board): such a
+    command never reached the sketch. The longest commands of the scenes were 361 bytes."""
+    limit = CFG["actuator"]["max_line_bytes"]
+    assert limit == 238
+    seen = 0
+    for name in SCENARIOS:
+        sim = SimActuator()
+        run_scenario(CFG, name, fps=10, actuator=sim)
+        for line in sim.sent:
+            assert fit_size(line) <= limit, (name, line)
+            seen += 1
+    assert seen > 20
+    full = {"v": 1, "seq": 123456, "t_ms": 1791674512029, "state": "WARN_PEDESTRIAN", "led": "RED_GROUND_BLINK",
+            "green_s": 8, "req": {"ped_green_extend_s": 7, "veh_red_hold": True, "veh_red_now": True, "flash": False},
+            "lcd": "FRENA!  50 km/h PEDONE", "oled": "FERMO! auto 50km/h",
+            "reason": "pedone lento 0.8 m/s; car 50 km/h a 36 m; non frena e d ≤ d_stop + 10 m (37.7 m)", "tech": True}
+    assert fit_size(full) > limit
+    short = fit_line(full, limit)
+    assert fit_size(short) <= limit and short["req"] == full["req"] and short["state"] == full["state"]
+    assert short["tech"] is True and short["seq"] == full["seq"]
+    assert "reason" not in short or short["reason"].endswith("...")
+    assert fit_line(full, 1000) is full                                   # short enough: untouched
+    roomy = fit_line(full, fit_size(full) - 30)                           # a little too long: only the reason
+    assert roomy["reason"].endswith("...") and roomy["lcd"] == full["lcd"] and roomy["oled"] == full["oled"]
+

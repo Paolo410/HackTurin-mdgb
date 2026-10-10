@@ -434,3 +434,21 @@ con v_ped 0,3 → 25 s.
       che di sera suonava di continuo;
     - `tech` è un campo nuovo del contratto C1, come `req.veh_red_now` (punto 31): da far scrivere a Lorenzo in
       `docs/CONTRACTS.md`. Chi non lo conosce lo ignora.
+38. **Comandi C1 troppo lunghi per il Bridge (11/10, 01:30)**, trovato provando tutto sulla scheda:
+    - `arduino-router` rifiuta le chiamate `mdgb_line` oltre **238 byte** ("message size exceeds the limit").
+      Misurato sulla scheda con righe di prova che lo sketch scarta. Il contratto C1 dice 512, e
+      `comms/actuators.py` accorcia solo sopra 512;
+    - nelle scene di prova i comandi arrivavano a 361 byte: PRESENCE, avvisi, rosso subito per animale o
+      bambino, DEGRADED. **Nessuno arrivava allo sketch**; passavano solo IDLE e gli heartbeat. La prova del
+      punto 33 usava righe corte;
+    - ora `Commander` manda una riga che sta nel limite (`actuator.max_line_bytes: 238`). Prima accorcia `reason`,
+      poi toglie `oled`, `lcd`, `led`, `green_s`, `t_ms`. Restano sempre `v`, `seq`, `state`, `req` e `tech`, cioè
+      quello che lo sketch usa. Il comando completo resta per log, overlay e pagina del tecnico;
+    - per Lorenzo: in CONTRACTS il limite del Bridge è 238, non 512.
+39. **Camera ferma alle 01:11 dell'11/10.** Il flusso si è fermato senza errori del software; allo stop il kernel ha
+    scritto `imx219 ... disabling streaming failed (-6)`: il sensore non risponde più sull'I2C (cavo CSI
+    mosso o staccato durante il montaggio). Da lì il driver `qcom_camss` resta in "sta già registrando" e
+    nessun programma apre la camera (`Failed to start streaming: Operation already in progress`), nemmeno
+    `cam`. Si sblocca solo controllando il cavo e riavviando la scheda. La visione intanto era in DEGRADED
+    ("video assente").
+
