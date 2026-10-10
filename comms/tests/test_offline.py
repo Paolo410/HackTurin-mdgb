@@ -217,7 +217,7 @@ def test_c3_files_exactly_once_across_restart():
 # ---------------------------------------------------------------- end-to-end
 def _start_central(port, work):
     import ingest
-    ingest.MQTT_PORT, ingest.MQTT_HOST = port, "127.0.0.1"
+    ingest.MQTT_PORT, ingest.MQTT_HOST, ingest.MQTT_TLS = port, "127.0.0.1", False   # ignora app/.env (AWS)
     store = ingest.Store(os.path.join(work, "central.db"))
     return store, ingest.main_loop(store)
 

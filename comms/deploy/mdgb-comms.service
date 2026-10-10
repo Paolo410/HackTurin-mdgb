@@ -1,0 +1,20 @@
+# Avvio automatico del programma di comunicazione sulla UNO Q (systemd).
+#   sudo cp comms/deploy/mdgb-comms.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now mdgb-comms
+#   journalctl -u mdgb-comms -f            # log in diretta
+# Gira come root perché btmgmt (beacon BLE) richiede CAP_NET_ADMIN.
+# TODO(verify) sulla scheda: percorso del repo e del venv (qui /home/arduino/...).
+[Unit]
+Description=MDGB comms: Store & Forward, MQTT verso la centrale, backup BLE
+After=network-online.target bluetooth.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/home/arduino/HackTurin-mdgb/comms/node
+ExecStart=/home/arduino/venv/bin/python main.py
+Restart=always
+RestartSec=2
+User=root
+
+[Install]
+WantedBy=multi-user.target

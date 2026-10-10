@@ -21,6 +21,7 @@ import base64
 import json
 import logging
 import os
+import re
 import ssl
 import sqlite3
 import threading
@@ -34,14 +35,36 @@ from diagnosis import diagnose
 logging.basicConfig(level=logging.INFO, format="%(asctime)s ingest %(levelname)-7s %(message)s")
 log = logging.getLogger("ingest")
 
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _load_dotenv(path):
+    """Legge KEY=VALUE da app/.env (ignorato da git) senza sovrascrivere le variabili già impostate."""
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), re.split(r"\s+#", v, maxsplit=1)[0].strip())
+    except FileNotFoundError:
+        pass
+
+
+def _path(v):
+    return v if not v or os.path.isabs(v) else os.path.join(REPO_ROOT, v)
+
+
+_load_dotenv(os.path.join(REPO_ROOT, "app", ".env"))
 MQTT_HOST = os.environ.get("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.environ.get("MQTT_PORT", 1883))
 PREFIX = os.environ.get("TOPIC_PREFIX", "mdgb")
 DB_PATH = os.environ.get("INGEST_DB", os.path.join(os.path.dirname(os.path.abspath(__file__)), "central.db"))
 MQTT_TLS = os.environ.get("MQTT_TLS", "0").lower() in ("1", "true", "yes")
-MQTT_CA = os.environ.get("MQTT_CA", "")
-MQTT_CERT = os.environ.get("MQTT_CERT", "")
-MQTT_KEY = os.environ.get("MQTT_KEY", "")
+MQTT_CA = _path(os.environ.get("MQTT_CA", ""))
+MQTT_CERT = _path(os.environ.get("MQTT_CERT", ""))
+MQTT_KEY = _path(os.environ.get("MQTT_KEY", ""))
 CLIENT_ID = os.environ.get("INGEST_CLIENT_ID", "mdgb-ingest")
 
 

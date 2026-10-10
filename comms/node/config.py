@@ -1,5 +1,32 @@
-"""Configurazione del nodo. Ogni valore si può sovrascrivere con una variabile d'ambiente."""
+"""Configurazione del nodo. Ogni valore si può sovrascrivere con una variabile d'ambiente
+o, più comodo, nel file comms/.env (copiato da comms/.env.example, ignorato da git)."""
 import os
+import re
+
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+
+def _load_dotenv(path):
+    """Legge KEY=VALUE da un file .env (ignorato da git) senza sovrascrivere le variabili già impostate."""
+    try:
+        with open(path) as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), re.split(r"\s+#", v, maxsplit=1)[0].strip())
+    except FileNotFoundError:
+        pass
+
+
+_load_dotenv(os.path.join(REPO_ROOT, "comms", ".env"))
+
+
+def _path(v):
+    """Percorsi relativi (es. certs/nodo01.cert.pem) = relativi alla root del repo, da qualunque cartella si lanci."""
+    return v if not v or os.path.isabs(v) else os.path.join(REPO_ROOT, v)
+
 
 
 def _env(name, default, cast=str):
@@ -21,9 +48,9 @@ TOPIC_PREFIX = _env("TOPIC_PREFIX", "mdgb")
 MQTT_HOST = _env("MQTT_HOST", "localhost")
 MQTT_PORT = _env("MQTT_PORT", 1883, int)          # 1883 = TCP in chiaro, 8883 = TCP+TLS, 443 = TLS+ALPN
 MQTT_TLS = _env("MQTT_TLS", False, bool)
-MQTT_CA = _env("MQTT_CA", "")                     # es. certs/AmazonRootCA1.pem
-MQTT_CERT = _env("MQTT_CERT", "")                 # es. certs/nodo01.cert.pem
-MQTT_KEY = _env("MQTT_KEY", "")                   # es. certs/nodo01.private.key
+MQTT_CA = _path(_env("MQTT_CA", ""))                     # es. certs/AmazonRootCA1.pem
+MQTT_CERT = _path(_env("MQTT_CERT", ""))                 # es. certs/nodo01.cert.pem
+MQTT_KEY = _path(_env("MQTT_KEY", ""))                   # es. certs/nodo01.private.key
 MQTT_USER = _env("MQTT_USER", "")                 # non usato con AWS IoT (autenticazione via certificato)
 MQTT_PASS = _env("MQTT_PASS", "")
 MQTT_SESSION_EXPIRY_S = _env("MQTT_SESSION_EXPIRY_S", 3600, int)   # AWS IoT: default 1 h, max configurabile 7 gg
@@ -34,7 +61,7 @@ MQTT_NACK_BACKOFF_MAX_S = _env("MQTT_NACK_BACKOFF_MAX_S", 60, int)  # attesa mas
 HB_PERIOD_S = _env("HB_PERIOD_S", 10, int)          # heartbeat MQTT `hb` (retained): dà conferme anche senza eventi
 
 # --- Store & Forward ---
-DB_PATH = _env("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "outbox.db"))
+DB_PATH = _path(_env("DB_PATH", os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "outbox.db")))
 RETENTION_MAX_ROWS = _env("RETENTION_MAX_ROWS", 2_000_000, int)  # oltre: si cancellano i più vecchi GIA' inviati
 
 # --- Aggregati ---
@@ -49,5 +76,5 @@ BACKUP_HB_S = _env("BACKUP_HB_S", 300, float)               # HB sul backup: 5 m
 
 # --- Sorgente eventi ---
 EVENT_SOURCE = _env("EVENT_SOURCE", "sim")        # "sim" (simulatore interno) | "c3" (file JSONL scritti da ai/ e da Actuator)
-C3_DIR = _env("MDGB_C3_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "logs", "c3"))
+C3_DIR = _path(_env("MDGB_C3_DIR", os.path.join(REPO_ROOT, "logs", "c3")))
 SIM_RATE_HZ = _env("SIM_RATE_HZ", 0.5, float)     # eventi/secondo medi del simulatore
