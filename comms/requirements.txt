@@ -1,3 +1,4 @@
 pyserial==3.5
+paho-mqtt==2.1.0
 # sviluppo
 pytest==9.1.1

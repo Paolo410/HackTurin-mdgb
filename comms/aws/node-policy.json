@@ -9,7 +9,7 @@
     {
       "Effect": "Allow",
       "Action": ["iot:Publish", "iot:RetainPublish"],
-      "Resource": "arn:aws:iot:REGION:ACCOUNT:topic/torino/crosswalk/${iot:Connection.Thing.ThingName}/*"
+      "Resource": "arn:aws:iot:REGION:ACCOUNT:topic/mdgb/${iot:Connection.Thing.ThingName}/*"
     }
   ]
 }

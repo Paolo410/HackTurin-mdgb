@@ -4,7 +4,9 @@ Regola d'oro: un evento viene scritto qui PRIMA di qualsiasi tentativo di invio,
 e viene marcato come inviato SOLO dopo l'ACK del broker (PUBACK MQTT QoS 1).
 `seq` (AUTOINCREMENT) non viene mai riusato: il backend lo usa per deduplicare
 e per rilevare buchi (= dati persi).
+Ogni evento è la riga C3/C5 così com'è (docs/CONTRACTS.md v1): `type` e `ts` sono copiati in colonna.
 """
+import json
 import os
 import sqlite3
 import threading
@@ -17,13 +19,15 @@ class Outbox:
         self._db = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
         self._db.execute("PRAGMA journal_mode=WAL")
         self._db.execute("PRAGMA synchronous=FULL")      # durabilità anche in caso di power-loss
+        cols = [r[1] for r in self._db.execute("PRAGMA table_info(events)")]
+        if cols and "body" not in cols:
+            raise RuntimeError(f"{path}: outbox del prototipo (formato vecchio): spostalo o cambia DB_PATH")
         self._db.executescript("""
             CREATE TABLE IF NOT EXISTS events(
                 seq  INTEGER PRIMARY KEY AUTOINCREMENT,
                 ts   REAL    NOT NULL,
-                cat  INTEGER NOT NULL,
-                dir  INTEGER NOT NULL,
-                conf REAL    NOT NULL,
+                type TEXT    NOT NULL,
+                body TEXT    NOT NULL,
                 sent INTEGER NOT NULL DEFAULT 0);
             CREATE INDEX IF NOT EXISTS ix_events_sent ON events(sent, seq);
             CREATE INDEX IF NOT EXISTS ix_events_ts   ON events(ts);
@@ -31,16 +35,32 @@ class Outbox:
         """)
 
     # ---------- eventi ----------
-    def put(self, ts: float, cat: int, direction: int, conf: float) -> int:
+    def put(self, ev: dict) -> int:
+        return self.put_many([ev])[0]
+
+    def put_many(self, evs, meta=None):
+        """Scrive gli eventi e (opzionale) aggiorna `meta` nella STESSA transazione: chi legge i file C3
+        salva qui il proprio cursore, così dopo un crash non perde né duplica righe. Ritorna i seq."""
+        rows = [(float(ev.get("ts") or 0), str(ev.get("type", "")), json.dumps(ev, separators=(",", ":")))
+                for ev in evs]
         with self._lock:
-            return self._db.execute(
-                "INSERT INTO events(ts,cat,dir,conf) VALUES(?,?,?,?)",
-                (ts, cat, direction, conf)).lastrowid
+            self._db.execute("BEGIN")
+            try:
+                seqs = [self._db.execute("INSERT INTO events(ts,type,body) VALUES(?,?,?)", r).lastrowid
+                        for r in rows]
+                for k, v in (meta or {}).items():
+                    self._db.execute("INSERT OR REPLACE INTO meta(k,v) VALUES(?,?)", (k, str(v)))
+                self._db.execute("COMMIT")
+            except Exception:
+                self._db.execute("ROLLBACK")
+                raise
+        return seqs
 
     def pending(self, limit: int):
+        """[(seq, body JSON)] non ancora confermati, dal più vecchio."""
         with self._lock:
             return self._db.execute(
-                "SELECT seq,ts,cat,dir,conf FROM events WHERE sent=0 ORDER BY seq LIMIT ?",
+                "SELECT seq,body FROM events WHERE sent=0 ORDER BY seq LIMIT ?",
                 (limit,)).fetchall()
 
     def ack(self, seqs):
@@ -53,17 +73,11 @@ class Outbox:
         with self._lock:
             return self._db.execute("SELECT COUNT(*) FROM events WHERE sent=0").fetchone()[0]
 
-    def counts(self, t0: float, t1: float):
-        """Matrice 2x5 [direzione][categoria] degli eventi nella finestra [t0, t1)."""
-        m = [[0] * 5 for _ in range(2)]
+    def events_between(self, t0: float, t1: float):
+        """Eventi (dict) con ts nella finestra [t0, t1): servono agli aggregati esatti."""
         with self._lock:
-            rows = self._db.execute(
-                "SELECT dir,cat,COUNT(*) FROM events WHERE ts>=? AND ts<? GROUP BY dir,cat",
-                (t0, t1)).fetchall()
-        for d, c, n in rows:
-            if d in (0, 1) and 0 <= c < 5:
-                m[d][c] = n
-        return m
+            rows = self._db.execute("SELECT body FROM events WHERE ts>=? AND ts<?", (t0, t1)).fetchall()
+        return [json.loads(b) for (b,) in rows]
 
     def prune(self, max_rows: int) -> int:
         """Retention: se la tabella supera max_rows cancella i più vecchi GIA' inviati.

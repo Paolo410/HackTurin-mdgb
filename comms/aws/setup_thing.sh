@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 # Crea un "Thing" AWS IoT Core con certificato X.509 e policy.  Richiede AWS CLI configurata (aws configure).
 #
-#   ./aws/setup_thing.sh xw-001            aws/node-policy.json     # il nodo sull'UNO Q
-#   ./aws/setup_thing.sh crosswalk-ingest  aws/ingest-policy.json   # il subscriber di backend
+#   ./comms/aws/setup_thing.sh nodo01       comms/aws/node-policy.json     # il nodo sull'UNO Q
+#   ./comms/aws/setup_thing.sh mdgb-ingest  comms/aws/ingest-policy.json   # il subscriber della centrale (app/ingest.py)
+#   ./comms/aws/setup_thing.sh mdgb-ble-gw  comms/aws/ingest-policy.json   # il ricevitore BLE (app/ble_receiver.py)
+#   Il client ID MQTT deve coincidere con il nome del Thing (lo impone la policy).
 #
-# Output: certs/<thing>.cert.pem, certs/<thing>.private.key, certs/AmazonRootCA1.pem + endpoint da usare in MQTT_HOST.
+# Output: certs/<thing>.cert.pem, certs/<thing>.private.key, certs/AmazonRootCA1.pem (nella root del repo, ignorata da git)
+# + endpoint da usare in MQTT_HOST.
 # I certificati sono credenziali: NON committarli su git.
 set -euo pipefail
 
 THING="${1:?nome del thing}"
 POLICY_FILE="${2:?file policy json}"
-POLICY_NAME="crosswalk-$(basename "$POLICY_FILE" .json)"
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+POLICY_NAME="mdgb-$(basename "$POLICY_FILE" .json)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 CERTS="$ROOT/certs"
 mkdir -p "$CERTS"
 

@@ -17,7 +17,8 @@ except ImportError:
 
 
 class McuLink:
-    """Funzioni esposte dallo sketch con Bridge.provide(...)."""
+    """Funzioni esposte dallo sketch con Bridge.provide(...) (docs/CONTRACTS.md v1, sezione Bridge).
+    C1/C2 verso l'MCU passano da comms/actuators.py: qui serve solo la radio LoRa (produzione)."""
 
     def _call(self, name, *args):
         try:
@@ -26,15 +27,9 @@ class McuLink:
             log.error("Bridge.call(%s) fallita: %s", name, e)
             return False
 
-    def lora_send(self, payload: bytes) -> bool:
-        """Accoda un uplink LoRa. Ritorna subito: la trasmissione avviene nel loop() dell'MCU."""
-        return bool(self._call("lora_send", payload.hex().upper()))
-
-    def heartbeat(self) -> bool:
-        return bool(self._call("heartbeat"))
-
-    def pedestrian_alert(self, seconds: int) -> bool:
-        return bool(self._call("pedestrian_alert", int(seconds)))
+    def lora_send(self, payload: bytes, port: int = 1) -> bool:
+        """Accoda un uplink LoRa (fPort = type C4-B). Ritorna subito: la trasmissione avviene nel loop() dell'MCU."""
+        return bool(self._call("lora_send", int(port), payload.hex().upper()))
 
     def lora_joined(self) -> bool:
         return bool(self._call("lora_joined"))
@@ -44,18 +39,11 @@ class SimulatedMcu:
     """Stessa interfaccia di McuLink, per girare sul laptop."""
 
     def __init__(self):
-        self.sent = []          # payload "trasmessi via LoRa" (utile nei test)
+        self.sent = []          # (fPort, payload) "trasmessi via LoRa" (utile nei test)
 
-    def lora_send(self, payload: bytes) -> bool:
-        self.sent.append(payload)
-        log.info("[SIM LoRa] uplink %d byte: %s", len(payload), payload.hex().upper())
-        return True
-
-    def heartbeat(self) -> bool:
-        return True
-
-    def pedestrian_alert(self, seconds: int) -> bool:
-        log.info("[SIM semaforo] estensione verde pedonale di %d s", seconds)
+    def lora_send(self, payload: bytes, port: int = 1) -> bool:
+        self.sent.append((port, payload))
+        log.info("[SIM LoRa] uplink fPort %d, %d byte: %s", port, len(payload), payload.hex().upper())
         return True
 
     def lora_joined(self) -> bool:
@@ -77,32 +65,32 @@ import subprocess
 
 BLE_COMPANY_ID = 0xFFFF            # ID riservato ai test dal Bluetooth SIG (in produzione: ID registrato)
 BLE_FRAME_SIZE = 27                # 31 byte di advertising - 4 di header manufacturer data
-PORT_AGGREGATE, PORT_DEAD, PORT_TAMPER, PORT_INCIDENT = 1, 9, 10, 11
+PORT_AGGREGATE = 1                 # = TYPE_AGG di payload.py (C4-B)
 
 
 def ble_frame(payload: bytes, port: int = PORT_AGGREGATE) -> bytes:
-    """Converte un messaggio di backup nel frame BLE da 27 byte.
-    Aggregato (port 1): type(1) | window_start u32 | 10 x u16 conteggi | backlog/10 u16
-      -> dall'aggregato LoRa da 28 byte si tolgono il byte flag e il byte disco.
-    Allarmi (port 9/10/11): type(1) | primi 26 byte del payload (zero-padded)."""
-    if port == PORT_AGGREGATE:
-        if len(payload) != 28:
-            raise ValueError("atteso l'aggregato da 28 byte")
-        return bytes([port]) + payload[1:27]
-    return (bytes([port]) + payload[:BLE_FRAME_SIZE - 1]).ljust(BLE_FRAME_SIZE, b"\x00")
+    """Messaggio C4-B -> frame BLE da 27 byte: type(1) | corpo (al massimo 26 byte), zeri in coda."""
+    if len(payload) > BLE_FRAME_SIZE - 1:
+        raise ValueError(f"corpo di {len(payload)} byte: al massimo {BLE_FRAME_SIZE - 1}")
+    return (bytes([port]) + payload).ljust(BLE_FRAME_SIZE, b"\x00")
 
 
 class McuLoraBackup:
-    """Backup via LoRa: il payload va all'MCU con Bridge, l'MCU lo trasmette col Wio-E5."""
+    """Backup via LoRa: il payload va all'MCU con Bridge, l'MCU lo trasmette col Wio-E5 (fPort = type)."""
+
+    kind = "lora"
 
     def __init__(self, mcu):
         self.mcu = mcu
+        self.active = False
 
     def send(self, payload: bytes, port: int = PORT_AGGREGATE) -> bool:
-        return self.mcu.lora_send(payload)
+        ok = self.mcu.lora_send(payload, port)
+        self.active = self.active or ok
+        return ok
 
     def idle(self):
-        pass
+        self.active = False
 
 
 class BleBackup:
@@ -111,6 +99,7 @@ class BleBackup:
     aggiornato a ogni nuovo messaggio; quando MQTT torna sano viene spento con idle()."""
 
     INSTANCE = "1"
+    kind = "ble"
 
     def __init__(self, sudo=False, runner=None):
         self.prefix = ["sudo"] if sudo else []
@@ -153,6 +142,8 @@ class BleBackup:
 
 
 class NoBackup:
+    kind, active = "none", False
+
     def send(self, payload, port=PORT_AGGREGATE):
         return False
 
