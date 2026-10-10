@@ -1,2 +1,3 @@
 paho-mqtt==2.1.0
 pyserial==3.5
+arduino-router-bridge==0.5.1

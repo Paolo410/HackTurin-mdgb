@@ -1,7 +1,7 @@
 """Actuator transports: C1 (command) and C2 (heartbeat) from the AI to the MCU — docs/CONTRACTS.md v1.
 
     from comms.actuators import make_actuator
-    act = make_actuator("serial", port="/dev/cu.usbmodem1101")   # or "sim"; "bridge" still to do (with the firmware)
+    act = make_actuator("bridge")        # Arduino UNO Q; or "serial" (port=...) for a USB Arduino, "sim" without hardware
     act.send(c1)            # never blocks, never raises on link errors
     act.heartbeat(seq)      # every 100 ms: without it the firmware fails safe after 500 ms
     act.close()
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from typing import Callable, Optional
@@ -235,13 +236,129 @@ class SerialActuator(Actuator):
         self.connected = False
 
 
+class BridgeActuator(Actuator):
+    """C1/C2 over the Bridge of the Arduino UNO Q (docs/CONTRACTS.md v1, section Bridge).
+
+    Uses Arduino's official Python client of the arduino-router, the same one App Lab wraps in
+    arduino.app_utils.Bridge, so it also works from a plain venv or a systemd service:
+    https://github.com/arduino/arduino-router-bridge-py (pip: arduino-router-bridge), MessagePack-RPC over
+    unix:///var/run/arduino-router.sock. The sketch side is Arduino_RouterBridge
+    (https://github.com/arduino-libraries/Arduino_RouterBridge).
+      Linux -> MCU  call("mdgb_line", line) -> bool    sketch: Bridge.provide_safe("mdgb_line", ...), runs in loop()
+      MCU -> Linux  Bridge.notify("mcu_event", line)   here: provide("mcu_event", ...)
+    Like SerialActuator, a background thread sends the latest C1 and the latest C2 (state, not a queue):
+    send()/heartbeat() never block the vision loop and never raise on link errors. The router reconnects by itself;
+    while the MCU does not answer, the firmware is in fail-safe on its own (no C2 for 500 ms)."""
+
+    LINE_METHOD = "mdgb_line"
+    EVENT_METHOD = "mcu_event"
+    CALL_TIMEOUT_S = 0.3        # a C2 goes out every 100 ms: a later answer is useless anyway
+    WARN_EVERY_S = 10.0         # the same link problem is logged at most this often
+
+    def __init__(self, address: Optional[str] = None, connect_timeout_s: float = 3.0, bridge=None,
+                 mcu_log: bool = True, **kwargs):
+        super().__init__(mcu_log=mcu_log, **kwargs)
+        if bridge is None:
+            try:
+                from arduino.router_bridge import DEFAULT_ADDRESS, Bridge
+            except ImportError as e:
+                raise RuntimeError("--actuator bridge needs the arduino-router-bridge package: "
+                                   "~/venv/bin/pip install -r comms/requirements.txt") from e
+            bridge = Bridge(address or os.environ.get("MDGB_BRIDGE_ADDRESS") or DEFAULT_ADDRESS)
+        self.bridge = bridge
+        self.connected = bool(self.bridge.connect(timeout=connect_timeout_s))
+        if not self.connected:
+            log.warning("arduino-router not reachable at %s: retrying in the background (firmware in fail-safe "
+                        "meanwhile). Check: systemctl status arduino-router", getattr(bridge, "address", "?"))
+        try:                                     # registered now if connected, otherwise as soon as it connects
+            self.bridge.provide(self.EVENT_METHOD, self._on_bridge_event)
+        except ValueError as e:                  # another process already receives the C5 lines: C1/C2 still work
+            log.error("C5 not received here: %s", e)
+        self.rejected = 0                        # lines the sketch answered false to (invalid for its parser)
+        self._cv = threading.Condition()
+        self._pending_cmd = None                 # (monotonic time, line)
+        self._pending_hb = None
+        self._closed = False
+        self._last_warn = ("", 0.0)
+        self._thread = threading.Thread(target=self._run, name="actuator-bridge", daemon=True)
+        self._thread.start()
+
+    def send(self, cmd: dict) -> None:
+        line = encode_line(cmd).decode("utf-8")
+        with self._cv:
+            self._pending_cmd = (time.monotonic(), line)
+            self._cv.notify()
+
+    def heartbeat(self, seq: int) -> None:
+        line = encode_line({"v": 1, "hb": int(seq)}).decode("utf-8")
+        with self._cv:
+            self._pending_hb = (time.monotonic(), line)
+            self._cv.notify()
+
+    def close(self) -> None:
+        with self._cv:
+            self._closed = True
+            self._cv.notify()
+        self._thread.join(timeout=2)
+        try:
+            self.bridge.disconnect()
+        except Exception:
+            pass
+        super().close()
+
+    def _on_bridge_event(self, line, *_):
+        """Handler of "mcu_event" (bridge dispatcher thread): one C5 line. It must not call the bridge back."""
+        self._on_mcu_line(line.decode("utf-8", "replace") if isinstance(line, bytes) else str(line))
+
+    def _warn(self, key: str, msg: str, *args) -> None:
+        now = time.monotonic()
+        if key != self._last_warn[0] or now - self._last_warn[1] >= self.WARN_EVERY_S:
+            log.warning(msg, *args)
+            self._last_warn = (key, now)
+
+    def _run(self) -> None:
+        while True:
+            with self._cv:
+                while not self._closed and self._pending_cmd is None and self._pending_hb is None:
+                    self._cv.wait()
+                if self._closed:
+                    break
+                pending = [p for p in (self._pending_cmd, self._pending_hb) if p is not None]
+                self._pending_cmd = self._pending_hb = None
+            for t, line in pending:
+                if time.monotonic() - t > STALE_S:
+                    continue
+                try:
+                    ok = self.bridge.call(self.LINE_METHOD, line, timeout=self.CALL_TIMEOUT_S)
+                except TimeoutError:
+                    self.connected = False
+                    self._warn("timeout", "the MCU did not answer %s within %.1f s", self.LINE_METHOD,
+                               self.CALL_TIMEOUT_S)
+                    continue
+                except Exception as e:           # RpcError, ConnectionError: the thread must survive anything
+                    self.connected = False
+                    if getattr(e, "code", None) == 2:
+                        self._warn("missing", "no sketch provides %s: load the firmware of firmware/unoq_mcu on "
+                                   "the MCU", self.LINE_METHOD)
+                    else:
+                        self._warn(type(e).__name__, "Bridge %s failed: %s", self.LINE_METHOD, e)
+                    continue
+                if not self.connected:
+                    log.info("Bridge: the MCU answers %s", self.LINE_METHOD)
+                    self._last_warn = ("", 0.0)
+                self.connected = True
+                if ok is False:
+                    self.rejected += 1
+                    self._warn("rejected", "the MCU rejected a line (%d so far): %s", self.rejected, line[:120])
+
+
 def make_actuator(kind: str = "sim", **kwargs) -> Actuator:
-    """kind: "sim" | "serial" (port=...) | "bridge" (not yet: needs the firmware's Bridge functions)."""
+    """kind: "sim" | "serial" (port=...) | "bridge" (Arduino UNO Q: Linux side -> MCU through the arduino-router)."""
     if kind == "sim":
         return SimActuator(**kwargs)
     if kind == "serial":
         return SerialActuator(**kwargs)
     if kind == "bridge":
-        raise NotImplementedError("BridgeActuator not implemented yet (needs the firmware's Bridge functions): "
-                                  "use 'sim' or 'serial'")
+        kwargs.pop("port", None)                 # the Bridge has no port: ignore a leftover --port
+        return BridgeActuator(**kwargs)
     raise ValueError(f"unknown actuator kind: {kind!r}")

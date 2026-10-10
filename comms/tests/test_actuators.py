@@ -200,9 +200,7 @@ def test_serial_on_pty(tmp_path):
 
 # ---------- factory, JSONL, tool ----------
 def test_make_actuator():
-    assert isinstance(make_actuator("sim"), SimActuator)
-    with pytest.raises(NotImplementedError):
-        make_actuator("bridge")
+    assert isinstance(make_actuator("sim"), SimActuator)      # "bridge": see test_bridge.py
     with pytest.raises(ValueError):
         make_actuator("carrier-pigeon")
 

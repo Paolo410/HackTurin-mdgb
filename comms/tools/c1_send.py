@@ -1,10 +1,12 @@
-"""Drive the firmware from a PC with C1 commands and C2 heartbeats (docs/CONTRACTS.md v1).
+"""Drive the firmware with C1 commands and C2 heartbeats (docs/CONTRACTS.md v1): from a PC over USB serial, or on
+the Arduino UNO Q through the Bridge (the same BridgeActuator ai/ uses with --actuator bridge).
 
 Cycles through a scenario of C1 states (each resent every second, as the contract asks), sends C2 at 10 Hz
 and prints every C5 line coming back from the MCU. With --stop-hb-at the heartbeat stops: the firmware
 must fail safe within 500 ms.
 
     python -m comms.tools.c1_send --port /dev/cu.usbmodem1101 --duration 30 --stop-hb-at 20
+    python -m comms.tools.c1_send --port bridge --duration 30 --stop-hb-at 20     # on the UNO Q (exit 1: MCU silent)
     python -m comms.tools.c1_send --port sim --duration 3          # no hardware
 """
 from __future__ import annotations
@@ -36,7 +38,8 @@ SCENARIO = [
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--port", required=True, help="serial port, or 'sim' to run without hardware")
+    ap.add_argument("--port", required=True, help="serial port, 'bridge' (Arduino UNO Q) or 'sim' (no hardware)")
+    ap.add_argument("--bridge-address", default=None, help="arduino-router address (default unix:///var/run/arduino-router.sock)")
     ap.add_argument("--baud", type=int, default=115200)
     ap.add_argument("--duration", type=float, default=30.0, help="seconds")
     ap.add_argument("--period", type=float, default=3.0, help="seconds per scenario state")
@@ -50,6 +53,8 @@ def main(argv=None) -> int:
 
     if a.port == "sim":
         act = make_actuator("sim", verbose=True, listener=on_c5)
+    elif a.port == "bridge":
+        act = make_actuator("bridge", address=a.bridge_address, listener=on_c5)
     else:
         act = make_actuator("serial", port=a.port, baud=a.baud, listener=on_c5)
 
@@ -81,6 +86,11 @@ def main(argv=None) -> int:
     finally:
         act.close()
     print(f"fine: {seq} C1 e {hb} C2 inviati")
+    if a.port == "bridge":
+        ok = act.connected and act.rejected == 0
+        print(f"Bridge: l'MCU {'risponde' if act.connected else 'NON risponde'} a mdgb_line, righe rifiutate {act.rejected}"
+              f" -> {'OK' if ok else 'da controllare (firmware caricato? arduino-router attivo?)'}")
+        return 0 if ok else 1
     return 0
 
 
