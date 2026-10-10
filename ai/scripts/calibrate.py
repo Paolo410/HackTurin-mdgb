@@ -7,6 +7,7 @@ Click four points on the frame, in this order:
     1-2  pedestrian line ("ped"): along the stripes, in the middle of the road
     3-4  vehicle line ("veh"): across the lane, before the crossing
 The arrow shows the direction counted as IN. Keys: i = invert the last line, r = restart, s = save, q = quit.
+A line only counts between its two ends: draw it longer than needed.
 The homography and the zones are added to the same file by AI-M3.
 """
 from __future__ import annotations

@@ -72,10 +72,12 @@ ad AI-M3. Ogni attraversamento contato viene anche stampato sul terminale.
   - `veh`, trasversale alla corsia: conta `car`, `bus`, `truck`, `motorcyclist`, `cyclist`.
 - **Niente doppioni:** conta il punto in basso al centro del box, servono 3 frame oltre la linea, e ogni traccia
   conta al massimo una volta per verso su ciascuna linea.
+- **Una linea conta solo tra i suoi due estremi:** chi passa oltre la fine del segmento non viene contato.
+  Conviene disegnarla più lunga del necessario. Le coordinate possono uscire dall'immagine (meno di 0, più di 1).
 - **Verso:** la freccia a schermo indica IN. Per scambiare IN e OUT si invertono i due punti della linea (tasto `i`
   in `calibrate.py`).
-- Senza `calib.json` si usa `calib.example.json`: una linea `ped` verticale al centro dell'immagine, comoda per
-  provare con la webcam camminando da un lato all'altro.
+- Senza `calib.json` si usa `calib.example.json`: una linea `ped` verticale al centro, che continua oltre i bordi
+  dell'immagine. Serve per provare con la webcam spostandosi da un lato all'altro.
 
 ## Prestazioni misurate
 

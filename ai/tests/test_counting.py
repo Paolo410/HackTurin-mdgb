@@ -89,6 +89,26 @@ def test_cyclist_and_bicycle_together_count_one():
     assert len(events) == 1 and events[0]["cls"] == "cyclist"
 
 
+def test_only_the_segment_between_the_two_ends_counts():
+    # LineZone ignores anchors beyond the ends of the line: here the line stops at 80% of the height.
+    cfg = load_config()
+    short = {"v": 1, "lines": {"ped": {"start": [0.5, 0.0], "end": [0.5, 0.8]}}}
+    counter = LineCounter(cfg, short, (W, H))
+    assert run(counter, 1, range(260, 400, 10), y=300.0) != []        # inside the segment
+    assert run(counter, 2, range(260, 400, 10), y=float(H - 1)) == []  # below its end
+
+
+def test_example_calib_counts_a_box_that_touches_the_bottom_of_the_frame():
+    # Webcam on a desk: the person's box is cut by the bottom edge of the image.
+    cfg = load_config()
+    cfg["counting"]["calib_path"] = "does_not_exist.json"
+    calib, used = load_calib(cfg)
+    assert used.name == "calib.example.json"
+    counter = LineCounter(cfg, calib, (W, H))
+    events = run(counter, 1, range(260, 400, 10), y=float(H - 1))
+    assert [(e["line"], e["dir"]) for e in events] == [("ped", "in")]
+
+
 def test_uncalibrated_line_is_skipped_and_summary_reads_well():
     cfg = load_config()
     counter = LineCounter(cfg, {"v": 1, "lines": {"ped": CALIB["lines"]["ped"]}}, (W, H))
