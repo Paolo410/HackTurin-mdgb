@@ -10,6 +10,16 @@ Per avviare l'una o l'altra app (ne gira una sola alla volta, perché caricano l
 
 Ordine deciso dal team: **prima sketch + visione**, poi la rete verso la centrale (Lorenzo).
 
+**Com'è la scheda dall'11/10 notte** (`DECISIONS.md`, punto 37):
+- app `mdgb` con lo sketch del cicalino muto per il tecnico e `mdgb_link.py` di Lorenzo nel `main.py`;
+- visione con `run_vision.sh` (non ancora servizio) e rete come servizio `mdgb-comms` (broker sul PC di Lorenzo);
+- tutti gli eventi in una cartella sola, `~/ArduinoApps/mdgb/data/c3`, scelta da
+  `push_to_arduino.sh --bridge --applab mdgb`:
+  - `c3-*.jsonl`: la visione;
+  - `applab-*.jsonl`: sensori, urto e badge, scritti da `mdgb_link.py`;
+  - `mcu-*.jsonl`: fail-safe dello sketch.
+- Backup del vecchio sketch e del `main.py` in `~/HackTurin-mdgb/backups/`.
+
 ## Come è fatto il sistema sulla scheda
 
 | Cosa | Dove gira | Di chi |
@@ -169,7 +179,10 @@ ssh arduino@<scheda> 'journalctl -u mdgb-ai -f'
 - [x] Camera letta da OpenCV fuori da App Lab: sì, con `libcamerify`.
 - [x] L'utente `arduino` può usare `/var/run/arduino-router.sock`: sì.
 - [x] Sketch con `mdgb_line`: comandi e heartbeat ricevuti, rosso d'urgenza, fail-safe in circa mezzo secondo.
-- [ ] Badge e antifurto che arrivano alla visione (`mcu_event`).
+- [x] Antifurto e sensori nella cartella degli eventi, scritti da `mdgb_link.py`; la rete li porta alla centrale.
+- [x] Rete verso la centrale: MQTT verso il PC di Lorenzo, heartbeat ogni 10 s con stato e FPS della visione.
+- [ ] Backup Bluetooth: `btmgmt` si blocca se lanciato senza input (servizio systemd). Correzione per Lorenzo.
+- [ ] Badge → pagina → login dal telefono, con il cicalino muto fino all'uscita.
 - [ ] Pagina del tecnico dal telefono: login, costo della vista dal vivo sugli FPS, tempo del login.
 - [ ] Temperatura e rallentamenti dopo 10 minuti di funzionamento.
 - [ ] Visione e app di App Lab insieme: carico della CPU e memoria.
