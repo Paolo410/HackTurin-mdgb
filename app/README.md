@@ -22,7 +22,7 @@ Dietro la finestra l'app riceve i dati dei nodi in due modi e li salva nello ste
 ```
 
 **Demo e produzione.** Nella demo il broker MQTT gira sul PC, dentro l'app, e l'Arduino si collega al PC sulla stessa rete
-Wi-Fi. In produzione al posto del PC ci sarà un broker in cloud (AWS IoT Core o un altro broker MQTT 5) con TLS e un
+Wi-Fi. In produzione al posto del PC ci sarà un broker MQTT 5 in cloud con TLS e un
 certificato per nodo: è la stessa app, cambiano solo le righe `MQTT_*` del file di configurazione.
 
 ## Per il centralino: solo l'app
@@ -59,7 +59,7 @@ Pulsanti **Configurazione** e **Cartella** in alto nella finestra. La cartella �
 |---|---|
 | `config.env` | broker (locale o cloud), Bluetooth, porta della dashboard, chiave di Google Maps. Dopo una modifica, riapri l'app |
 | `nodes.json` | camere sulla mappa: `id` (= `NODE_ID` dell'Arduino), nome, `lat`, `lon`, profilo, `mock: true` per le camere di esempio. Si modifica anche ad app aperta |
-| `certs/` | solo per il cloud: certificati del broker (vedi `comms/aws/`) |
+| `certs/` | solo con un broker in cloud: certificati TLS della centrale |
 | `central.db`, `centrale.log` | database e log della centrale |
 
 **Mappa.** Mappa vettoriale moderna (MapLibre + OpenFreeMap, gratis e senza chiave): stile automatico chiaro/scuro

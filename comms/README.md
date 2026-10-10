@@ -27,9 +27,9 @@ Il semaforo **non** passa da qui: lo comandano `ai/` e il firmware. Se questa re
 
 | | Demo (adesso) | Produzione (in futuro) |
 |---|---|---|
-| Broker MQTT | dentro l'app sul PC della centrale (Mosquitto) | AWS IoT Core o un altro broker MQTT 5 in cloud |
+| Broker MQTT | dentro l'app sul PC della centrale (Mosquitto) | un broker MQTT 5 in cloud |
 | Rete | PC e Arduino sulla stessa rete Wi-Fi | Internet |
-| Sicurezza | rete locale, senza cifratura | TLS e un certificato per nodo (`comms/aws/`) |
+| Sicurezza | rete locale, senza cifratura | TLS e un certificato per nodo |
 | Backup | BLE verso il PC (10–50 m) | LoRaWAN (chilometri) |
 
 Il codice è lo stesso: cambiano solo le righe `MQTT_*` e `BACKUP_LINK` in `comms/.env`.
@@ -38,7 +38,7 @@ Il codice è lo stesso: cambiano solo le righe `MQTT_*` e `BACKUP_LINK` in `comm
 
 Sulla scheda va **solo** il codice che gira lì. Dal PC dello sviluppatore, un comando copia via ssh la rete
 (`comms/node`, gli strumenti per la scheda, la configurazione d'esempio e il servizio di avvio) in `~/HackTurin-mdgb` e prepara
-Python. Niente app del PC, test, AWS o documentazione:
+Python. Niente app del PC, test o documentazione:
 
 ```bash
 ./comms/deploy/push_to_arduino.sh arduino@<IP della scheda>     # oppure --pack: crea mdgb-nodo.tar.gz per la chiavetta
@@ -83,7 +83,6 @@ Le altre (tempi del backup, batch, ritentativi) hanno già il valore giusto: son
 | `tools/c3_sim.py` | eventi finti come quelli di `ai/`: per provare la rete prima che la visione sia pronta |
 | `tools/ble_beacon_test.py` | prima prova del Bluetooth vero sulla UNO Q |
 | `tools/c1_send.py` | **per Salvatore**: manda comandi e heartbeat al firmware dal PC, per provare il fail-safe |
-| `aws/` | per il futuro: policy e script dei certificati per AWS IoT Core |
 | `deploy/push_to_arduino.sh` | copia sulla scheda solo questi file e prepara Python (o crea il pacchetto `--pack`) |
 | `deploy/mdgb-comms.service` | avvio automatico sulla UNO Q |
 | `tests/` | test automatici della rete e della centrale |
