@@ -4,9 +4,11 @@
     canale di backup:   nodo ──BLE──────────────────────────────────────► qui   (Bluetooth del PC, SENZA Internet)
 Tutto finisce nello stesso database (app/central.db): eventi deduplicati, aggregati, heartbeat, messaggi di
 backup, e ogni 10 s la diagnosi di ogni nodo (OK / rete giù / guasto / Linux bloccato / manomissione / ...).
+La dashboard per chi guarda i dati è su http://localhost:8080 (dashboard.py).
 
 Uso:
-    python app/central.py                       # MQTT + BLE (nodo nodo01)
+    python app/central.py                       # MQTT + BLE + dashboard (nodo nodo01)
+    python app/central.py --host 0.0.0.0        # dashboard visibile anche da telefono/tablet sulla stessa rete
     python app/central.py --node nodo07         # nome del nodo da associare ai beacon BLE
     python app/central.py --no-ble              # solo MQTT (PC senza Bluetooth)
     python app/central.py --report              # riepilogo dal database ed esce
@@ -18,6 +20,7 @@ import json
 import logging
 import time
 
+import dashboard
 import ingest
 from ble_receiver import COMPANY_ID, Receiver
 
@@ -75,6 +78,9 @@ def main():
     ap.add_argument("--node", default="nodo01", help="nodo a cui appartengono i beacon BLE ricevuti")
     ap.add_argument("--addr", default=None, help="accetta solo i beacon di questo indirizzo BLE (su macOS è un UUID)")
     ap.add_argument("--no-ble", action="store_true")
+    ap.add_argument("--no-web", action="store_true", help="senza dashboard")
+    ap.add_argument("--host", default="127.0.0.1", help="0.0.0.0 = dashboard visibile dalla rete locale")
+    ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--report", action="store_true")
     a = ap.parse_args()
     store = ingest.Store(ingest.DB_PATH)
@@ -83,6 +89,9 @@ def main():
         return
     ingest.main_loop(store)
     ingest.ttn_loop(store)
+    if not a.no_web:
+        dashboard.serve(store, a.host, a.port)
+        log.info("dashboard: http://%s:%d", "localhost" if a.host in ("127.0.0.1", "0.0.0.0") else a.host, a.port)
     try:
         asyncio.run(run(store, a.node, not a.no_ble, a.addr))
     except KeyboardInterrupt:

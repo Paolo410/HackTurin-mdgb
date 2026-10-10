@@ -91,9 +91,11 @@ class Store:
                 PRIMARY KEY(node, window_start, source));
             CREATE TABLE IF NOT EXISTS hb(node TEXT PRIMARY KEY, data TEXT, rx_at REAL);
             CREATE TABLE IF NOT EXISTS backup(
-                node TEXT, type INTEGER, ts INTEGER, via TEXT, data TEXT, rx_at REAL,
+                node TEXT, type INTEGER, ts INTEGER, via TEXT, data TEXT, rx_at REAL, rssi INTEGER,
                 PRIMARY KEY(node, type, ts));
         """)
+        if "rssi" not in [r[1] for r in self.db.execute("PRAGMA table_info(backup)")]:   # DB di prima versione
+            self.db.execute("ALTER TABLE backup ADD COLUMN rssi INTEGER")
         self.dups = 0
 
     def add_events(self, node, events):
@@ -118,13 +120,14 @@ class Store:
         with self.lock:
             self.db.execute("INSERT OR REPLACE INTO hb VALUES(?,?,?)", (node, json.dumps(data), time.time()))
 
-    def add_backup(self, node, type_, data, via):
+    def add_backup(self, node, type_, data, via, rssi=None):
         """Ritorna True se il messaggio è nuovo (non già visto da un altro ricevitore)."""
         now = time.time()
         ts = data.get("t0") or data.get("ts") or int(now // 60) * 60     # DEAD non ha ts: chiave al minuto
         with self.lock:
-            new = self.db.execute("INSERT OR IGNORE INTO backup VALUES(?,?,?,?,?,?)",
-                                  (node, type_, int(ts), via, json.dumps(data), now)).rowcount
+            new = self.db.execute(
+                "INSERT OR IGNORE INTO backup(node,type,ts,via,data,rx_at,rssi) VALUES(?,?,?,?,?,?,?)",
+                (node, type_, int(ts), via, json.dumps(data), now, rssi)).rowcount
         if new and data.get("kind") == "agg":
             self.add_aggregate(node, data["t0"], via, True, data)
         return bool(new)
@@ -164,7 +167,7 @@ class Store:
 
 def handle_backup(store, node, type_, raw: bytes, via, rssi=None):
     data = decode(type_, raw)
-    if not store.add_backup(node, type_, data, via):
+    if not store.add_backup(node, type_, data, via, rssi):
         return
     if data["kind"] == "alarm":
         log.warning("%s: ALLARME %s %s via %s (RSSI %s)", node, data["alarm"], data.get("detail", ""), via, rssi)

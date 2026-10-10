@@ -251,6 +251,7 @@ class WifiProxy:
 
 def test_wifi_off_then_on_ble_backup_end_to_end():
     from central import ble_to_store
+    from dashboard import state
     from event_source import SimulatedSource
     from test_offline import Broker, _start_central, free_port, need_mosquitto, wait_until
     from uplink_mqtt import MqttUplink
@@ -328,6 +329,11 @@ def test_wifi_off_then_on_ble_backup_end_to_end():
         assert wait_until(lambda: store.db.execute(
             "SELECT COUNT(*) FROM backup WHERE node=? AND type=?", (node, TYPE_INCIDENT)).fetchone()[0], 3)
         print(f"... allarme 'persona a terra' arrivato in centrale via BLE in {time.time() - t_alarm:.1f} s")
+        page = state(store, {}, **win)                 # quello che vede la dashboard durante il blackout
+        card = next(n for n in page["nodes"] if n["node"] == node)
+        assert (card["diagnosis"]["code"], card["channel"]) == ("network_down", "BLE") and card["rssi"] == -65
+        assert any(a["text"] == "persona a terra" and a["via"] == ["BLE"] for a in page["alarms"])
+        print(f"... dashboard: '{card['diagnosis']['text']}' via {card['channel']}, coda {card['queue']} eventi")
         time.sleep(2)
         backlog_off = ob.backlog()
         assert backlog_off > 100, "durante il blackout gli eventi si accumulano su disco"
@@ -349,6 +355,9 @@ def test_wifi_off_then_on_ble_backup_end_to_end():
         rep = store.report()[0]
         assert rep["gaps"] == 0
         assert wait_until(lambda: store.diagnose(node, **win)["code"] == "ok", 5)
+        page = state(store, {}, **win)
+        assert page["reliability"]["gaps"] == 0 and page["nodes"][0]["channel"] == "Wi-Fi/MQTT"
+        assert next(a for a in page["alarms"] if a["text"] == "persona a terra")["via"] == ["BLE", "MQTT"]
         print(f"OK  Wi-Fi spento/riacceso: inviati={total}, ricevuti={rep['events']}, buchi={rep['gaps']}, "
               f"duplicati scartati={rep['duplicates_dropped']}, diagnosi finale '{store.diagnose(node, **win)['text']}'")
     finally:

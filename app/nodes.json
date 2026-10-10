@@ -1,0 +1,10 @@
+{
+  "_comment": "Camere/nodi mostrati sulla mappa della centrale. id = NODE_ID del nodo (= nome del Thing AWS). mock = true: camera di esempio per la demo, senza nodo reale. site = profilo della specifica (urbano | lungofiume | collina). Coordinate indicative.",
+  "nodes": [
+    {"id": "nodo01", "name": "Via Roma, piazza San Carlo", "lat": 45.0679, "lon": 7.6829, "site": "urbano", "mock": false},
+    {"id": "nodo02", "name": "Corso Francia, piazza Bernini", "lat": 45.0758, "lon": 7.6561, "site": "urbano", "mock": true},
+    {"id": "nodo03", "name": "Lungo Po Cadorna", "lat": 45.0646, "lon": 7.6985, "site": "lungofiume", "mock": true},
+    {"id": "nodo04", "name": "Corso Unione Sovietica", "lat": 45.0392, "lon": 7.6431, "site": "urbano", "mock": true},
+    {"id": "nodo05", "name": "Strada del Nobile, collina", "lat": 45.0522, "lon": 7.7127, "site": "collina", "mock": true}
+  ]
+}

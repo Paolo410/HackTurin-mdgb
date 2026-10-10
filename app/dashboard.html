@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Centrale MDGB</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #ffffff; --soft: #efeee9; --text: #1f1e1c; --muted: #6b6a64; --line: #dedcd4;
+    --ok-bg: #eaf3de; --ok: #3b6d11; --warn-bg: #faeeda; --warn: #854f0b; --bad-bg: #fcebeb; --bad: #a32d2d;
+    --info-bg: #e6f1fb; --info: #185fa5; --bar: #378add; --map: #eef1f4; --grid: #dfe4ea;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1b1b1a; --card: #242422; --soft: #2c2c2a; --text: #ecebe6; --muted: #a3a29b; --line: #3a3a37;
+      --ok-bg: #27500a; --ok: #c0dd97; --warn-bg: #633806; --warn: #fac775; --bad-bg: #791f1f; --bad: #f7c1c1;
+      --info-bg: #0c447c; --info: #b5d4f4; --bar: #85b7eb; --map: #1f2328; --grid: #2d333b;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 20px; font-weight: 500; margin: 0; }
+  h2 { font-size: 14px; font-weight: 500; margin: 0 0 10px; }
+  h3 { font-size: 13px; font-weight: 500; margin: 14px 0 6px; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .grid { display: grid; gap: 12px; margin-bottom: 12px; }
+  .row1 { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); }
+  .row2 { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  @media (max-width: 860px) { .row1, .row2 { grid-template-columns: minmax(0, 1fr); } }
+  .metrics { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
+  .ok { background: var(--ok-bg); color: var(--ok); } .warn-b { background: var(--warn-bg); color: var(--warn); }
+  .bad-b { background: var(--bad-bg); color: var(--bad); } .info-b { background: var(--info-bg); color: var(--info); }
+  .neutral { background: var(--soft); color: var(--muted); }
+  #map { height: 420px; border-radius: 8px; overflow: hidden; background: var(--map); position: relative; }
+  #map svg.schematic { width: 100%; height: 100%; display: block; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .chip { border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 999px; padding: 2px 10px 2px 8px;
+          font: inherit; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .chip.sel { border-color: var(--text); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .facts { font-size: 13px; color: var(--muted); margin-top: 8px; line-height: 1.8; }
+  .facts b { color: var(--text); font-weight: 500; }
+  .bars { display: grid; grid-template-columns: 90px 1fr 48px; gap: 6px 8px; align-items: center; font-size: 13px; }
+  .bar { height: 10px; background: var(--bar); border-radius: 2px; min-width: 2px; }
+  .cols { display: flex; align-items: flex-end; gap: 4px; height: 80px; margin-top: 12px; border-bottom: 1px solid var(--line); }
+  .col { flex: 1; background: var(--bar); border-radius: 2px 2px 0 0; min-height: 2px; }
+  .col.prov { background: repeating-linear-gradient(45deg, var(--bar) 0 3px, transparent 3px 6px); border: 1px solid var(--bar); }
+  .alarm { border-bottom: 1px solid var(--line); padding: 6px 0; font-size: 13px; }
+  .alarm:last-child { border-bottom: 0; }
+  .sev-danger { color: var(--bad); font-weight: 500; } .sev-warning { color: var(--warn); font-weight: 500; }
+  .sev-info { color: var(--info); font-weight: 500; }
+  .metric { background: var(--soft); border-radius: 8px; padding: 10px 12px; }
+  .metric .v { font-size: 20px; font-weight: 500; }
+  .good { color: var(--ok); } .badv { color: var(--bad); }
+  .err { background: var(--bad-bg); color: var(--bad); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; display: none; }
+  .note { background: var(--soft); border-radius: 8px; padding: 8px 10px; font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .leaflet-container { background: var(--map); font: inherit; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Centrale MDGB</h1>
+    <span class="muted" id="updated">in attesa dei dati…</span>
+  </header>
+  <div class="err" id="err">La centrale non risponde: controlla che app/central.py sia in esecuzione.</div>
+  <section class="grid row1">
+    <div class="card">
+      <div class="top"><h2>Mappa delle camere</h2><span class="muted" id="maptype"></span></div>
+      <div id="map"></div>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="card" id="detail"><span class="muted">Clicca una camera sulla mappa per vederne i dettagli.</span></div>
+  </section>
+  <section class="grid row2">
+    <div class="card"><h2>Tutti gli allarmi</h2><div id="alarms" class="muted">Nessun allarme.</div></div>
+    <div class="card"><h2>Rete</h2><div class="metrics" id="metrics"></div></div>
+  </section>
+</main>
+<script>
+const DIAG = { ok: "ok", network_down: "warn-b", battery_low: "warn-b", faulty: "bad-b", linux_hung: "bad-b",
+               tampered: "bad-b", destroyed: "bad-b", unknown: "neutral" };
+const DOT = { ok: "#639922", "warn-b": "#BA7517", "bad-b": "#E24B4A", neutral: "#888780" };
+let S = null, picked = null, leaflet = null, markers = {}, mapMode = "loading";
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ago = s => s == null ? "mai" : s < 60 ? `${Math.round(s)} s fa` : s < 3600 ? `${Math.round(s / 60)} min fa` : `${Math.round(s / 3600)} h fa`;
+const dur = s => s < 60 ? `${Math.round(s)} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`;
+const hhmm = t => new Date(t * 1000).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const num = n => n == null ? "n.d." : Number(n).toLocaleString("it-IT");
+const cls = n => DIAG[n.diagnosis.code] || "neutral";
+const label = n => n.mock && n.diagnosis.code === "unknown" ? "mockup, nessun dato" : n.diagnosis.text;
+
+function select(id) { picked = id; if (S) render(S); }
+
+/* ---------- mappa: Leaflet + OpenStreetMap se c'è Internet, altrimenti mappa schematica in SVG ---------- */
+function loadLeaflet() {
+  const css = document.createElement("link");
+  css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+  document.head.appendChild(css);
+  const js = document.createElement("script");
+  js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
+  const fallback = setTimeout(() => useSvg("senza Internet: mappa schematica"), 4000);
+  js.onload = () => { clearTimeout(fallback); useLeaflet(); };
+  js.onerror = () => { clearTimeout(fallback); useSvg("senza Internet: mappa schematica"); };
+  document.head.appendChild(js);
+}
+
+function useLeaflet() {
+  if (mapMode !== "loading") return;
+  mapMode = "leaflet";
+  document.getElementById("maptype").textContent = "OpenStreetMap";
+  leaflet = L.map("map", { zoomControl: true, attributionControl: true }).setView([45.07, 7.68], 13);
+  let ok = 0, bad = 0;
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" })
+    .on("tileload", () => ok++)
+    .on("tileerror", () => { if (++bad >= 4 && ok === 0) useSvg("tile non raggiungibili: mappa schematica"); })
+    .addTo(leaflet);
+  if (S) { drawMap(S); fit(); }
+}
+
+function useSvg(why) {
+  if (mapMode === "svg") return;
+  if (leaflet) { leaflet.remove(); leaflet = null; markers = {}; }
+  mapMode = "svg";
+  document.getElementById("maptype").textContent = why;
+  if (S) drawMap(S);
+}
+
+function fit() {
+  const pts = (S?.nodes || []).filter(n => n.lat != null).map(n => [n.lat, n.lon]);
+  if (leaflet && pts.length) leaflet.fitBounds(pts, { padding: [40, 40], maxZoom: 15 });
+}
+
+function drawMap(s) {
+  const placed = s.nodes.filter(n => n.lat != null && n.lon != null);
+  if (mapMode === "leaflet") {
+    const fresh = !Object.keys(markers).length;
+    for (const n of placed) {
+      const color = DOT[cls(n)], sel = n.node === picked;
+      const style = { radius: sel ? 11 : 8, color: sel ? "#1f1e1c" : color, weight: sel ? 3 : 2, fillColor: color,
+                      fillOpacity: n.mock && n.diagnosis.code === "unknown" ? 0.25 : 0.9 };
+      if (!markers[n.node]) {
+        markers[n.node] = L.circleMarker([n.lat, n.lon], style).addTo(leaflet).on("click", () => select(n.node));
+      }
+      markers[n.node].setStyle(style).setLatLng([n.lat, n.lon])
+        .bindTooltip(`${esc(n.node)} · ${esc(n.name)}<br>${esc(label(n))}`);
+    }
+    if (fresh) fit();
+    return;
+  }
+  if (mapMode !== "svg") return;
+  const el = document.getElementById("map"), W = el.clientWidth || 600, H = el.clientHeight || 420, pad = 50;
+  if (!placed.length) { el.innerHTML = `<div class="muted" style="padding:16px">Nessuna camera con coordinate in app/nodes.json.</div>`; return; }
+  const lat0 = placed.reduce((a, n) => a + n.lat, 0) / placed.length, k = Math.cos(lat0 * Math.PI / 180);
+  const xs = placed.map(n => n.lon * k), ys = placed.map(n => n.lat);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const sc = Math.min((W - 2 * pad) / Math.max(x1 - x0, 1e-4), (H - 2 * pad) / Math.max(y1 - y0, 1e-4));
+  const px = n => pad + (n.lon * k - x0) * sc + ((W - 2 * pad) - (x1 - x0) * sc) / 2;
+  const py = n => H - pad - (n.lat - y0) * sc - ((H - 2 * pad) - (y1 - y0) * sc) / 2;
+  let g = "";
+  for (let i = 1; i < 8; i++) g += `<line x1="${i * W / 8}" y1="0" x2="${i * W / 8}" y2="${H}" stroke="var(--grid)"/><line x1="0" y1="${i * H / 8}" x2="${W}" y2="${i * H / 8}" stroke="var(--grid)"/>`;
+  const dots = placed.map(n => {
+    const c = DOT[cls(n)], sel = n.node === picked, faint = n.mock && n.diagnosis.code === "unknown";
+    return `<g style="cursor:pointer" data-node="${esc(n.node)}"><title>${esc(n.node)} · ${esc(n.name)} · ${esc(label(n))}</title>
+      <circle cx="${px(n)}" cy="${py(n)}" r="${sel ? 12 : 9}" fill="${c}" fill-opacity="${faint ? 0.3 : 0.9}" stroke="${sel ? "var(--text)" : c}" stroke-width="${sel ? 3 : 2}"/>
+      <text x="${px(n) + 14}" y="${py(n) + 4}" font-size="12" fill="var(--text)">${esc(n.node)}</text></g>`;
+  }).join("");
+  el.innerHTML = `<svg class="schematic" viewBox="0 0 ${W} ${H}" role="img" aria-label="Mappa schematica delle camere">${g}${dots}</svg>`;
+}
+
+/* ---------- pannello di dettaglio ---------- */
+function trafficView(t) {
+  if (!t || !t.windows.length) return `<div class="muted">Nessun aggregato ricevuto.</div>`;
+  const h = t.last_hour, max = Math.max(1, ...Object.values(h));
+  const rows = [["Pedoni in", h.ped_in], ["Pedoni out", h.ped_out], ["Ciclisti", h.cyclist], ["Veicoli", h.vehicles], ["Animali", h.animals]]
+    .map(([k, v]) => `<span>${k}</span><div class="bar" style="width:${(100 * v / max).toFixed(1)}%"></div><span>${num(v)}</span>`).join("");
+  const tot = w => w.ped_in + w.ped_out + w.cyclist + w.vehicles + w.animals;
+  const cmax = Math.max(1, ...t.windows.map(tot));
+  const cols = t.windows.map(w => `<div class="col ${w.provisional ? "prov" : ""}" style="height:${(100 * tot(w) / cmax).toFixed(1)}%"
+    title="${hhmm(w.t0)}–${hhmm(w.t1)}: ${tot(w)} passaggi${w.provisional ? " (provvisorio, via backup)" : ""}"></div>`).join("");
+  const e = t.env || {};
+  const env = [e.t_c != null ? `${e.t_c} °C` : null, e.rh != null ? `${e.rh}% umidità` : null, e.lux != null ? `${e.lux} lux` : null].filter(Boolean);
+  return `<div class="muted" style="margin-bottom:6px">Ultima ora${t.last_hour_provisional ? " · include dati provvisori arrivati via backup" : ""}</div>
+    <div class="bars">${rows}</div><div class="cols">${cols}</div>
+    <div class="muted" style="margin-top:6px">Passaggi per finestra · tratteggio = provvisorio${env.length ? " · ambiente: " + env.join(", ") : ""}</div>`;
+}
+
+function alarmRow(a, withNode) {
+  return `<div class="alarm"><span class="sev-${a.severity}">${esc(a.text)}</span><br>
+    <span class="muted">${withNode ? esc(a.node) + (a.name ? " · " + esc(a.name) + " · " : " · ") : ""}${hhmm(a.ts)} · via ${esc(a.via.join(", poi "))}</span></div>`;
+}
+
+function detailView(n, s) {
+  const c = cls(n), t = s.traffic[n.node] || {}, today = t.today || {};
+  const head = `<div class="top"><span><b>${esc(n.node)}</b>${n.name ? " · " + esc(n.name) : ""}</span>
+    <span class="badge ${c}">${esc(label(n))}</span></div>
+    <div class="muted">${n.site ? "profilo " + esc(n.site) + " · " : ""}${n.lat != null ? n.lat.toFixed(4) + ", " + n.lon.toFixed(4) : "senza coordinate"}${n.mock ? " · camera di esempio" : ""}</div>`;
+  if (n.diagnosis.code === "unknown") {
+    return head + `<div class="note">${n.mock
+      ? `Camera del mockup: nessun nodo collegato. Per vederla viva avvia un nodo simulato con <code>NODE_ID=${esc(n.node)}</code>.`
+      : "Nessun dato ricevuto da questo nodo."}</div>`;
+  }
+  const f = [];
+  f.push(`${n.channel ? `<b>${esc(n.channel)}</b>` : "<b>nessun canale</b>"} · ultimo contatto ${ago(n.last_contact_s)}`);
+  if (n.diagnosis.code === "network_down" && n.mqtt_silent_s != null) f.push(`senza Wi-Fi da <b>${dur(n.mqtt_silent_s)}</b>`);
+  if (n.rssi != null) f.push(`segnale BLE ${n.rssi} dBm · ultimo beacon ${ago(n.ble_last_s)}`);
+  f.push(`semaforo <b>${esc(n.state || "n.d.")}</b> · modo ${esc(n.mode || "n.d.")}${n.fps ? ` · ${n.fps} fps` : ""}`);
+  f.push(`coda <b>${num(n.queue)}</b> eventi da inviare · batteria ${n.batt == null ? "n.d." : n.batt + "%"}`);
+  const alarms = s.alarms.filter(a => a.node === n.node);
+  const metric = (l, v) => `<div class="metric"><div class="muted">${l}</div><div class="v">${v}</div></div>`;
+  return head + `<div class="facts">${f.join("<br>")}</div>
+    <h3>Traffico</h3>${trafficView(t)}
+    <h3>Sicurezza oggi</h3><div class="metrics">
+      ${metric("Precedenza data", today.yield_rate == null ? "n.d." : Math.round(100 * today.yield_rate) + "%")}
+      ${metric("Near-miss", num(today.near_miss ?? 0))}${metric("Pedoni vulnerabili", num(today.vulnerable ?? 0))}</div>
+    <h3>Allarmi di questa camera</h3>${alarms.length ? alarms.map(a => alarmRow(a, false)).join("") : `<div class="muted">Nessun allarme.</div>`}`;
+}
+
+function render(s) {
+  S = s;
+  document.getElementById("err").style.display = "none";
+  document.getElementById("updated").textContent = `aggiornato alle ${hhmm(s.now)}`;
+  if (!s.nodes.some(n => n.node === picked)) picked = (s.nodes.find(n => n.diagnosis.code !== "unknown") || s.nodes[0] || {}).node || null;
+  document.getElementById("chips").innerHTML = s.nodes.map(n =>
+    `<button class="chip ${n.node === picked ? "sel" : ""}" data-node="${esc(n.node)}">
+      <span class="dot" style="background:${DOT[cls(n)]}"></span>${esc(n.node)}${n.name ? " · " + esc(n.name) : ""}</button>`).join("");
+  const n = s.nodes.find(x => x.node === picked);
+  document.getElementById("detail").innerHTML = n ? detailView(n, s) : `<span class="muted">Nessuna camera configurata.</span>`;
+  document.getElementById("alarms").innerHTML = s.alarms.length ? s.alarms.map(a => alarmRow(a, true)).join("") : "Nessun allarme.";
+  const r = s.reliability;
+  const metric = (label, value, c = "") => `<div class="metric"><div class="muted">${label}</div><div class="v ${c}">${value}</div></div>`;
+  document.getElementById("metrics").innerHTML =
+    metric("Eventi ricevuti", num(r.events)) + metric("Eventi persi", num(r.gaps), r.gaps ? "badv" : "good") +
+    metric("Doppioni scartati", num(r.duplicates_dropped)) + metric("Messaggi via backup", num(r.backup_messages)) +
+    metric("Camere online", `${s.nodes.filter(x => x.diagnosis.code === "ok").length} / ${s.nodes.length}`);
+  drawMap(s);
+}
+
+async function refresh() {
+  try {
+    const res = await fetch("/api/state", { cache: "no-store" });
+    if (!res.ok) throw new Error(res.status);
+    render(await res.json());
+  } catch (e) {
+    document.getElementById("err").style.display = "block";
+  }
+}
+for (const id of ["chips", "map"]) {
+  document.getElementById(id).addEventListener("click", e => {
+    const el = e.target.closest("[data-node]");
+    if (el) select(el.dataset.node);
+  });
+}
+window.addEventListener("resize", () => { if (mapMode === "svg" && S) drawMap(S); });
+loadLeaflet();
+refresh();
+setInterval(refresh, 2000);
+</script>
+</body>
+</html>
