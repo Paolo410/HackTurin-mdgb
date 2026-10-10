@@ -31,6 +31,18 @@ tracking:
   history_len: 60                 # positions kept per track
   default_frame_rate: 30          # rate given to ByteTrack when the source does not report one
 
+derive:
+  rider_iou: 0.3                  # (spec) person/two-wheeler IoU above which the person is the rider
+  animal_classes: [dog, cat, horse, sheep, cow, bear]   # (spec) COCO classes reported as "animal"
+
+counting:
+  minimum_crossing_threshold: 3   # frames past the line before a crossing counts (no jitter counts)
+  calib_path: calib.json          # made by scripts/calibrate.py
+  example_calib_path: calib.example.json   # used when calib.json is missing
+  lines:                          # roles counted on each line
+    ped: [pedestrian, cyclist, animal]              # along the stripes: who crosses the road
+    veh: [car, bus, truck, motorcyclist, cyclist]   # across the lane: who drives along the road
+
 overlay:
   window_name: MDGB smartcrossing
   font_scale: 0.5
@@ -38,12 +50,15 @@ overlay:
   fps_ema_alpha: 0.1              # smoothing of the FPS shown on screen
   status_every_s: 1.0             # period of the status line in --headless mode
   quit_keys: [q, Q]
+  line_arrow_px: 40               # length of the arrow that shows the IN direction
+  line_arrow_tip: 0.3             # arrow head, as a fraction of its length
   colors:                         # BGR
     person: [80, 200, 80]
     two_wheeler: [0, 200, 255]
     vehicle: [255, 160, 0]
     animal: [200, 80, 200]
-    pending: [150, 150, 150]      # track younger than min_track_age
+    pending: [150, 150, 150]      # track younger than min_track_age, or two-wheeler with a rider
+    line: [0, 255, 255]           # counting lines
     text: [255, 255, 255]
     hud_bg: [0, 0, 0]
 

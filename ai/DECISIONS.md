@@ -209,3 +209,10 @@ con v_ped 0,3 → 25 s.
     video reale: `conf` 0,30, `nms` 0,45, `detect_every_n` 1, parametri ByteTrack ai default di supervision con
     soglia di attivazione 0,30. In più `nms_cross_class` 0,85: due box di classi diverse quasi coincidenti sono lo
     stesso oggetto, resta il punteggio migliore (persona e bici sovrapposte restano entrambe).
+16. **Scelte di AI-M2**, tutte in `config.yaml`:
+    - `minimum_crossing_threshold` 3 frame;
+    - nomi dei ruoli allineati alla bozza di `docs/CONTRACTS.md` di Lorenzo (`pedestrian`, `cyclist`,
+      `motorcyclist`, `car`, `bus`, `truck`, `animal`, `bird`);
+    - linea `ped`: `pedestrian`, `cyclist`, `animal`; linea `veh`: `car`, `bus`, `truck`, `motorcyclist`, `cyclist`;
+    - una bici o una moto senza persona riconosciuta sopra non viene contata;
+    - le linee stanno in `calib.json` in coordinate normalizzate (0–1), così non dipendono dalla risoluzione.

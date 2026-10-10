@@ -22,7 +22,7 @@ Specifica completa: [`PROMPT_SMART_CROSSING.md`](../PROMPT_SMART_CROSSING.md), �
 | Milestone | Contenuto | Stato |
 |---|---|---|
 | AI-M1 | sorgente video + detector + tracker + overlay, `bench.py` | fatto |
-| AI-M2 | conteggio per direzione + ciclista/motociclista | da fare |
+| AI-M2 | conteggio per direzione + ciclista/motociclista | fatto |
 | AI-M3 | calibrazione, velocità, attributi, regole, `SimActuator` | da fare |
 | AI-M4 | eventi, animali, logger, output C3 | da fare |
 | AI-M5 | termocamera | da fare |
@@ -47,6 +47,7 @@ python -m smartcrossing.app --source 0                     # webcam, finestra co
 python -m smartcrossing.app --source samples/video.mp4     # file video
 python -m smartcrossing.app --source 0 --emulate-unoq      # limiti della UNO Q: 10 FPS, 4 thread
 python -m smartcrossing.app --source 0 --headless          # senza finestra, una riga di stato al secondo
+python scripts/calibrate.py --source samples/video.mp4     # disegna le due linee di conteggio e salva calib.json
 python scripts/bench.py samples/video.mp4                  # ms medi e p95 per fase
 pytest                                                     # test, senza hardware
 ```
@@ -57,8 +58,26 @@ pytest                                                     # test, senza hardwar
 - **Non tenere il repo in una cartella sincronizzata** (Desktop o Documenti con iCloud, OneDrive, Dropbox): il
   virtualenv e `.git` vengono spostati nel cloud e l'avvio resta bloccato.
 
-A schermo: un box per traccia con `#ID classe punteggio` (grigio finché la traccia non ha 5 frame), FPS e
-millisecondi per fase. `rules` e `act` mostrano `-` fino ad AI-M3.
+A schermo: un box per traccia con `#ID ruolo punteggio` (grigio finché la traccia non ha 5 frame), le linee di
+conteggio con la freccia del verso IN, i conteggi, FPS e millisecondi per fase. `rules` e `act` mostrano `-` fino
+ad AI-M3. Ogni attraversamento contato viene anche stampato sul terminale.
+
+## Conteggio
+
+- **Ruoli:** `pedestrian`, `cyclist`, `motorcyclist`, `car`, `bus`, `truck`, `animal`, `bird`. Un ciclista è una
+  persona sovrapposta a una bici (IoU > 0,3, persona più in alto); la bici con il suo ciclista diventa `ridden` e
+  non si conta. Il ruolo di una traccia è quello della maggioranza dei suoi frame.
+- **Linee** (in `calib.json`, coordinate normalizzate 0–1):
+  - `ped`, lungo le strisce a metà carreggiata: conta `pedestrian`, `cyclist`, `animal`;
+  - `veh`, trasversale alla corsia: conta `car`, `bus`, `truck`, `motorcyclist`, `cyclist`.
+- **Niente doppioni:** conta il punto in basso al centro del box, servono 3 frame oltre la linea, e ogni traccia
+  conta al massimo una volta per verso su ciascuna linea.
+- **Una linea conta solo tra i suoi due estremi:** chi passa oltre la fine del segmento non viene contato.
+  Conviene disegnarla più lunga del necessario. Le coordinate possono uscire dall'immagine (meno di 0, più di 1).
+- **Verso:** la freccia a schermo indica IN. Per scambiare IN e OUT si invertono i due punti della linea (tasto `i`
+  in `calibrate.py`).
+- Senza `calib.json` si usa `calib.example.json`: una linea `ped` verticale al centro, che continua oltre i bordi
+  dell'immagine. Serve per provare con la webcam spostandosi da un lato all'altro.
 
 ## Prestazioni misurate
 

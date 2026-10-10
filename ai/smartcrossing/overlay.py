@@ -4,33 +4,38 @@ from __future__ import annotations
 import cv2
 import numpy as np
 
+from .geometry import in_direction
 from .pipeline import FrameResult
 from .tracking import Tracker
 
-# Colour group of each kept class (colours are in config.yaml).
-CLASS_GROUP = {
-    "person": "person",
+# Colour group of each role (colours are in config.yaml).
+ROLE_GROUP = {
+    "pedestrian": "person",
+    "cyclist": "two_wheeler",
+    "motorcyclist": "two_wheeler",
     "bicycle": "two_wheeler",
     "motorcycle": "two_wheeler",
     "car": "vehicle",
     "bus": "vehicle",
     "truck": "vehicle",
+    "ridden": "pending",   # two-wheeler represented by its rider
 }
 _DEFAULT_GROUP = "animal"
 _FONT = cv2.FONT_HERSHEY_SIMPLEX
 
 
 def draw_tracks(frame: np.ndarray, result: FrameResult, tracker: Tracker, cfg: dict) -> None:
-    """Draws one box per track: '#id class score'. Tracks not yet valid are grey."""
+    """Draws one box per track: '#id role score'. Tracks not yet valid are grey."""
     o = cfg["overlay"]
     colors, scale, thickness = o["colors"], float(o["font_scale"]), int(o["thickness"])
     tracked = result.tracked
     if tracked.tracker_id is None:
         return
-    for xyxy, score, track_id, valid in zip(tracked.xyxy, tracked.confidence, tracked.tracker_id, result.valid):
+    for i, (xyxy, score, track_id, valid) in enumerate(
+            zip(tracked.xyxy, tracked.confidence, tracked.tracker_id, result.valid)):
         state = tracker.tracks.get(int(track_id))
-        name = state.class_name if state else "?"
-        group = CLASS_GROUP.get(name, _DEFAULT_GROUP) if valid else "pending"
+        name = result.roles[i] if i < len(result.roles) else (state.class_name if state else "?")
+        group = ROLE_GROUP.get(name, _DEFAULT_GROUP) if valid else "pending"
         color = tuple(int(c) for c in colors[group])
         x1, y1, x2, y2 = (int(v) for v in xyxy)
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, thickness)
@@ -39,6 +44,23 @@ def draw_tracks(frame: np.ndarray, result: FrameResult, tracker: Tracker, cfg: d
         top = max(y1 - th - baseline, 0)
         cv2.rectangle(frame, (x1, top), (x1 + tw, top + th + baseline), color, cv2.FILLED)
         cv2.putText(frame, label, (x1, top + th), _FONT, scale, tuple(colors["hud_bg"]), 1, cv2.LINE_AA)
+
+
+def draw_lines(frame: np.ndarray, counter, cfg: dict) -> None:
+    """Counting lines with their name and an arrow pointing to the IN direction."""
+    if counter is None:
+        return
+    o = cfg["overlay"]
+    color, scale, thickness = tuple(o["colors"]["line"]), float(o["font_scale"]), int(o["thickness"])
+    arrow = int(o["line_arrow_px"])
+    for name, line in counter.lines.items():
+        start, end = line["start"], line["end"]
+        cv2.line(frame, start, end, color, thickness)
+        mid = ((start[0] + end[0]) // 2, (start[1] + end[1]) // 2)
+        dx, dy = in_direction(start, end)
+        tip = (int(mid[0] + dx * arrow), int(mid[1] + dy * arrow))
+        cv2.arrowedLine(frame, mid, tip, color, thickness, tipLength=float(o["line_arrow_tip"]))
+        cv2.putText(frame, f"{name} IN", (tip[0] + thickness, tip[1]), _FONT, scale, color, 1, cv2.LINE_AA)
 
 
 def draw_hud(frame: np.ndarray, lines: list[str], cfg: dict) -> None:
