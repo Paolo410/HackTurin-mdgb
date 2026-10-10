@@ -135,7 +135,7 @@ con v_ped 0,3 → 25 s.
 | Parametro | Valore | Fonte |
 |---|---|---|
 | C1 | una riga JSON per messaggio: `v`, `seq`, `t_ms`, `state`, `led`, `green_s`, `req`, `lcd`, `oled`, `reason` | §4 |
-| `req` | `ped_green_extend_s`, `veh_red_hold`, `flash` | §4 |
+| `req` | `ped_green_extend_s`, `veh_red_hold`, `flash`; in più `veh_red_now`, aggiunto l'11/10 (punto 31), da confermare con Lorenzo | §4 |
 | `lcd` | massimo 2x16 caratteri | §4 |
 | Seriale | 115200 baud | §4 |
 | C2 heartbeat | ogni 100 ms; il firmware va in fail-safe dopo più di 500 ms senza | §4 |
@@ -178,6 +178,7 @@ con v_ped 0,3 → 25 s.
 1. **Camera sulla UNO Q.** La specifica prevede webcam USB, file o RTSP (§5.1.1). `hardware/BOM.md` indica come
    camera principale la Sony IMX219 su Media Carrier (CSI), con la webcam USB come piano B. Va capito come si legge
    la IMX219 da Python sulla scheda. Per Kuzey e Salvatore. Non blocca AI-M1…M5 su PC.
+   **Chiusa il 10/10 (punto 32):** la scheda monta la IMX219; si apre con `libcamerify`.
 2. **Valore di `--thermal`.** L'opzione prevede `none|uvc|mlx90640` (§5.1.13) e AI-M5 parla di "MLX90640 simulata",
    ma il sensore disponibile è la MLX90621 16x4 (§6). Serve il valore `mlx90621` e un simulatore 16x4. Anche il test
    di §8 parla di "blob caldo", che con 4 righe diventa "colonne calde".
@@ -185,6 +186,7 @@ con v_ped 0,3 → 25 s.
    (§5.2 dice "estendere C3"). Servono a `thermal.py` e allo stato DEGRADED. Per Lorenzo e Salvatore.
 4. **Come si calcola `req`.** La specifica dà `green_s` ma non dice come ricavare `ped_green_extend_s` (manca la
    durata base del verde pedonale della centralina) né quando valgono `veh_red_hold` e `flash`. Per Salvatore e Lorenzo.
+   **Deciso da Paolo il 10/10 (punto 31).**
 5. **Testi di `lcd` e `oled`.** Ci sono solo due esempi (§1, §4). Manca il testo per ogni stato, e quale velocità
    compare in "PEDONE 47 km/h".
 6. **Trasporto di C3.** "JSONL su file + endpoint HTTP locale" (§4): non è scritto chi espone l'endpoint. Flask è
@@ -222,7 +224,8 @@ con v_ped 0,3 → 25 s.
       `RED_GROUND_BLINK`, ANIMAL_WARN `AMBER_BLINK_2HZ`, ANIMAL_ALERT `AMBER_BLINK_4HZ`, DEGRADED `YELLOW_FAILSAFE`;
     - `ped_green_extend_s` = `green_s` meno il verde standard `W/1,2 + 2`, arrotondato, al massimo 15 s
       (con W = 12 m e 0,7 m/s dà 19 s e +7 s, come l'esempio di §4);
-    - `veh_red_hold` vero in WARN_DRIVER, in WARN_PEDESTRIAN e finché c'è qualcuno sulle strisce;
+    - `veh_red_hold` vero in WARN_DRIVER, in WARN_PEDESTRIAN e finché c'è qualcuno sulle strisce
+      (**superato dal punto 31**: ora solo per chi ha bisogno di tempo, bambino solo o animale);
     - `flash` vero solo in ANIMAL_ALERT;
     - `lcd` su due righe da 16 caratteri ASCII: `PEDONE / IN ATTESA`, `PEDONE / SULLE STRISCE`,
       `PEDONE  47 km/h / RALLENTA`, `FRENA!  47 km/h / PEDONE`; la velocità è quella del veicolo in arrivo;
@@ -409,4 +412,12 @@ con v_ped 0,3 → 25 s.
     È una costante dello sketch dell'app `mdgb` (`VEH_RED_MS`); i limiti diventano 20 + 15 s di estensione e
     20 + 20 s di rosso trattenuto. Misurato sulla scheda: 20,0 s. `deploy/run_vision.sh` accende e spegne la
     visione sulla scheda senza `sudo`.
+35. **Stato a fine serata dell'11/10 (per chi riprende il lavoro):**
+    - sulla scheda gira l'app `mdgb` (cicalino spento per ora: `BUZZER_ENABLED 0` nello sketch) e la visione,
+      accesa con `deploy/run_vision.sh`. La sorgente dello sketch non è nel repo: è in `~/ArduinoApps/mdgb` sulla
+      scheda e in `mdgb-app-proposta.zip` consegnato a Salvatore, che deciderà se e come metterlo in `firmware/`;
+    - manca la calibrazione sull'incrocio vero: senza, la visione conta ma non chiede niente al semaforo;
+    - non ancora provati: badge → pagina del tecnico → login dal telefono; una richiesta nata da una scena vera;
+    - PR #9 e #11 aperte (la #11 sopra la #9); la PR #10 di Lorenzo non è su main;
+    - da fare con Lorenzo: punto 30 e il campo `req.veh_red_now` nel contratto.
 

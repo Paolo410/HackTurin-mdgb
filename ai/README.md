@@ -26,7 +26,7 @@ Specifica completa: [`PROMPT_SMART_CROSSING.md`](../PROMPT_SMART_CROSSING.md), �
 | AI-M3 | calibrazione, velocità, attributi, regole, `SimActuator` | fatto |
 | AI-M4 | eventi, animali, logger, output C3 | fatto |
 | AI-M5 | termocamera | fatto in simulazione, da provare con il sensore |
-| AI-M6 | profilo `unoq`, prova sulla scheda, benchmark | la visione gira sulla scheda con la camera vera a 9 FPS; manca la prova con lo sketch nuovo. Guida in [docs/DEPLOY_UNOQ.md](docs/DEPLOY_UNOQ.md) |
+| AI-M6 | profilo `unoq`, prova sulla scheda, benchmark | la visione gira sulla scheda con la camera vera a 9 FPS e comanda il semaforo dell'app `mdgb`; manca la calibrazione sull'incrocio. Guida in [docs/DEPLOY_UNOQ.md](docs/DEPLOY_UNOQ.md) |
 
 ## Come si avvia
 
@@ -45,7 +45,7 @@ Poi, con il virtualenv attivo e dentro `ai/`:
 ```bash
 python -m smartcrossing.app --source 0                     # webcam, finestra con l'overlay (q o Esc per uscire)
 python -m smartcrossing.app --source samples/video.mp4     # file video
-python -m smartcrossing.app --source 0 --emulate-unoq      # limiti della UNO Q: 10 FPS, 4 thread
+python -m smartcrossing.app --source 0 --emulate-unoq      # limiti nominali della specifica: 10 FPS, 4 thread
 python -m smartcrossing.app --source 0 --headless          # senza finestra, una riga di stato al secondo
 python -m smartcrossing.app --source 0 --operator-port 8090  # in più la pagina del tecnico (badge + login)
 python scripts/operator_login.py                           # imposta utente e password del tecnico
@@ -232,7 +232,7 @@ A schermo e a fine corsa: yield rate, near-miss e incidenti.
   - `veh`, trasversale alla corsia: conta `car`, `bus`, `truck`, `motorcyclist`, `cyclist`.
 - **Niente doppioni:** conta il punto in basso al centro del box, servono 3 frame oltre la linea, e ogni traccia
   conta al massimo una volta per verso su ciascuna linea.
-- **Tracce valide:** una traccia conta dopo 5 frame (specifica). Nei profili a 10 FPS (`unoq`, `--emulate-unoq`)
+- **Tracce valide:** una traccia conta dopo 5 frame (specifica). Nei profili della scheda (`unoq`, `--emulate-unoq`)
   ne bastano 2: cinque frame sarebbero mezzo secondo, e un'auto passerebbe la linea prima di contare.
 - **Una linea conta solo tra i suoi due estremi:** chi passa oltre la fine del segmento non viene contato.
   Conviene disegnarla più lunga del necessario. Le coordinate possono uscire dall'immagine (meno di 0, più di 1).
