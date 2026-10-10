@@ -1,8 +1,12 @@
 # Portare `ai/` sulla Arduino UNO Q
 
-**Provato sulla scheda il 10/10/2026:** copia, ambiente Python, camera vera, 9,2 FPS, collegamento con il router.
-**Non ancora provato:** il semaforo comandato dalla visione (serve lo sketch con `mdgb_line`), la pagina del tecnico
-dal telefono, l'avvio automatico.
+**Provato sulla scheda il 10/10/2026:** copia, ambiente Python, camera vera, 9,2 FPS, e con l'app `mdgb` avviata
+il semaforo comandato attraverso il Bridge (rosso d'urgenza, fail-safe): vedi `DECISIONS.md`, punto 33.
+**Non ancora provato:** una richiesta nata da una scena vera (serve la calibrazione), la pagina del tecnico dal
+telefono, l'avvio automatico.
+
+Per avviare l'una o l'altra app (ne gira una sola alla volta, perché caricano lo sketch sul microcontrollore):
+`arduino-app-cli app start user:mdgb` oppure `arduino-app-cli app start user:test`, o da App Lab.
 
 Ordine deciso dal team: **prima sketch + visione**, poi la rete verso la centrale (Lorenzo).
 
@@ -12,6 +16,7 @@ Ordine deciso dal team: **prima sketch + visione**, poi la rete verso la central
 |---|---|---|
 | Sketch: semaforo, buzzer, sensori, RFID, antifurto | microcontrollore | Salvatore |
 | `main.py` dell'app di App Lab: riceve i dati dello sketch | container di App Lab | Salvatore |
+| App `mdgb` in `~/ArduinoApps/` (10/10): copia di `test` con lo sketch che ascolta la visione e senza camera | come sopra | proposta di Paolo, da rivedere con Salvatore |
 | **Visione** (`smartcrossing.app`): camera, regole, comandi al semaforo, pagina del tecnico | Linux, fuori da App Lab | Paolo |
 | Rete verso la centrale e backup | Linux | Lorenzo, dopo |
 
@@ -143,7 +148,8 @@ ssh arduino@<scheda> 'journalctl -u mdgb-ai -f'
 - [x] FPS e ms per fase: vedi `ai/README.md`.
 - [x] Camera letta da OpenCV fuori da App Lab: sì, con `libcamerify`.
 - [x] L'utente `arduino` può usare `/var/run/arduino-router.sock`: sì.
-- [ ] Sketch con `mdgb_line`: comandi e heartbeat ricevuti, fail-safe entro 0,5 s, badge e antifurto alla visione.
+- [x] Sketch con `mdgb_line`: comandi e heartbeat ricevuti, rosso d'urgenza, fail-safe in circa mezzo secondo.
+- [ ] Badge e antifurto che arrivano alla visione (`mcu_event`).
 - [ ] Pagina del tecnico dal telefono: login, costo della vista dal vivo sugli FPS, tempo del login.
 - [ ] Temperatura e rallentamenti dopo 10 minuti di funzionamento.
 - [ ] Visione e app di App Lab insieme: carico della CPU e memoria.

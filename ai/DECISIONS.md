@@ -391,4 +391,18 @@ con v_ped 0,3 → 25 s.
     - sulla scheda manca `python3-venv`: l'ambiente si crea senza pip e si installa con il pip di sistema;
     - gli FPS mostrati erano una media di tempi tra frame consecutivi: con il detector un frame su due dava numeri
       assurdi (220). Ora è la frequenza sugli ultimi 30 frame.
+33. **App `mdgb` sulla scheda e prima prova del semaforo comandato (10/10, 23:30)**. Su richiesta di Paolo lo sketch
+    proposto non sostituisce quello di Salvatore: è in una app nuova, `~/ArduinoApps/mdgb`, copia della sua `test`
+    (versione sulla scheda, con buzzer su A5 e luce su A0) più `mdgb_line`. `test` è intatta. Misure dai log dell'app:
+    - lo sketch compila per la scheda (129 kB, 16%) e parte;
+    - ciclo normale: verde 20,0 s, giallo 3,0 s, rosso 10,0 s; badge, allarme e sensori come prima;
+    - rosso d'urgenza chiesto attraverso il Bridge con `comms/actuators.py` quando il verde era acceso da 5 s: lo
+      sketch ha aspettato il verde minimo (giallo a 8,0 s), giallo breve di 1,5 s, rosso tenuto 24,5 s finché la
+      richiesta è rimasta, poi verde;
+    - heartbeat fermati: fail-safe e ciclo normale dopo circa mezzo secondo (i log hanno la precisione del
+      secondo sul lato visione, non permettono di dire di più);
+    - visione vera con la camera collegata allo sketch: "visione collegata", nessuna riga rifiutata; fermandola,
+      fail-safe. In quella prova 7,4 FPS: sulla scheda girava anche un `apt`.
+    Non ancora provati sull'hardware: una richiesta nata da una scena vera (serve la calibrazione), badge → pagina
+    del tecnico → login dal telefono, antifurto mostrato sulla pagina.
 
