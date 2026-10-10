@@ -21,6 +21,7 @@ l'app della centrale. Il codice è lo stesso: in produzione basta puntare un bro
 | Diagnosi | Incrociando MQTT e backup: OK / rete giù, nodo sano / nodo guasto / Linux bloccato / manomissione / batteria scarica / nodo spento o distrutto |
 | Chi ha cosa | Sviluppatori: tutto il repo. Arduino: solo i 15 file di comms che girano lì (`comms/deploy/push_to_arduino.sh`, gli strumenti di collaudo solo con `--tools`) accanto alla visione di Paolo, in `~/HackTurin-mdgb`. Centralino: solo lo zip dell'app (Mac o Windows) |
 | Niente finte sulla scheda | Il nodo legge solo i file veri di `ai/` e dell'MCU; BLE solo vero (senza BlueZ il nodo non parte); camere sulla mappa solo vere. Eventi di prova solo con `tools/c3_sim.py` lanciato a mano |
+| App Lab | Il Python di App Lab gira in un container senza Bluetooth: la rete resta un servizio sul Linux della scheda. L'app di App Lab dello sketch le passa sensori e allarmi con `comms/applab/mdgb_link.py` (file `applab-*.jsonl` in `~/ArduinoApps/<app>/data/c3`) |
 | Bridge (visione ↔ MCU) | `BridgeActuator` con la libreria ufficiale `arduino-router-bridge` (la stessa di App Lab, funziona da un venv normale): `call("mdgb_line")` per C1/C2, `provide("mcu_event")` per C5 |
 | Mappa | Vettoriale (MapLibre + OpenFreeMap, gratis, senza chiave), stile chiaro/scuro/dettagliato; senza Internet mappa schematica. Google Maps solo con una chiave (facoltativo) |
 | Privacy | Solo metadati anonimi verso la centrale. Unica eccezione (specifica §5.3): il video **dal vivo** della camera nell'app, in rete locale, se abilitato e mai registrato |
@@ -52,7 +53,8 @@ Formati completi con esempi: [`docs/CONTRACTS.md`](../docs/CONTRACTS.md).
 | `comms/deploy/` | `push_to_arduino.sh` (porta la rete sulla scheda, imposta il broker, `--service` per l'avvio automatico), servizio systemd |
 | `app/` | la centrale: `central.py`, `ingest.py`, `diagnosis.py`, `dashboard.py`/`.html`, `decoder.py`, `ble_receiver.py` |
 | `app/desktop/` | l'app per il PC e la sua costruzione (`build_mac.sh`) |
-| `comms/tests/` | 38 test, tra cui il nodo vero che legge file reali, la prova "Wi-Fi spento / riacceso", un PUBACK negativo vero e il Bridge con la libreria ufficiale contro un router finto |
+| `comms/applab/` | per l'app di App Lab di Salvatore: `mdgb_link.py` (sensori e allarmi dello sketch → righe C5) e il suo `main.py` con l'inoltro |
+| `comms/tests/` | 41 test, tra cui il nodo vero che legge file reali, la prova "Wi-Fi spento / riacceso", un PUBACK negativo vero e il Bridge con la libreria ufficiale contro un router finto |
 
 Provato: tutta la catena sul PC (broker vero, nodo vero con eventi di prova nei file, perdita di rete: 0 eventi persi);
 il Bridge con la libreria ufficiale di Arduino; l'app costruita, firmata e avviata dallo zip; `push_to_arduino.sh` su una

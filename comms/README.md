@@ -54,6 +54,7 @@ Copia sulla scheda **solo** i file che girano lì (in `~/HackTurin-mdgb/comms`),
 `comms/.env` con il broker = questo PC, e con `--service` installa l'avvio automatico e fa partire il nodo (chiede la
 password di sudo della scheda). Rilanciarlo aggiorna il codice; i dati restano. Altre opzioni:
 `--tools` (aggiunge i 3 strumenti di collaudo, vedi sotto), `--broker IP` (broker su un altro PC),
+`--applab CARTELLA` (legge anche l'app di App Lab dello sketch, vedi sotto),
 `--pack` (crea `mdgb-nodo.tar.gz` da copiare a mano, senza ssh).
 
 Nel log del nodo (`journalctl -u mdgb-comms -f`) deve comparire `backup BLE reale (btmgmt)`. Se manca BlueZ il nodo
@@ -62,6 +63,25 @@ Nel log del nodo (`journalctl -u mdgb-comms -f`) deve comparire `backup BLE real
 La visione di Paolo (`ai/`) gira sulla stessa scheda, in `~/HackTurin-mdgb/ai`: scrive gli eventi in
 `~/HackTurin-mdgb/logs/c3/`, dove la rete li legge, e importa `comms/actuators.py`.
 Procedura completa: [`docs/INSTRUCTIONS_FOR_OTHERS.md`](../docs/INSTRUCTIONS_FOR_OTHERS.md#7-arduino-uno-q).
+
+### Con l'app di App Lab dello sketch (Salvatore)
+
+Il Python di App Lab gira in un container Docker che **non può usare il Bluetooth** della scheda (verificato nel codice di
+[arduino-app-cli](https://github.com/arduino/arduino-app-cli): il container non usa la rete dell'host). Per questo la rete
+resta un servizio sul Linux della scheda, e l'app di App Lab le passa i dati dello sketch tramite file:
+
+1. nella cartella `python/` dell'app di App Lab vanno `applab/mdgb_link.py` e `applab/main.py` (il `main.py` di Salvatore
+   con 5 righe in più: ogni callback inoltra il dato a `mdgb_link`);
+2. `mdgb_link.py` scrive righe C5 in `/app/data/c3/applab-*.jsonl`, che sulla scheda è `~/ArduinoApps/<cartella>/data/c3/`;
+3. `push_to_arduino.sh ... --applab <cartella>` fa leggere al nodo quella cartella (`MDGB_C3_DIR` in `comms/.env`).
+   La visione di Paolo deve scrivere i suoi eventi nella stessa cartella (`MDGB_C3_DIR` o `--c3-dir`).
+
+| Lo sketch manda | Alla centrale arriva |
+|---|---|
+| `sensor_env`, `sensor_light`, `sensor_air` (ogni 300 ms) | `env` ogni 10 s: `t_c`, `rh` (più `light` grezzo 0–1023, `eco2_ppm`, `tvoc_ppb`) |
+| `alarm_status` (tentato furto) | `tamper` code 1, al massimo uno ogni 10 s |
+| `rfid_status` "ACCESSO CONSENTITO" | `tamper` code 3 (badge del tecnico, informazione) |
+| `led_status`, `sensor_movement`, `rfid_data`, accesso negato | niente (debug; il codice del badge non esce dalla scheda) |
 
 ## Configurazione (`comms/.env` sulla scheda)
 
@@ -72,6 +92,7 @@ Procedura completa: [`docs/INSTRUCTIONS_FOR_OTHERS.md`](../docs/INSTRUCTIONS_FOR
 | `BACKUP_LINK` | `ble` | canale di backup: `ble`, `lora` (futuro) o `none` |
 | `BACKUP_HB_S` | `30` | ogni quanto il BLE manda lo stato (300 in produzione) |
 | `AGG_PERIOD_S` | `60` | finestra dei conteggi (900 in produzione) |
+| `MDGB_C3_DIR` | (vuoto) | cartella degli eventi; vuota = `~/HackTurin-mdgb/logs/c3`; con App Lab la imposta `--applab` |
 
 Le altre (tempi del backup, batch, ritentativi) hanno già il valore giusto: sono in [`node/config.py`](node/config.py).
 
@@ -101,6 +122,8 @@ Solo con `--tools`, per il collaudo (si lanciano a mano, il nodo non li usa mai)
 | `tools/ble_beacon_test.py` | prima prova della radio Bluetooth: beacon per 60 s, li vede l'app sul PC |
 | `tools/c1_send.py` | prova del semaforo: stati C1 e heartbeat all'MCU via Bridge (`--port bridge`) o USB, fail-safe compreso |
 | `tools/c3_sim.py` | eventi di prova nei file di `ai/`, per provare la rete sulla scheda prima che la visione sia pronta |
+
+Nell'app di App Lab (trascinati da Salvatore nella cartella `python/`): `applab/mdgb_link.py`, `applab/main.py`.
 
 Solo nel repo (sviluppatori): `deploy/push_to_arduino.sh`, `tests/` (test automatici della rete e della centrale),
 `requirements-dev.txt`, questa documentazione.
