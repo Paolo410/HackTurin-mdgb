@@ -18,7 +18,7 @@ Le voci marcate **[da confermare: X]** sono proposte mie su punti che la specifi
 | C1 | AI → firmware: comando | seriale 115200 o Bridge, via `Actuator` | Paolo (`rules.py`) | Salvatore |
 | C2 | AI → firmware: heartbeat | come C1 | Paolo (`app.py`) | Salvatore |
 | C3 | AI → comms/app: eventi | file JSONL | Paolo (`logger.py`) | Lorenzo |
-| C4 | nodo → centrale | MQTT 5 / AWS IoT Core | Lorenzo (`comms/`) | Lorenzo (`app/`) |
+| C4 | nodo → centrale | MQTT 5 (broker sul PC della centrale nella demo) | Lorenzo (`comms/`) | Lorenzo (`app/`) |
 | C4-B | nodo → centrale, backup | BLE (demo) / LoRaWAN (produzione), binario | Lorenzo (`comms/`), Salvatore per la radio LoRa | Lorenzo (`app/`) |
 | C5 | firmware → Linux: dati dell'MCU | seriale o Bridge, righe JSON | Salvatore | Paolo, Lorenzo |
 | Bridge | funzioni RPC Linux ↔ MCU sulla UNO Q | Arduino_RouterBridge | Salvatore (MCU), Lorenzo (Linux) | — |
@@ -153,18 +153,18 @@ Trasporto **[da confermare: Paolo]** (chiude la questione 6 di Paolo; l'endpoint
 
 ---
 
-## C4 — Nodo → centrale (MQTT 5, AWS IoT Core)
+## C4 — Nodo → centrale (MQTT 5)
 
-**Demo (senza crediti AWS):** broker Mosquitto dentro l'app della centrale sul PC, porta 1883 sulla rete locale, senza
-TLS né certificati. Topic e messaggi sono identici; in produzione si torna alla connessione qui sotto.
+**Demo:** broker Mosquitto dentro l'app della centrale sul PC, porta 1883 sulla rete locale, senza TLS né certificati.
+**Produzione (in futuro):** un broker MQTT 5 in cloud, TLS mutuo sulla porta 8883 e un certificato X.509 per nodo.
+Topic e messaggi sono gli stessi nei due casi.
 
-Connessione: TLS mutuo sulla porta 8883 (443 con ALPN `x-amzn-mqtt-ca` se la rete blocca la 8883), un certificato X.509
-per nodo, client ID = `node_id` = nome del Thing (`^[a-z0-9-]{1,32}$`, es. `nodo07`). MQTT 5, QoS 1 ovunque,
+In entrambi i casi: client ID = `node_id` (`^[a-z0-9-]{1,32}$`, es. `nodo07`), MQTT 5, QoS 1 ovunque,
 `clean_start=false`, Session Expiry 3600 s.
 
 ### Topic
 
-Prefisso `mdgb` (configurabile con `TOPIC_PREFIX`). Al posto di `torino/crosswalk` del codice testato: cambiano anche le policy AWS.
+Prefisso `mdgb` (configurabile con `TOPIC_PREFIX`).
 
 | Topic | Da → A | Contenuto | QoS | Retained |
 |---|---|---|---|---|
@@ -343,3 +343,5 @@ Da compilare. Pin che servono alla comunicazione:
 ## Changelog
 
 - v1 (10/10/2026): prima versione da §4 di `PROMPT_SMART_CROSSING.md` con le decisioni di `comms/DECISIONS.md`.
+- v1, stesso giorno (formati invariati): broker locale sul PC per la demo, broker generico in cloud per la produzione
+  (niente più AWS IoT Core); ricevitore BLE dentro la centrale.
