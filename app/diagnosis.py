@@ -13,7 +13,20 @@ TEXT = {
 }
 
 
+# dettagli in italiano (codici del contratto C4-B / C5), usati anche dalla dashboard
+LABELS = {
+    "person_down": "persona a terra", "collision": "collisione", "hard_brake": "frenata brusca",
+    "vehicle_on_crosswalk": "veicolo fermo sulle strisce",
+    "shock_or_tilt": "urto o inclinazione", "door_open": "sportello aperto",
+    "authorized_badge": "apertura autorizzata (badge tecnico)",
+    "lamp_fault": "guasto lampada", "video_lost": "video assente", "lens_covered": "lente coperta",
+    "glare": "abbagliamento", "firmware_failsafe": "fail-safe del firmware", "dead": "Linux bloccato (watchdog MCU)",
+    "degraded": "visione degradata", "failsafe": "semaforo in fail-safe",
+}
+
+
 def _result(code, via=None, detail=None, last_contact=None):
+    detail = LABELS.get(detail, detail)
     return {"code": code, "text": TEXT[code] + (f" ({detail})" if detail else ""), "via": via,
             "last_contact": last_contact}
 

@@ -16,15 +16,9 @@ import subprocess
 import sys
 import time
 
+from diagnosis import LABELS
+
 ALARM_EVENT_TYPES = ("incident", "tamper", "lamp_fault", "failsafe")
-LABELS = {
-    "person_down": "persona a terra", "collision": "collisione", "hard_brake": "frenata brusca",
-    "vehicle_on_crosswalk": "veicolo fermo sulle strisce",
-    "shock_or_tilt": "urto o inclinazione", "door_open": "sportello aperto",
-    "authorized_badge": "apertura autorizzata (badge tecnico)",
-    "lamp_fault": "guasto lampada", "video_lost": "video assente", "lens_covered": "lente coperta",
-    "glare": "abbagliamento", "firmware_failsafe": "fail-safe del firmware", "dead": "Linux bloccato (watchdog MCU)",
-}
 TAMPER = {1: "shock_or_tilt", 2: "door_open", 3: "authorized_badge"}
 VEHICLES = ("car", "motorcyclist", "bus", "truck")
 ANIMALS = ("animal", "bird")
