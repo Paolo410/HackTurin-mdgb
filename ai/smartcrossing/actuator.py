@@ -97,13 +97,15 @@ class Commander:
         """Sends the command if it changed or if the last one is old. Returns True when something was sent."""
         self.alive()
         now = self._monotonic()
-        if fields == self._last_fields and now - self._last_sent_t < self.repeat_s:
+        # A new wording of the reason alone is not worth a line: it goes out with the next repeat.
+        acts = {k: v for k, v in fields.items() if k != "reason"}
+        if acts == self._last_fields and now - self._last_sent_t < self.repeat_s:
             return False
         with self._lock:
             self.seq += 1
             line = {"v": C1_VERSION, "seq": self.seq, "t_ms": int(self._wall_clock() * 1000), **fields}
             self.actuator.send(line)
-        self.last_line, self._last_fields, self._last_sent_t = line, fields, now
+        self.last_line, self._last_fields, self._last_sent_t = line, acts, now
         return True
 
     def beat(self) -> bool:
