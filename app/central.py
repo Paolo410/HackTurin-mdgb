@@ -21,6 +21,7 @@ import json
 import logging
 import os
 import socket
+import sys
 import threading
 import time
 
@@ -101,6 +102,11 @@ class Central:
         scanner = None
         if self.use_ble:
             try:
+                if sys.platform.startswith("win"):
+                    # Windows: se questo thread fosse in modalità STA le callback di WinRT non arriverebbero mai
+                    # https://bleak.readthedocs.io/en/latest/troubleshooting.html
+                    from bleak.backends.winrt.util import uninitialize_sta
+                    uninitialize_sta()
                 from bleak import BleakScanner
                 rx = ble_to_store(self.store, self.node)
 

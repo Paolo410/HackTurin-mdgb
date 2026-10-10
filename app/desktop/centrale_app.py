@@ -11,8 +11,13 @@ con dentro:
   central.db    database della centrale             centrale.log   log dell'app
 Se il broker è "localhost" e non risponde, l'app avvia il Mosquitto che ha dentro (o quello installato nel sistema).
 
-Da sorgente:   python app/desktop/centrale_app.py        App:   app/desktop/build_mac.sh -> "MDGB Centrale.app"
+Da sorgente:   python app/desktop/centrale_app.py
+App:           macOS  app/desktop/build_mac.sh -> "MDGB Centrale.app"
+               Windows app/desktop/build_windows.ps1 (o la build automatica su GitHub) -> "MDGB Centrale.exe"
+Autotest:      "MDGB Centrale" --selftest   avvia broker, centrale e dashboard senza finestra, li controlla ed esce
+               (codice 0 = tutto ok); usato dagli script di build.
 """
+import json
 import logging
 import os
 import re
@@ -20,9 +25,12 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
+import urllib.request
 
 APP_NAME = "MDGB Centrale"
+WINDOWS = sys.platform.startswith("win")
 HERE = os.path.dirname(os.path.abspath(__file__))
 APP_DIR = os.path.dirname(HERE)                                   # app/ (da sorgente)
 RESOURCES = getattr(sys, "_MEIPASS", APP_DIR)                     # dentro l'app impacchettata: file in bundle
@@ -101,9 +109,15 @@ def port_open(port, host="127.0.0.1"):
         return s.connect_ex((host, port)) == 0
 
 
+def free_port():
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 def find_mosquitto():
-    """Prima la copia dentro l'app (build_mac.sh la include), poi quella installata nel sistema."""
-    for p in (os.path.join(RESOURCES, "mosquitto", "mosquitto"), shutil.which("mosquitto"),
+    """Prima la copia dentro l'app (gli script di build la includono), poi quella installata nel sistema."""
+    for p in (os.path.join(RESOURCES, "mosquitto", "mosquitto.exe" if WINDOWS else "mosquitto"), shutil.which("mosquitto"),
               "/opt/homebrew/sbin/mosquitto", "/usr/local/sbin/mosquitto",
               "/usr/sbin/mosquitto", r"C:\Program Files\mosquitto\mosquitto.exe"):
         if p and os.path.exists(p):
@@ -118,14 +132,17 @@ def ensure_local_broker(home, port):
         return None
     exe = find_mosquitto()
     if exe is None:
-        log.error("nessun broker sulla porta %d e Mosquitto non è installato (brew install mosquitto)", port)
+        log.error("nessun broker sulla porta %d e Mosquitto non c'è (né dentro l'app né installato)", port)
         return None
     conf = os.path.join(home, "mosquitto.conf")
+    data = os.path.join(home, "mosquitto-data").replace("\\", "/")   # Mosquitto accetta "/" anche su Windows
     with open(conf, "w") as f:
         f.write(f"listener {port} 0.0.0.0\nallow_anonymous true\npersistence true\n"
-                f"persistence_location {os.path.join(home, 'mosquitto-data')}/\nmax_queued_messages 100000\n")
+                f"persistence_location {data}/\nmax_queued_messages 100000\n")
     os.makedirs(os.path.join(home, "mosquitto-data"), exist_ok=True)
-    proc = subprocess.Popen([exe, "-c", conf], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    flags = subprocess.CREATE_NO_WINDOW if WINDOWS else 0           # su Windows niente finestra nera
+    proc = subprocess.Popen([exe, "-c", conf], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                            creationflags=flags)
     for _ in range(30):
         if port_open(port):
             break
@@ -141,9 +158,12 @@ def show_window(url):
     except ImportError:
         webview = None
     if webview is not None:
-        webview.create_window(APP_NAME, url, width=1320, height=900, min_size=(900, 600))
-        webview.start()
-        return
+        try:
+            webview.create_window(APP_NAME, url, width=1320, height=900, min_size=(900, 600))
+            webview.start()                             # Windows: WebView2 (Edge), già presente in Windows 10/11
+            return
+        except Exception:
+            log.exception("finestra non disponibile: apro la dashboard nel browser")
     import webbrowser                                   # ripiego: dashboard nel browser, l'app resta aperta
     webbrowser.open(url)
     log.warning("pywebview non installato: dashboard aperta nel browser; Ctrl-C per chiudere")
@@ -154,11 +174,35 @@ def show_window(url):
         pass
 
 
+def selftest(url):
+    """Controlla broker, centrale e dashboard senza finestra. Ritorna True se tutto risponde."""
+    get = lambda path: urllib.request.urlopen(url + path, timeout=5).read()
+    for _ in range(60):                                 # fino a 15 s perché la centrale si colleghi al broker
+        info = json.loads(get("/api/info"))
+        if info["mqtt"]["connected"]:
+            break
+        time.sleep(0.25)
+    state = json.loads(get("/api/state"))
+    ok = info["mqtt"]["connected"] and bool(state["nodes"]) and b"Centrale MDGB" in get("/")
+    log.info("SELFTEST %s: mqtt=%s camere=%d mosquitto=%s", "OK" if ok else "FALLITO", info["mqtt"],
+             len(state["nodes"]), find_mosquitto())
+    return ok
+
+
 def main():
+    test = "--selftest" in sys.argv
+    if test and not os.environ.get("MDGB_HOME"):
+        os.environ["MDGB_HOME"] = tempfile.mkdtemp(prefix="mdgb-selftest-")
     home = home_dir()
     cfg_path = prepare_home(home)
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s",
-                        handlers=[logging.FileHandler(os.path.join(home, "centrale.log")), logging.StreamHandler()])
+    if test:                                            # porte libere e niente Bluetooth: gira anche su una macchina di build
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            f.write(CONFIG_TEMPLATE.replace("MQTT_PORT=1883", f"MQTT_PORT={free_port()}")
+                    .replace("BLE=1", "BLE=0").replace("WEB_PORT=8080", f"WEB_PORT={free_port()}"))
+    handlers = [logging.FileHandler(os.path.join(home, "centrale.log"), encoding="utf-8")]
+    if sys.stderr is not None:                          # l'exe di Windows senza console non ha stderr
+        handlers.append(logging.StreamHandler())
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s", handlers=handlers)
     cfg = read_config(cfg_path)
     os.environ.update(cfg)                              # la configurazione dell'app vince sull'ambiente
     os.environ.update({"MDGB_HOME": home, "INGEST_DB": os.path.join(home, "central.db"),
@@ -177,15 +221,20 @@ def main():
     import central                                      # dopo aver impostato l'ambiente (ingest lo legge all'import)
     c = central.Central(node=cfg.get("BLE_NODE", "nodo01"), use_ble=cfg.get("BLE", "1") == "1",
                         host=cfg.get("WEB_HOST", "127.0.0.1"), port=int(cfg.get("WEB_PORT", 8080))).start()
+    ok = True
     try:
-        show_window(c.url)
+        if test:
+            ok = selftest(c.url)
+        else:
+            show_window(c.url)
     finally:
         log.info("chiusura: fermo la centrale")
         c.stop()
         if broker is not None:
             broker.terminate()
             broker.wait(5)
+    return 0 if ok else 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

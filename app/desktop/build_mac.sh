@@ -40,6 +40,11 @@ xattr -cr "$OUT/MDGB Centrale.app"
 codesign --force --deep --sign - "$OUT/MDGB Centrale.app"
 codesign --verify --deep --strict "$OUT/MDGB Centrale.app"
 
+# autotest: l'app appena costruita avvia il suo Mosquitto, la centrale e la dashboard, li controlla ed esce
+"$OUT/MDGB Centrale.app/Contents/MacOS/MDGB Centrale" --selftest >/dev/null 2>&1 \
+  || { echo "Autotest fallito: vedi centrale.log in ${TMPDIR:-/tmp}/mdgb-selftest-*"; exit 1; }
+echo "autotest ok"
+
 # pacchetto per il centralino: solo l'app, zippata (si manda via AirDrop, chiavetta, mail...)
 ditto -c -k --keepParent "$OUT/MDGB Centrale.app" "$OUT/MDGB-Centrale-mac.zip"
 rm -rf "$HERE/dist" && mkdir -p "$HERE/dist"

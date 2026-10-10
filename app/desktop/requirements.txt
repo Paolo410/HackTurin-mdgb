@@ -1,4 +1,5 @@
 # App per il PC: dipendenze della centrale + finestra + build
 -r ../requirements.txt
 pywebview==6.2.1
+pythonnet==3.0.5; sys_platform == "win32"     # finestra su Windows (WebView2 via .NET)
 pyinstaller==6.22.3

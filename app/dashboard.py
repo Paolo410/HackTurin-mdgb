@@ -166,7 +166,10 @@ def open_path(path, edit=False):
     if sys.platform == "darwin":
         subprocess.Popen(["open", "-e", path] if edit else ["open", path])
     elif sys.platform.startswith("win"):
-        os.startfile(path)                                       # noqa: S606 (solo percorsi della centrale)
+        if edit:
+            subprocess.Popen(["notepad.exe", path])              # .env non ha un'app associata su Windows
+        else:
+            os.startfile(path)                                   # noqa: S606 (solo percorsi della centrale)
     else:
         subprocess.Popen(["xdg-open", path])
 
