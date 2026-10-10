@@ -111,6 +111,18 @@ def draw(frame, points: list[tuple[int, int]], cfg: dict, calib: dict | None = N
     return view
 
 
+def camera_check(calib: dict, width: int, height: int, cfg: dict) -> str:
+    """One line that tells whether the calibration fits a real camera, to catch wrong corners or sizes."""
+    geometry = Geometry(calib, cfg)
+    geometry.set_frame_size(width, height)
+    if geometry.camera is None:
+        return ("Warning: these corners and sizes do not fit a real camera looking at a rectangle. Check the order "
+                "of the corners and the two sizes. Counting works; speeds are less precise and children are "
+                "not recognised.")
+    return (f"Camera worked out from the calibration: {geometry.camera['height_m']:.1f} m above the ground. "
+            "If that is far from the truth, check the corners and the two sizes.")
+
+
 def write_calib(out: Path, new: dict, replace_all: bool) -> None:
     calib = {}
     if not replace_all and out.is_file():   # lines-only: keep the metric part already there
@@ -139,11 +151,18 @@ def main() -> int:
     p.add_argument("--width", type=float, help="distance between corners 2 and 3 (road width W), in metres")
     p.add_argument("--corners", help='skip the window: the 4 corners as normalized "x,y x,y x,y x,y"')
     p.add_argument("--lines-only", action="store_true", help="only draw the two counting lines")
+    p.add_argument("--roi", help='part of the image the detector looks at, normalized "x0,y0,x1,y1" '
+                                 "(the crossing and the road before it): objects are seen larger at the same cost")
     p.add_argument("--warmup-frames", type=int, default=10, help="frames skipped before the one shown")
     args = p.parse_args()
 
     cfg = load_config()
     out = Path(args.out) if args.out else resolve_path(cfg["counting"]["calib_path"])
+    roi = None
+    if args.roi:
+        roi = [float(v) for v in args.roi.split(",")]
+        if len(roi) != 4 or not (0 <= roi[0] < roi[2] <= 1 and 0 <= roi[1] < roi[3] <= 1):
+            p.error("--roi needs x0,y0,x1,y1 with x0 < x1 and y0 < y1, all between 0 and 1")
 
     if args.corners:   # no window: everything from the command line
         if args.along is None or args.width is None:
@@ -151,7 +170,10 @@ def main() -> int:
         corners = [[float(v) for v in pair.split(",")] for pair in args.corners.split()]
         if len(corners) != N_POINTS:
             p.error("--corners needs exactly 4 points")
-        write_calib(out, build_metric_calib(corners, args.along, args.width, cfg), replace_all=True)
+        calib = build_metric_calib(corners, args.along, args.width, cfg)
+        if roi:
+            calib["roi"] = roi
+        write_calib(out, calib, replace_all=True)
         print(f"Saved {out}")
         return 0
 
@@ -191,6 +213,7 @@ def main() -> int:
             if state["road"] is None:
                 state["road"] = _ask_metres("Distance between corners 2 and 3 (road width, kerb to kerb)")
             state["calib"] = metric_from_points(points, width, height, state["along"], state["road"], cfg)
+            print(camera_check(state["calib"], width, height, cfg))
             print("Check the zones and the lines in the window, then press s to save or r to restart.")
         cv2.imshow(WINDOW, draw(frame, points, cfg, state["calib"], args.lines_only))
         key = cv2.waitKey(30) & 0xFF
@@ -207,9 +230,9 @@ def main() -> int:
                 if not lines:
                     print("Nothing to save: click at least the two points of the pedestrian line.")
                     continue
-                write_calib(out, {"lines": lines}, replace_all=False)
+                write_calib(out, {"lines": lines, **({"roi": roi} if roi else {})}, replace_all=False)
             elif state["calib"] is not None:
-                write_calib(out, state["calib"], replace_all=True)
+                write_calib(out, {**state["calib"], **({"roi": roi} if roi else {})}, replace_all=True)
             else:
                 print("Nothing to save: click the four corners first.")
                 continue

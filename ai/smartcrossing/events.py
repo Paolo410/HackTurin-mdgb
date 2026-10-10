@@ -65,16 +65,21 @@ class EventDetector:
         vehicles = [(s, r) for s, r in items if r in self.vehicle_roles]
         vulnerable = [(s, r) for s, r in items if r in self.pedestrian_roles or r in ("animal", "bird")]
         events: list[dict] = []
+        along = geometry.along or 0.0
+        reach = float(e["max_distance_m"])
+
+        def measured(state: TrackState) -> bool:
+            """Speed known (not too far, not cut by the border) and close enough to the calibrated stripes."""
+            return state.speed_samples > 0 and -reach <= state.ground[0] <= along + reach
 
         for state, _ in items:
             if state.speed > float(e["collision_fast_ms"]):
                 self._last_fast[state.track_id] = t
 
-        # Hard braking.
+        # Hard braking: a vehicle on the road that was really moving and lost speed fast.
         for state, _ in vehicles:
-            was_moving = (state.speed >= float(e["hard_brake_min_speed_ms"])
-                          or t - self._last_fast.get(state.track_id, -math.inf) <= float(e["collision_window_s"]))
-            if state.accel <= -float(e["hard_brake_ms2"]) and was_moving:
+            if (measured(state) and state.zone in ROAD_ZONES and state.accel <= -float(e["hard_brake_ms2"])
+                    and state.speed_before >= float(e["hard_brake_min_speed_ms"])):
                 self._incident(events, "hard_brake", state)
 
         # Person lying on the road.
@@ -88,7 +93,7 @@ class EventDetector:
 
         # Vehicle standing on the stripes.
         for state, _ in vehicles:
-            if state.zone == CROSSWALK and state.speed < float(e["stopped_ms"]):
+            if state.zone == CROSSWALK and state.speed_samples > 0 and state.speed < float(e["stopped_ms"]):
                 since = self._stopped_since.setdefault(state.track_id, t)
                 if t - since > float(e["stopped_on_crosswalk_s"]):
                     self._incident(events, "vehicle_on_crosswalk", state)
@@ -103,6 +108,8 @@ class EventDetector:
                 key = ("collision", min(a.track_id, b.track_id), max(a.track_id, b.track_id))
                 if key in self._done or math.dist(a.ground, b.ground) >= float(e["collision_distance_m"]):
                     continue
+                if not (measured(a) and measured(b)):
+                    continue   # an unknown speed is not a standstill
                 stopped = a.speed < float(e["collision_stopped_ms"]) and b.speed < float(e["collision_stopped_ms"])
                 recent = max(self._last_fast.get(a.track_id, -math.inf), self._last_fast.get(b.track_id, -math.inf))
                 if stopped and t - recent <= float(e["collision_window_s"]):
@@ -115,7 +122,7 @@ class EventDetector:
         for veh, _ in vehicles:
             for vul, _ in vulnerable:
                 key = ("near_miss", vul.track_id, veh.track_id)
-                if key in self._done or vul.zone not in ROAD_ZONES:
+                if key in self._done or vul.zone not in ROAD_ZONES or veh.speed_samples == 0:
                     continue
                 ttc, pet = self._ttc(veh, vul), self._pet(veh, vul, t)
                 if (ttc is not None and ttc < float(e["near_miss_ttc_s"])) or (pet is not None and pet < float(e["near_miss_pet_s"])):
@@ -125,21 +132,25 @@ class EventDetector:
                                    "ttc_s": None if ttc is None else round(ttc, 2),
                                    "pet_s": None if pet is None else round(pet, 2)})
 
-        # Yield: every vehicle that arrives while a pedestrian waits either slows below the threshold or not.
+        # Yield: every vehicle that arrives while a pedestrian waits either slowed below the threshold or not.
+        # One event per vehicle, when it reaches the stripes (not when a standing car seems to move).
         someone_waiting = any(s.zone in WAITING_ZONES for s, r in items if r in self.pedestrian_roles)
-        along = geometry.along or 0.0
         for veh, _ in vehicles:
-            approaching = veh.zone in ROAD_ZONES and approach_distance(veh, along) is not None
-            if approaching:
-                if veh.track_id in self._approach:
-                    self._approach[veh.track_id] = min(self._approach[veh.track_id], veh.speed)
-                elif someone_waiting:
-                    self._approach[veh.track_id] = veh.speed
-            elif veh.track_id in self._approach:
-                yielded = self._approach.pop(veh.track_id) < float(e["yield_speed_ms"])
-                self.yields["total"] += 1
-                self.yields["yielded"] += int(yielded)
-                events.append({"type": "yield", "track_id": veh.track_id, "yielded": yielded})
+            key = ("yield", veh.track_id)
+            if key in self._done or veh.zone not in ROAD_ZONES:
+                continue
+            distance = approach_distance(veh, along)
+            if veh.track_id in self._approach:
+                self._approach[veh.track_id] = min(self._approach[veh.track_id], veh.speed)
+                arrived = veh.zone == CROSSWALK or 0.0 <= veh.ground[0] <= along
+                if arrived:
+                    yielded = self._approach.pop(veh.track_id) < float(e["yield_speed_ms"])
+                    self._done.add(key)
+                    self.yields["total"] += 1
+                    self.yields["yielded"] += int(yielded)
+                    events.append({"type": "yield", "track_id": veh.track_id, "yielded": yielded})
+            elif someone_waiting and distance is not None and veh.speed >= self.vehicle_min:
+                self._approach[veh.track_id] = veh.speed
 
         self._forget(tracker)
         return events
@@ -152,9 +163,9 @@ class EventDetector:
             events.append({"type": "incident", "kind": kind, "track_id": state.track_id, "zone": state.zone})
 
     def _ttc(self, veh: TrackState, vul: TrackState) -> float | None:
-        """Time before the vehicle reaches the other track, if it is heading at it."""
-        if veh.speed < self.vehicle_min:
-            return None
+        """Time before the vehicle reaches the other track, if it is heading at it at some speed."""
+        if veh.speed < float(self.e["near_miss_min_speed_ms"]):
+            return None   # a car creeping past people at walking pace is normal traffic
         dx, dy = vul.ground[0] - veh.ground[0], vul.ground[1] - veh.ground[1]
         ux, uy = veh.velocity[0] / veh.speed, veh.velocity[1] / veh.speed
         ahead = dx * ux + dy * uy
@@ -165,6 +176,8 @@ class EventDetector:
 
     def _pet(self, veh: TrackState, vul: TrackState, t: float) -> float | None:
         """Post-encroachment time: how long after one left a point the other arrived there."""
+        if veh.speed < self.vehicle_min:
+            return None   # a standing vehicle does not "arrive" anywhere
         radius = float(self.e["pet_radius_m"])
         best = None
         for here, other in ((veh, vul), (vul, veh)):

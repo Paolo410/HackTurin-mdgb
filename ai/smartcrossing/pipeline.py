@@ -82,6 +82,8 @@ class Pipeline:
         self.cfg = cfg
         self.calib = calib
         self.detector = detector if detector is not None else (Detector(cfg) if load_detector else None)
+        if self.detector is not None and calib is not None:
+            self.detector.set_roi(calib.get("roi"))   # the part of the image this camera has to watch
         self.detect_every_n = max(1, int(cfg["model"]["detect_every_n"]))
         # ByteTrack only sees the frames on which the detector runs.
         self.tracker = Tracker(cfg, frame_rate / self.detect_every_n if frame_rate > 0 else 0.0)
@@ -95,7 +97,10 @@ class Pipeline:
         self.luminance: float | None = None       # mean brightness of the last checked frame
         self.commander = Commander(actuator, cfg) if actuator is not None else None
         self.selfcheck_every = max(1, int(cfg["selfcheck"]["every_n_frames"]))
-        self.fault: str | None = None             # last result of the camera self-check
+        self.selfcheck_confirm = max(1, int(cfg["selfcheck"]["confirm_checks"]))
+        self.fault: str | None = None             # confirmed result of the camera self-check
+        self._last_fault: str | None = None
+        self._fault_streak = 0
         self.scene = Scene(W=float(cfg["rules"]["default_W_m"]))
         self._frame = 0
         self._last = sv.Detections.empty()
@@ -117,7 +122,11 @@ class Pipeline:
         self._setup_size(width, height)
         run_detector = self._frame % self.detect_every_n == 0
         if self._frame % self.selfcheck_every == 0:
-            self.fault = frame_fault(frame, self.cfg)
+            fault = frame_fault(frame, self.cfg)
+            # One odd frame is not a fault: it must come back on the next checks.
+            self._fault_streak = self._fault_streak + 1 if fault is not None and fault == self._last_fault else int(fault is not None)
+            self._last_fault = fault
+            self.fault = fault if self._fault_streak >= self.selfcheck_confirm else None
             self.luminance = mean_luminance(frame)
         detections, detect_ms = None, None
         if run_detector:

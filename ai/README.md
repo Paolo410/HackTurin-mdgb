@@ -51,6 +51,7 @@ python scripts/calibrate.py --source samples/video.mp4     # calibra l'inquadrat
 python scripts/scenario.py                                 # elenco delle scene simulate (senza camera)
 python scripts/scenario.py elderly_fast_car                # pedone lento + auto a 50 km/h: regole e attuatore
 python scripts/animal_probe.py cartella_di_foto            # come il detector vede animali non previsti da COCO
+python scripts/evaluate.py samples/video.mp4 --calib c.json  # numeri e fotogrammi annotati di un video di prova
 python scripts/bench.py samples/video.mp4                  # ms medi e p95 per fase
 pytest                                                     # test, senza hardware
 ```
@@ -86,6 +87,22 @@ carreggiata e le due linee di conteggio. I margini stanno in `config.yaml` (`geo
 Con `--lines-only` si disegnano solo le due linee di conteggio, senza misure: basta per contare, non per le regole.
 Senza una calibrazione in metri lo stato resta `IDLE`.
 
+La calibrazione è manuale: la fa una persona all'installazione, e va rifatta se la camera viene spostata. Non c'è
+una calibrazione automatica. Due aiuti:
+
+- **misure senza metro:** in Italia le strisce pedonali sono larghe 50 cm con 50 cm di intervallo, e lunghe almeno
+  2,50 m (regolamento del Codice della Strada, D.P.R. 495/1992, art. 145). Contando le strisce da cordolo a cordolo
+  si ottiene la larghezza della strada: una striscia più un intervallo fanno un metro;
+- **controllo di plausibilità:** dai quattro punti e dalle due misure lo script ricostruisce dove si trova la camera
+  e stampa a che altezza da terra risulta. Se il numero è lontano dal vero, o se compare l'avviso che i punti non
+  tornano con una camera reale, un angolo o una misura sono sbagliati. Vale per camere normali (webcam, telefono),
+  non per immagini ritagliate da un lato.
+
+L'altezza delle persone (attributo `child`) usa la posizione ricostruita della camera: da una camera in alto una
+persona appare più corta di quanto è larga la strada accanto, e senza questa correzione gli adulti risultano bambini.
+`child` si decide solo quando l'altezza è misurabile: calibrazione che torna con una camera reale e riquadro alto
+almeno 30 pixel (`attributes.height_min_box_px`). Altrimenti resta non deciso, e vale la velocità di camminata misurata.
+
 ## Regola
 
 `rules.py` è una macchina a stati in puro Python. Ogni decisione riporta in `reason` i numeri che l'hanno prodotta.
@@ -100,6 +117,9 @@ Senza una calibrazione in metri lo stato resta `IDLE`.
 
 - `d_stop = v·1,0 + v²/(2·7,0)`, `T_need = W/v_ped + 1,0`, `TTC = d/v`, `green_s = min(25, max(W/1,2, W/v_ped) + 2)`.
 - `v_ped`: 1,2 m/s; 0,8 per bambino, pedone lento o con ausilio; la velocità misurata se è più bassa.
+- Le velocità si misurano su una finestra di mezzo secondo, non tra un frame e l'altro: il box di un oggetto fermo
+  trema di qualche pixel e da un frame all'altro sembrerebbe muoversi. Non si misura la velocità quando il box è
+  tagliato dal bordo dell'immagine, né dove la calibrazione è troppo grossolana (un pixel vale più di mezzo metro).
 - Il pedone "vuole attraversare" se è sulle strisce, oppure in zona d'attesa da più di 1 s o in cammino verso la strada.
 - Lo stato sale subito e scende solo dopo 1 s, per non far tremolare le lampade.
 - Il verde richiesto può solo crescere finché c'è qualcuno: una stima di velocità che oscilla non fa cambiare la
@@ -179,6 +199,8 @@ A schermo e a fine corsa: yield rate, near-miss e incidenti.
   - `veh`, trasversale alla corsia: conta `car`, `bus`, `truck`, `motorcyclist`, `cyclist`.
 - **Niente doppioni:** conta il punto in basso al centro del box, servono 3 frame oltre la linea, e ogni traccia
   conta al massimo una volta per verso su ciascuna linea.
+- **Tracce valide:** una traccia conta dopo 5 frame (specifica). Nei profili a 10 FPS (`unoq`, `--emulate-unoq`)
+  ne bastano 2: cinque frame sarebbero mezzo secondo, e un'auto passerebbe la linea prima di contare.
 - **Una linea conta solo tra i suoi due estremi:** chi passa oltre la fine del segmento non viene contato.
   Conviene disegnarla più lunga del necessario. Le coordinate possono uscire dall'immagine (meno di 0, più di 1).
 - **Verso:** la freccia a schermo indica IN. Per scambiare IN e OUT si invertono i due punti della linea (tasto `i`
@@ -206,6 +228,21 @@ Webcam, input 416 px (prima del passaggio a 320):
 |---|---|---|
 | profilo `pc` | 12,7 / 17,4 ms | 26,6 (la webcam ne dà circa 30) |
 | `--emulate-unoq` | 16,9 / 24,0 ms | 9,8 (limite imposto: 10) |
+
+## Risoluzione: forma dell'immagine e zona d'interesse
+
+Provando su video reali il limite principale è risultato la dimensione dei pedoni: in un'inquadratura larga, a
+320 px, una persona lontana occupa una decina di pixel e non viene vista. Due rimedi, senza costo in più:
+
+- **Input a forma di immagine** (`model.match_aspect`, attivo): lo stesso numero di pixel di 320x320, ma con le
+  proporzioni dell'immagine (416x256 per un 16:9). Niente pixel sprecati in bordi vuoti: sui video di prova le
+  persone trovate sono circa il doppio, con lo stesso tempo di calcolo.
+- **Zona d'interesse** (`"roi": [x0, y0, x1, y1]` in `calib.json`, oppure `calibrate.py --roi`): il detector guarda
+  solo la parte dell'immagine che serve, cioè le strisce e la strada prima. Gli oggetti diventano più grandi a
+  parità di costo. Sul video di New York, pedoni trovati sulle strisce per frame: 3,4 sull'immagine intera,
+  5,1 sulla fascia delle strisce, 8,8 portando il budget a 416.
+
+La regola pratica per chi monta la camera: le strisce e le zone d'attesa devono riempire l'inquadratura.
 
 ## Modello
 

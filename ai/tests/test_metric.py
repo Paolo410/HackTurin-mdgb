@@ -9,13 +9,14 @@ from smartcrossing.geometry import (
     Geometry, apply_homography, build_metric_calib, find_homography, point_in_polygon,
 )
 from smartcrossing.sim import (
+    virtual_camera_config,
     DEMO_ALONG_M, DEMO_CORNERS, DEMO_WIDTH_M, FRAME_SIZE, Actor, demo_calib, detections_at, drive,
     run_scenario, walk_then_wait,
 )
 from smartcrossing.sources import frame_fault
 from smartcrossing.tracking import Tracker
 
-CFG = load_config()
+CFG = virtual_camera_config(load_config())   # scripted actors may be outside the image
 
 
 def geometry():
@@ -57,6 +58,23 @@ def test_zones_and_lines_are_derived_from_the_corners():
     h = np.array(calib["homography"])
     for end in ("start", "end"):
         assert apply_homography(h, *calib["lines"]["ped"][end])[1] == pytest.approx(DEMO_WIDTH_M / 2, abs=0.05)
+        # The vehicle line runs through the middle of the stripes, from kerb to kerb and a little more.
+        assert apply_homography(h, *calib["lines"]["veh"][end])[0] == pytest.approx(DEMO_ALONG_M / 2, abs=0.05)
+    cfg = load_config()
+    cfg["geometry"]["veh_line_offset_m"] = 3.0          # or a few metres before the stripes
+    before = build_metric_calib(DEMO_CORNERS, DEMO_ALONG_M, DEMO_WIDTH_M, cfg)
+    assert apply_homography(h, *before["lines"]["veh"]["start"])[0] == pytest.approx(-3.0, abs=0.05)
+
+
+def test_calibration_from_points_that_are_not_the_corners_of_the_crossing():
+    # Four points on two stripes in the middle of a 20 m road: zones still go from kerb to kerb.
+    full = build_metric_calib(DEMO_CORNERS, DEMO_ALONG_M, DEMO_WIDTH_M, CFG)
+    inv = np.linalg.inv(np.array(full["homography"]))
+    ground = [[0.0, 1.25], [DEMO_ALONG_M, 1.25], [DEMO_ALONG_M, 5.25], [0.0, 5.25]]
+    corners = [list(apply_homography(inv, x, y)) for x, y in ground]
+    partial = build_metric_calib(corners, DEMO_ALONG_M, DEMO_WIDTH_M, CFG, ground=ground)
+    assert np.allclose(np.array(partial["homography"]), np.array(full["homography"]), atol=1e-6)
+    assert partial["zones"] == full["zones"] and partial["W"] == DEMO_WIDTH_M
 
 
 def test_point_in_polygon():
@@ -74,6 +92,55 @@ def test_sizes_in_metres_from_box_and_foot_point():
     # Farther away the same metre covers fewer pixels.
     near, far = g.to_image(2.0, 0.5), g.to_image(2.0, 6.5)
     assert g.pixels_per_metre(*near) > g.pixels_per_metre(*far)
+
+
+def test_height_is_corrected_for_a_camera_that_looks_down():
+    # A real camera 6 m above the kerb, looking 35 degrees down and slightly tilted: a person 1.7 m tall
+    # must come out 1.7 m tall near and far, although from above the box is much shorter than 1.7 m of ground.
+    width, height, focal = 1280, 720, 900.0
+    pitch, roll = np.radians(35.0), np.radians(4.0)
+    forward = np.array([0.0, np.cos(pitch), -np.sin(pitch)])
+    right = np.array([np.cos(roll), 0.0, 0.0]) + np.sin(roll) * np.cross(forward, [1.0, 0.0, 0.0])
+    right /= np.linalg.norm(right)
+    down = np.cross(forward, right)
+    eye = np.array([2.0, -4.0, 6.0])
+
+    def project(point):
+        rel = np.asarray(point, dtype=float) - eye
+        return (width / 2 + focal * rel @ right / (rel @ forward), height / 2 + focal * rel @ down / (rel @ forward))
+
+    ground = [[0.0, 0.0], [4.0, 0.0], [4.0, 7.0], [0.0, 7.0]]
+    corners = [[u / width, v / height] for u, v in (project([x, y, 0.0]) for x, y in ground)]
+    g = Geometry(build_metric_calib(corners, 4.0, 7.0, CFG), CFG)
+    g.set_frame_size(width, height)
+    assert g.camera is not None
+    assert g.camera["height_m"] == pytest.approx(6.0, rel=0.02)
+    assert g.camera["focal_px"] == pytest.approx(focal, rel=0.02)
+    as_a_width = []
+    for x, y in [(2.0, 0.5), (0.5, 3.5), (3.5, 6.5), (-3.0, 5.0)]:
+        foot, head = project([x, y, 0.0]), project([x, y, 1.7])
+        box_h = foot[1] - head[1]
+        assert g.height_in_metres(box_h, *foot) == pytest.approx(1.7, rel=0.02)
+        assert g.box_height_px(1.7, *foot) == pytest.approx(box_h, rel=0.02)
+        as_a_width.append(g.size_in_metres(box_h, *foot))
+    assert min(as_a_width) < CFG["attributes"]["child_height_m"]   # measured like a width, this adult is a child
+
+
+def test_height_without_a_camera_position_is_still_corrected():
+    # Four points that no real camera would see like this: the camera position is not trusted,
+    # and the height falls back on the local stretch of the ground. Box and height stay consistent.
+    g = Geometry(build_metric_calib([[0.2, 0.9], [0.8, 0.7], [0.9, 0.3], [0.3, 0.45]], 4.0, 7.0, CFG), CFG)
+    g.set_frame_size(*FRAME_SIZE)
+    assert g.camera is None
+    foot = g.to_image(2.0, 3.0)
+    assert g.height_in_metres(g.box_height_px(1.7, *foot), *foot) == pytest.approx(1.7, rel=1e-6)
+    # Such a height is rough: sizes of animals still use it, but nobody is called a child on it.
+    tracker = Tracker(CFG, frame_rate=10)
+    actor = Actor("person", 1.10, 0.4, walk_then_wait((0.0, 3.0), (3.0, 3.0), 1.0))
+    for i in range(20):
+        tracker.update(detections_at([actor], i / 10.0, g), i / 10.0, g)
+    state = next(iter(tracker.tracks.values()))
+    assert state.heights and not state.precise_heights
 
 
 def test_build_metric_calib_rejects_bad_sizes():
@@ -116,6 +183,13 @@ def test_child_is_decided_from_the_height():
     child = track_one(Actor("person", 1.10, 0.4, walk_then_wait((0.0, -0.7), (3.0, -0.7), 1.0)), seconds=2)
     adult = track_one(Actor("person", 1.75, 0.5, walk_then_wait((0.0, -0.7), (3.0, -0.7), 1.0)), seconds=2)
     assert child.attrs["child"] is True and adult.attrs["child"] is False
+
+
+def test_child_is_not_decided_on_a_box_too_small_to_measure():
+    # 60 m beyond the crossing an adult is a box of a few pixels: no decision, instead of a wrong one.
+    far = track_one(Actor("person", 1.75, 0.5, walk_then_wait((0.0, 60.0), (3.0, 60.0), 1.0)), seconds=2)
+    assert far.heights and not far.precise_heights
+    assert far.attrs["child"] is None
 
 
 def test_slow_needs_two_seconds_of_walking_and_ignores_standing():

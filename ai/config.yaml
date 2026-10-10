@@ -5,6 +5,8 @@
 model:
   path: models/yolox_nano_dynamic.onnx   # relative to ai/, made by scripts/get_model.sh (free input size)
   input_size: 320                 # (spec) 320, 416 optional. Must be a multiple of the largest stride.
+  match_aspect: true              # same number of pixels as input_size squared, shaped like the image:
+                                  # no input wasted on padding, objects seen larger at the same cost
   conf: 0.30                      # minimum score (objectness * class probability)
   nms: 0.45                       # IoU threshold of the per-class NMS
   nms_cross_class: 0.85           # boxes of different classes above this IoU are one object: keep the best
@@ -28,7 +30,7 @@ tracking:
   minimum_matching_threshold: 0.8
   minimum_consecutive_frames: 1
   min_track_age: 5                # (spec) frames before a track is considered valid
-  history_len: 60                 # positions kept per track
+  history_len: 150                # positions kept per track (5 s at 30 frames per second)
   default_frame_rate: 30          # rate given to ByteTrack when the source does not report one
 
 geometry:
@@ -36,19 +38,35 @@ geometry:
   waiting_zone_margin_m: 1.0      # how far the waiting zones extend beyond the sides of the stripes
   carriageway_extent_m: 150       # road considered before and after the stripes
   ped_line_margin_m: 2.0          # the pedestrian line extends this far beyond the stripes
-  veh_line_offset_m: 2.0          # the vehicle line is this far before the stripes
+  veh_line_offset_m: middle       # vehicle line through the middle of the stripes (both directions fully
+                                  # in view), or a number: metres before the stripes
   scale_probe_px: 5               # half width of the step used to measure the local scale
   height_scale: 1.0               # correction of sizes in metres (tune with a person of known height)
+  camera_tolerance: 0.2           # the camera position is worked out from the calibration, and used for
+                                  # heights, only if the calibration fits a real camera this well (0 = perfectly;
+                                  # 0.2 accepts corners clicked 4 px off, rejects swapped corners or wrong sizes)
+  min_height_ratio: 0.2           # otherwise heights are rough, and a metre of height never counts as less
+                                  # than this share of a metre across (view from straight above)
 
 kinematics:
   ema_samples: 5                  # (spec) speed is an EMA over 5 samples
-  max_dt_s: 1.0                   # a gap longer than this restarts the speed estimate
+  window_s: 0.5                   # each sample is the displacement over this time, not over one frame
+  min_window_s: 0.15              # shortest time over which a speed is measured
+  max_dt_s: 1.0                   # samples older than this are not used
+  max_speed_ms: 70                # a faster jump is the tracker moving an ID to another object
+  max_metres_per_px: 0.5          # no speed where one pixel is more than this on the ground (too far)
+  edge_margin: 0.01               # no speed for boxes this close to the image border (fraction of the size);
+                                  # null = no check
 
 attributes:
   child_height_m: 1.30            # (spec) below this median height the pedestrian is a child
   height_samples: 5               # (spec) frames used for the median height
+  height_min_box_px: 30           # a box shorter than this is too coarse to tell 1.3 m from 1.7 m:
+                                  # the pedestrian stays undecided (not a child) until seen larger. The same
+                                  # when the calibration does not fit a real camera (geometry.camera_tolerance)
   slow_speed_ms: 0.9              # (spec) below this walking speed the pedestrian is slow
-  slow_min_time_s: 2.0            # (spec) walking time needed before deciding
+  slow_min_time_s: 2.0            # (spec) the walking speed is the progress made over this time
+  slow_min_samples: 3             # measures needed before deciding
   moving_min_speed_ms: 0.2        # below this the pedestrian is standing: not part of the walking speed
   walk_speed_samples: 100         # recent walking samples kept for the median walking speed
   aid_model_path: models/aid_cls.onnx   # (spec) optional classifier; missing file = aid unknown
@@ -120,6 +138,9 @@ events:
   near_miss_ttc_s: 1.0            # (spec) TTC below this ...
   near_miss_pet_s: 1.0            # (spec) ... or PET below this, between a vehicle and a pedestrian or animal
   near_miss_lateral_m: 1.5        # the vehicle must be heading at the pedestrian within this side distance
+  near_miss_min_speed_ms: 3.0     # slower vehicles do not make a near miss by TTC
+  max_distance_m: 30              # braking and collisions are judged only this close to the stripes:
+                                  # farther away the calibration is too coarse for accelerations
   pet_radius_m: 1.0               # two tracks passed "through the same point" within this distance
   stopped_on_crosswalk_s: 10.0    # (spec) vehicle standing on the stripes for longer than this
   stopped_ms: 0.3                 # below this speed a vehicle is standing
@@ -151,7 +172,9 @@ thermal:                          # optional, --thermal; sensor in the kit: Grov
 
 selfcheck:
   every_n_frames: 10              # how often a frame is checked
-  laplacian_var_min: 15.0         # below this sharpness the lens is covered
+  laplacian_var_min: 4.0          # below this sharpness the lens is covered (real scenes: 8 or more;
+                                  # a covered lens: below 2; measured on the test videos)
+  confirm_checks: 2               # a fault counts after this many checks in a row
   saturated_level: 250            # grey level counted as saturated
   saturated_fraction_max: 0.5     # above this fraction of saturated pixels the camera is dazzled
 
@@ -211,13 +234,18 @@ bench:
   warmup_frames: 10               # frames discarded before measuring
   percentile: 95
 
+# At 10 FPS a track is valid after 2 frames instead of 5: five frames are half a second, and a car at
+# 30 km/h has crossed the counting line before its track counts (Turin video: 16 vehicles counted of the
+# 35 counted at 30 FPS; with 2 frames, 28).
 profiles:
   pc: {}
   unoq:
     model: {input_size: 320, intra_op_num_threads: 4}
     source: {max_fps: 10, resize_width: 640}
+    tracking: {min_track_age: 2}
 
 # Applied on top of the profile by --emulate-unoq. (spec) 10 FPS, input 320, 4 onnxruntime threads.
 emulate_unoq:
   model: {input_size: 320, intra_op_num_threads: 4}
   source: {max_fps: 10}
+  tracking: {min_track_age: 2}

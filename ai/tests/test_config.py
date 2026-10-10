@@ -22,6 +22,8 @@ def test_emulate_unoq_applies_spec_limits():
     assert cfg["source"]["max_fps"] == 10
     assert cfg["model"]["input_size"] == 320
     assert cfg["model"]["intra_op_num_threads"] == 4
+    # At 10 FPS five frames are half a second: a track must count sooner, or passing cars are not counted.
+    assert cfg["tracking"]["min_track_age"] == 2
     # Values not overridden are kept.
     assert cfg["model"]["conf"] == load_config()["model"]["conf"]
 
@@ -30,6 +32,7 @@ def test_unoq_profile_overrides():
     cfg = load_config(profile="unoq")
     assert cfg["model"]["input_size"] == 320
     assert cfg["source"]["max_fps"] == 10
+    assert cfg["tracking"]["min_track_age"] == 2
 
 
 def test_unknown_profile_raises():

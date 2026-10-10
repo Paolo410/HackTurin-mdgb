@@ -5,6 +5,7 @@ so a scenario shows and tests the whole chain, and can drive the real firmware t
 """
 from __future__ import annotations
 
+import copy
 import time
 from dataclasses import dataclass
 from typing import Callable
@@ -32,6 +33,13 @@ class Actor:
     path: Callable[[float], tuple[float, float] | None]     # t -> ground position, None = not in the scene
 
 
+def virtual_camera_config(cfg: dict) -> dict:
+    """The virtual camera has no borders: actors may be outside the image and are still measured."""
+    cfg = copy.deepcopy(cfg)
+    cfg["kinematics"]["edge_margin"] = None
+    return cfg
+
+
 def demo_calib(cfg: dict) -> dict:
     return build_metric_calib(DEMO_CORNERS, DEMO_ALONG_M, DEMO_WIDTH_M, cfg)
 
@@ -44,8 +52,8 @@ def detections_at(actors: list[Actor], t: float, geometry: Geometry) -> sv.Detec
         if position is None:
             continue
         fx, fy = geometry.to_image(*position)
-        scale = geometry.pixels_per_metre(fx, fy)
-        half, high = actor.width_m * scale / 2, actor.height_m * scale
+        half = actor.width_m * geometry.pixels_per_metre(fx, fy) / 2
+        high = geometry.box_height_px(actor.height_m, fx, fy)   # standing things look shorter from above
         boxes.append([fx - half, fy - high, fx + half, fy])
         classes.append(COCO_CLASSES.index(actor.coco_class))
     if not boxes:
@@ -156,6 +164,7 @@ def run_actors(cfg: dict, actors: list[Actor], duration: float, fps: float = 10.
 
     thermal_script(t) -> warm columns of the thermal camera; luminance = brightness of the virtual image.
     """
+    cfg = virtual_camera_config(cfg)
     clock = {"t": 0.0}
     thermal = None
     if thermal_script is not None:

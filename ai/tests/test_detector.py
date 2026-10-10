@@ -3,7 +3,7 @@ import pytest
 
 from smartcrossing.config import load_config, resolve_path
 from smartcrossing.detector import (
-    COCO_CLASSES, Detector, decode_outputs, letterbox, make_grids, nms, postprocess,
+    COCO_CLASSES, Detector, decode_outputs, fit_input, letterbox, make_grids, nms, postprocess,
 )
 
 STRIDES = [8, 16, 32]
@@ -31,6 +31,26 @@ def test_grid_count_matches_model_output():
     grids, strides = make_grids(416, STRIDES)
     assert grids.shape == (3549, 2) and strides.shape == (3549, 1)   # 52*52 + 26*26 + 13*13
     assert make_grids(320, STRIDES)[0].shape == (2100, 2)            # 40*40 + 20*20 + 10*10
+
+
+def test_rectangular_input_letterbox_and_grids():
+    frame = np.zeros((270, 960, 3), dtype=np.uint8)          # a wide strip
+    blob, ratio = letterbox(frame, (576, 192), 114)          # (width, height)
+    assert blob.shape == (1, 3, 192, 576) and ratio == pytest.approx(0.6)
+    assert np.all(blob[0, :, :162, :] == 0) and np.all(blob[0, :, 162:, :] == 114)
+    grids, strides = make_grids((576, 192), STRIDES)
+    assert grids.shape[0] == 72 * 24 + 36 * 12 + 18 * 6
+    assert grids[:, 0].max() == 71 and grids[:, 1].max() == 23   # x runs along the width
+    assert make_grids(416, STRIDES)[0].shape == make_grids((416, 416), STRIDES)[0].shape
+
+
+def test_fit_input_keeps_the_pixel_budget_and_the_shape_of_the_image():
+    assert fit_input(960, 540, 320, 32) == (416, 256)        # 16:9 frame: 106 496 px instead of 102 400
+    assert fit_input(640, 640, 320, 32) == (320, 320)
+    assert fit_input(960, 297, 320, 32) == (576, 192)        # a strip around the crossing
+    w, h = fit_input(540, 960, 320, 32)                      # portrait
+    assert (w, h) == (256, 416)
+    assert fit_input(10000, 50, 320, 32)[1] == 32            # never below one cell of the coarsest level
 
 
 def test_decode_uses_grid_and_stride():
@@ -111,6 +131,45 @@ def test_model_accepts_both_input_sizes(size, rows):
     raw = detector.session.run(None, {detector.input_name: blob})[0]
     assert raw.shape == (1, rows, 85)
     assert len(detector.detect(np.full((480, 640, 3), 114, dtype=np.uint8))) == 0
+
+
+@needs_model
+def test_input_follows_the_shape_of_the_frame_and_of_the_region_of_interest():
+    detector = Detector(load_config())
+    frame = np.full((540, 960, 3), 114, dtype=np.uint8)
+    assert len(detector.detect(frame)) == 0
+    assert detector.input_wh == (416, 256) and detector.input_label == "416x256"
+    detector.set_roi([0.0, 0.25, 1.0, 0.8])                  # the strip with the crossing
+    assert len(detector.detect(frame)) == 0
+    assert detector.input_wh == (576, 192)
+    detector.set_roi(None)
+    cfg = load_config()
+    cfg["model"]["match_aspect"] = False
+    square = Detector(cfg)
+    square.detect(frame)
+    assert square.input_wh == (320, 320) and square.input_label == "320"
+    for bad in ([0.5, 0.0, 0.2, 1.0], [0.0, 0.0, 1.2, 1.0]):
+        with pytest.raises(ValueError):
+            detector.set_roi(bad)
+
+
+@needs_model
+def test_region_of_interest_boxes_come_back_in_frame_coordinates(monkeypatch):
+    detector = Detector(load_config())
+    seen = {}
+
+    def fake_infer(image):
+        seen["shape"] = image.shape[:2]
+        row = np.zeros((1, 85), dtype=np.float32)
+        row[0, :5] = [50, 40, 20, 30, 0.9]                   # centre (50, 40), 20 x 30, inside the crop
+        row[0, 5 + COCO_CLASSES.index("person")] = 0.9
+        return row, 1.0
+    monkeypatch.setattr(detector, "infer", fake_infer)
+    frame = np.zeros((400, 800, 3), dtype=np.uint8)
+    detector.set_roi([0.25, 0.5, 1.0, 1.0])                  # crop starts at x = 200, y = 200
+    detections = detector.detect(frame)
+    assert seen["shape"] == (200, 600)
+    assert detections.xyxy[0].tolist() == [240.0, 225.0, 260.0, 255.0]
 
 
 @needs_model
