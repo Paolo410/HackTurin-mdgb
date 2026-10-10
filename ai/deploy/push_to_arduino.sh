@@ -3,6 +3,10 @@
 # Same layout as comms/deploy/push_to_arduino.sh: everything under ~/HackTurin-mdgb on the board, Python in ~/venv.
 #
 #   ./ai/deploy/push_to_arduino.sh arduino@192.168.1.50                    copy, prepare Python (~/venv)
+#   ./ai/deploy/push_to_arduino.sh arduino@192.168.1.50 --bridge           also what is needed to command the
+#        traffic light (--actuator bridge): the three files of comms/ that talk to the sketch, taken from the
+#        working tree or, until they are on main, from the git ref in MDGB_COMMS_REF (default
+#        origin/lorenzo/ble-backup), and the arduino-router-bridge package. Not the network node.
 #   ./ai/deploy/push_to_arduino.sh arduino@192.168.1.50 --applab <folder>  events in the folder of the App Lab app
 #        of the sketch (~/ArduinoApps/<folder>/data/c3): the network node reads them there, and the vision
 #        reads there the sensors, the shock alarm and the badge written by that app
@@ -10,17 +14,33 @@
 #   ./ai/deploy/push_to_arduino.sh --pack                                  makes mdgb-ai.tar.gz to copy by hand
 #
 # On the board: ~/HackTurin-mdgb/ai/{smartcrossing/, config.yaml, calib*.json, models/yolox_nano_dynamic.onnx,
-# requirements.txt, scripts/bench.py, deploy/mdgb-ai.service}. Running it again updates the code.
-# The semaphore link (--actuator bridge) needs comms/actuators.py on the board: comms/deploy/push_to_arduino.sh.
+# requirements.txt, scripts/{bench,operator_login}.py, deploy/mdgb-ai.service}. Running it again updates the code.
+# The technician's credentials (ai/.env) are made on the board with scripts/operator_login.py and never copied.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+COMMS_REF="${MDGB_COMMS_REF:-origin/lorenzo/ble-backup}"
+COMMS_FILES=(comms/__init__.py comms/actuators.py comms/jsonl.py)   # vision <-> sketch over the Bridge (owner: comms)
+BRIDGE_PACKAGE="arduino-router-bridge==0.5.1"                       # same pin as comms/requirements.txt
+case " $* " in *" --bridge "*) BRIDGE=1 ;; *) BRIDGE=0 ;; esac
 FILES=(ai/smartcrossing ai/config.yaml ai/calib.example.json ai/calib_thermal.example.json ai/requirements.txt
-       ai/scripts/bench.py ai/deploy/mdgb-ai.service ai/models/yolox_nano_dynamic.onnx)
+       ai/scripts/bench.py ai/scripts/operator_login.py ai/deploy/mdgb-ai.service ai/models/yolox_nano_dynamic.onnx)
 [ -f "$ROOT/ai/calib.json" ] && FILES+=(ai/calib.json)            # the calibration of the mounted camera, if made
 [ -f "$ROOT/ai/calib_thermal.json" ] && FILES+=(ai/calib_thermal.json)
 [ -f "$ROOT/ai/models/yolox_nano_dynamic.onnx" ] || { echo "Manca il modello: lancia prima ai/scripts/get_model.sh"; exit 1; }
 pack() {   # tar without the hidden files of macOS (._*) and without Python caches
-  (cd "$ROOT" && COPYFILE_DISABLE=1 tar --no-mac-metadata -czf - --exclude='__pycache__' --exclude='*.pyc' "${FILES[@]}")
+  local stage
+  stage="$(mktemp -d)"
+  (cd "$ROOT" && tar -cf - --exclude='__pycache__' --exclude='*.pyc' "${FILES[@]}") | tar -xf - -C "$stage"
+  if [ "$BRIDGE" = 1 ]; then
+    if [ -f "$ROOT/comms/actuators.py" ]; then
+      (cd "$ROOT" && tar -cf - "${COMMS_FILES[@]}") | tar -xf - -C "$stage"
+    else
+      (cd "$ROOT" && git archive "$COMMS_REF" "${COMMS_FILES[@]}") | tar -xf - -C "$stage" \
+        || { echo "comms/actuators.py non c'è nel repo né in $COMMS_REF (git fetch origin?)" >&2; rm -rf "$stage"; return 1; }
+    fi
+  fi
+  (cd "$stage" && COPYFILE_DISABLE=1 tar --no-mac-metadata -czf - *)
+  rm -rf "$stage"
 }
 
 if [ "${1:-}" = "--pack" ]; then
@@ -29,13 +49,14 @@ if [ "${1:-}" = "--pack" ]; then
   echo "poi: python3 -m venv ~/venv && ~/venv/bin/pip install -r ~/HackTurin-mdgb/ai/requirements.txt"
   exit 0
 fi
-TARGET="${1:?uso: push_to_arduino.sh utente@ip-della-scheda [--applab CARTELLA] [--service]   oppure   --pack}"
+TARGET="${1:?uso: push_to_arduino.sh utente@ip-della-scheda [--bridge] [--applab CARTELLA] [--service]   oppure   --pack}"
 shift
 SERVICE=0
 APPLAB=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --service) SERVICE=1 ;;
+    --bridge) ;;
     --applab) APPLAB="${2:?--applab vuole il nome della cartella in ~/ArduinoApps}"; shift ;;
     *) echo "opzione sconosciuta: $1"; exit 2 ;;
   esac
@@ -46,12 +67,13 @@ echo "1/3 copio la visione su $TARGET:~/HackTurin-mdgb/ai"
 pack | ssh "$TARGET" "mkdir -p ~/HackTurin-mdgb && tar -xzf - -C ~/HackTurin-mdgb"
 
 echo "2/3 preparo Python sulla scheda (~/venv, serve Internet la prima volta: circa 500 MB)"
-ssh "$TARGET" "APPLAB='$APPLAB' bash -s" <<'REMOTE'
+ssh "$TARGET" "APPLAB='$APPLAB' BRIDGE='$BRIDGE' BRIDGE_PACKAGE='$BRIDGE_PACKAGE' bash -s" <<'REMOTE'
 set -e
 cd ~/HackTurin-mdgb
 [ -x ~/venv/bin/python ] || python3 -m venv ~/venv \
   || { echo "Manca python3-venv sulla scheda: sudo apt install python3-venv, poi rilancia"; exit 1; }
 ~/venv/bin/pip install -q -r ai/requirements.txt
+[ "$BRIDGE" = 1 ] && ~/venv/bin/pip install -q "$BRIDGE_PACKAGE"
 # Where the events go: the folder of the App Lab app when there is one, else ~/HackTurin-mdgb/logs/c3.
 C3_DIR="$HOME/HackTurin-mdgb/logs/c3"
 if [ -n "$APPLAB" ]; then
@@ -63,7 +85,8 @@ mkdir -p "$C3_DIR" 2>/dev/null || echo "   ATTENZIONE: non posso creare $C3_DIR 
 echo "$C3_DIR" > ai/.c3_dir
 echo "   eventi in $C3_DIR"
 [ -f ai/calib.json ] || echo "   NOTA: manca ai/calib.json (camera non calibrata): si contano i passaggi, niente velocità né regole"
-[ -f comms/actuators.py ] || echo "   NOTA: manca comms/actuators.py (lo porta comms/deploy/push_to_arduino.sh): per ora solo --actuator sim"
+[ -f comms/actuators.py ] || echo "   NOTA: manca comms/actuators.py: per comandare il semaforo rilancia con --bridge (per ora solo --actuator sim)"
+[ -f ai/.env ] || echo "   NOTA: credenziali del tecnico non impostate: sulla scheda, cd ~/HackTurin-mdgb/ai && ~/venv/bin/python scripts/operator_login.py"
 ls /dev/video* >/dev/null 2>&1 || echo "   ATTENZIONE: nessuna camera in /dev/video*"
 [ -S /var/run/arduino-router.sock ] || echo "   ATTENZIONE: arduino-router non attivo (serve per comandare il semaforo)"
 [ -r /var/run/arduino-router.sock ] && [ -w /var/run/arduino-router.sock ] \
