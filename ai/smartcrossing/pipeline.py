@@ -101,6 +101,7 @@ class Pipeline:
         self.selfcheck_confirm = max(1, int(cfg["selfcheck"]["confirm_checks"]))
         self.fault: str | None = None             # confirmed result of the camera self-check
         self.external_fault: str | None = None    # set by the caller: tamper or lamp fault from the MCU
+        self.technician = False                   # set by the caller: technician at the node (badge to logout)
         self._last_fault: str | None = None
         self._fault_streak = 0
         self.scene = Scene(W=float(cfg["rules"]["default_W_m"]))
@@ -176,7 +177,7 @@ class Pipeline:
             self.scene.animals, self.scene.animal_margin_m = self._animals, self.animals.margin_m
         if self.thermal is not None:
             self.thermal.update(self.scene, t, self.luminance)   # adds who only the thermal camera sees
-        self._command = self.rules.step(self.scene, t)
+        self._command = self._decide(t)
         t3 = perf_counter()
         sent = self.commander.update(self._command) if self.commander is not None else False
         lat_ms["rules"] = (t3 - t2) * 1000.0
@@ -188,10 +189,14 @@ class Pipeline:
         """The camera gave no frame: the rule runs on the age of the last one (DEGRADED after the timeout)."""
         age = t - self._last_frame_t if self._last_frame_t is not None else float("inf")
         self.scene = Scene(W=self.scene.W, video_age_s=age, fault=self.external_fault)
-        self._command = self.rules.step(self.scene, t)
+        self._command = self._decide(t)
         if self.commander is not None:
             self.commander.update(self._command)
         return self._command
+
+    def _decide(self, t: float) -> dict:
+        """C1 fields: the rule, plus "tech" (technician at the node: the sketch keeps the buzzer quiet)."""
+        return {**self.rules.step(self.scene, t), "tech": self.technician}
 
     def _describe(self, event: dict) -> dict:
         """Adds to a crossing what C3 wants to know about who crossed."""

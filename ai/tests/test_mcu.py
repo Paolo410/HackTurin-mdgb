@@ -14,6 +14,7 @@ import numpy as np
 import supervision as sv
 
 from smartcrossing import app
+from smartcrossing.actuator import SimActuator
 from smartcrossing.config import load_config
 from smartcrossing.mcu import C5FileTail, McuState
 from smartcrossing.pipeline import Pipeline
@@ -45,13 +46,16 @@ def request(port, method, path, body=None, cookie=None):
     return response.status, data, (response.getheader("Set-Cookie") or "").split(";")[0]
 
 
-def page_with_login(monkeypatch, images=True, mcu=None):
+def page_with_login(monkeypatch, images=True, mcu=None, clock=None, session_s=None):
     cfg = load_config()
     cfg["operator"]["share_images"] = images
+    if session_s is not None:
+        cfg["operator"]["session_s"] = session_s
     monkeypatch.setenv(USER_VAR, USER)
     monkeypatch.setenv(HASH_VAR, hash_password(PASSWORD, iterations=1000))   # few iterations: fast tests
-    mcu = mcu or McuState(cfg)
-    return OperatorPage(0, mcu, cfg, host="127.0.0.1"), mcu                  # port 0: any free port
+    clock = clock or time.monotonic
+    mcu = mcu or McuState(cfg, monotonic=clock)
+    return OperatorPage(0, mcu, cfg, host="127.0.0.1", monotonic=clock), mcu  # port 0: any free port
 
 
 def login(page, user=USER, password=PASSWORD):
@@ -68,18 +72,19 @@ def test_a_shock_is_the_anti_theft_alarm_and_does_not_change_the_vision():
     assert mcu.snapshot()["shock_s_ago"] == 7       # the technician sees it
 
 
-def test_the_badge_opens_a_window_and_a_second_badge_only_adds_time():
+def test_the_badge_gives_two_minutes_to_log_in_and_a_second_badge_only_adds_time():
     clock = Clock()
     mcu = McuState(CFG, monotonic=clock)
+    assert CFG["operator"]["login_s"] == 120
     assert not mcu.unlocked() and mcu.window == 0
     mcu.on_line(BADGE)
-    assert mcu.unlocked() and mcu.window == 1
-    clock.t += CFG["operator"]["unlock_s"] - 10
+    assert mcu.unlocked() and mcu.window == 1 and mcu.snapshot()["login_s_left"] == 120
+    clock.t += CFG["operator"]["login_s"] - 10
     mcu.on_line(BADGE)                              # still open: same window, more time
     assert mcu.window == 1
     clock.t += 20
     assert mcu.unlocked()
-    clock.t += CFG["operator"]["unlock_s"]
+    clock.t += CFG["operator"]["login_s"]
     assert not mcu.unlocked()                       # it closes by itself
     mcu.on_line(BADGE)
     assert mcu.window == 2                          # a new window: old sessions do not come back to life
@@ -163,12 +168,10 @@ def test_technician_page_needs_the_badge_and_then_the_login(monkeypatch):
         assert code == 200 and cookie.startswith("mdgb_session=")
         code, body, _ = request(page.port, "GET", "/status.json", cookie=cookie)
         status = json.loads(body)
-        assert code == 200 and status["state"] == "PRESENCE" and status["session_s_left"] > 0
-        assert request(page.port, "GET", "/status.json", cookie="mdgb_session=guess")[0] == 401
+        assert code == 200 and status["state"] == "PRESENCE" and status["session_s_left"] is None  # until logout
+        assert request(page.port, "GET", "/status.json", cookie="mdgb_session=guess")[0] == 403    # badge used
+        assert login(page)[0] == 403                                      # a second login needs a new badge
         request(page.port, "POST", "/logout", cookie=cookie)
-        assert request(page.port, "GET", "/status.json", cookie=cookie)[0] == 401
-        _, _, cookie = login(page)
-        mcu.lock()                                                        # the time of the badge is over
         assert request(page.port, "GET", "/status.json", cookie=cookie)[0] == 403
         mcu.on_line(BADGE)                                                # next badge: the old session is dead
         assert request(page.port, "GET", "/status.json", cookie=cookie)[0] == 401
@@ -185,6 +188,79 @@ def test_too_many_wrong_passwords_close_the_page_until_the_next_badge(monkeypatc
         assert login(page)[0] == 403 and not mcu.unlocked()               # even the right one: badge again
         mcu.on_line(BADGE)
         assert login(page)[0] == 200
+    finally:
+        page.close()
+
+
+def test_two_minutes_to_log_in_after_the_badge(monkeypatch):
+    clock = Clock()
+    page, mcu = page_with_login(monkeypatch, clock=clock)
+    try:
+        mcu.on_line(BADGE)
+        code, body, _ = request(page.port, "GET", "/status.json")
+        assert code == 401 and json.loads(body)["login_s_left"] == 120   # the form shows the seconds left
+        clock.t += 121
+        assert request(page.port, "GET", "/status.json")[0] == 403
+        assert login(page)[0] == 403                                      # too late: badge again
+        mcu.on_line(BADGE)
+        clock.t += 100
+        assert login(page)[0] == 200                                      # in time
+    finally:
+        page.close()
+
+
+def test_the_technician_is_present_from_the_badge_to_the_logout(monkeypatch):
+    clock = Clock()
+    page, mcu = page_with_login(monkeypatch, clock=clock)
+    try:
+        assert not page.technician_present()
+        mcu.on_line(BADGE)
+        assert page.technician_present()                                  # quiet from the badge on
+        _, _, cookie = login(page)
+        clock.t += 3600                                                   # no time limit once logged in
+        assert page.technician_present()
+        assert request(page.port, "GET", "/status.json", cookie=cookie)[0] == 200
+        request(page.port, "POST", "/logout", cookie="mdgb_session=guess")  # not a session: changes nothing
+        assert page.technician_present()
+        request(page.port, "POST", "/logout", cookie=cookie)
+        assert not page.technician_present()                              # the buzzer is back at once
+        mcu.on_line(BADGE)
+        clock.t += 121                                                    # badge and no login: back after 2 min
+        assert not page.technician_present()
+    finally:
+        page.close()
+
+
+def test_a_badge_while_logged_in_does_not_leave_a_window_open(monkeypatch):
+    clock = Clock()
+    page, mcu = page_with_login(monkeypatch, clock=clock)
+    try:
+        mcu.on_line(BADGE)
+        _, _, cookie = login(page)
+        mcu.on_line(BADGE)                                                # e.g. the same badge read twice
+        assert page.technician_present() and not mcu.unlocked()
+        request(page.port, "POST", "/logout", cookie=cookie)
+        assert not page.technician_present()                              # logout still ends it at once
+    finally:
+        page.close()
+
+
+def test_with_a_session_limit_the_session_ends_and_a_badge_starts_it_again(monkeypatch):
+    clock = Clock()
+    page, mcu = page_with_login(monkeypatch, clock=clock, session_s=600)
+    try:
+        mcu.on_line(BADGE)
+        _, _, cookie = login(page)
+        code, body, _ = request(page.port, "GET", "/status.json", cookie=cookie)
+        assert code == 200 and json.loads(body)["session_s_left"] == 600
+        clock.t += 500
+        mcu.on_line(BADGE)                                                # more time
+        assert page.technician_present()                                  # the vision loop asks at every frame
+        clock.t += 500
+        assert request(page.port, "GET", "/status.json", cookie=cookie)[0] == 200
+        clock.t += 101
+        assert request(page.port, "GET", "/status.json", cookie=cookie)[0] == 403
+        assert not page.technician_present()
     finally:
         page.close()
 
@@ -213,6 +289,7 @@ def test_live_view_only_for_a_logged_in_technician_who_is_watching(monkeypatch):
         assert not page.wants_frame()                                     # nobody watching: no frame is made
         _, _, cookie = login(page)
         stop = threading.Event()
+        close = threading.Timer(0.5, lambda: request(page.port, "POST", "/logout", cookie=cookie))
 
         def vision_loop():
             while not stop.is_set():
@@ -233,8 +310,9 @@ def test_live_view_only_for_a_logged_in_technician_who_is_watching(monkeypatch):
         jpeg = (data + response.read(max(0, start + length - len(data))))[start:start + length]
         image = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
         assert image.shape[1] == CFG["operator"]["stream_width"]          # reduced for the phone
-        mcu.lock()                                                        # badge time over: the stream ends
+        close.start()                                                     # logout: the stream ends
         response.read()
+        close.join()
         conn.close()
         stop.set()
         feeder.join()
@@ -271,6 +349,18 @@ def test_a_fault_of_the_microcontroller_puts_the_rule_in_degraded():
     for i in range(3, 30):                               # back to normal after the hold time of the rule
         command = pipeline.process(sv.Detections.empty(), i / 10.0, FRAME_SIZE).command
     assert command["state"] == "IDLE"
+
+
+def test_the_technician_reaches_the_sketch_in_the_command_at_once():
+    sim = SimActuator()
+    pipeline = Pipeline(CFG, frame_rate=10, calib=demo_calib(CFG), actuator=sim, load_detector=False)
+    assert pipeline.process(sv.Detections.empty(), 0.0, FRAME_SIZE).command["tech"] is False
+    pipeline.technician = True
+    result = pipeline.process(sv.Detections.empty(), 0.1, FRAME_SIZE)
+    assert result.sent and sim.sent[-1]["tech"] is True               # a change: sent now, not at the 1 s repeat
+    assert sim.sent[-1]["state"] == "IDLE"                            # the rule does not change
+    pipeline.technician = False
+    assert pipeline.no_frame(0.2)["tech"] is False and sim.sent[-1]["tech"] is False
 
 
 def test_the_app_reads_the_files_of_the_sketch_app_and_serves_the_page(tmp_path, capsys, monkeypatch):

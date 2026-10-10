@@ -420,4 +420,17 @@ con v_ped 0,3 → 25 s.
     - non ancora provati: badge → pagina del tecnico → login dal telefono; una richiesta nata da una scena vera;
     - PR #9 e #11 aperte (la #11 sopra la #9); la PR #10 di Lorenzo non è su main;
     - da fare con Lorenzo: punto 30 e il campo `req.veh_red_now` nel contratto.
-
+36. **Tecnico: 2 minuti per il login e cicalino muto mentre lavora** (chiesto da Paolo l'11/10, notte):
+    - dal badge ci sono 2 minuti per entrare (`operator.login_s`); la sessione resta aperta fino a "Esci"
+      (`operator.session_s: 0`, scelta di Paolo; con un limite, un badge con la pagina aperta lo fa ripartire).
+      Login e logout consumano il badge: un secondo login, o rientrare dopo l'uscita, chiede un altro badge;
+    - dal badge al logout (o ai 2 minuti senza login) il comando C1 porta il campo nuovo `"tech": true`. Lo sketch
+      tiene muto il cicalino; resta il bip di conferma del badge (scelta di Paolo). Il campo parte al cambio, non
+      aspetta la ripetizione di 1 s;
+    - nello sketch: 2 minuti di silenzio dal badge anche senza visione, poi silenzio finché arriva `tech: true`.
+      Quando `tech` passa da true a false (logout) il cicalino torna subito. Senza heartbeat il campo non vale:
+      se la visione si ferma, l'antifurto torna a suonare. L'urto viene comunque segnalato (`mcu_event`, centrale);
+    - Salvatore ha riacceso il cicalino l'11/10 (`BUZZER_ENABLED 1`) e tolto solo il bip del sensore di luce coperto,
+      che di sera suonava di continuo;
+    - `tech` è un campo nuovo del contratto C1, come `req.veh_red_now` (punto 31): da far scrivere a Lorenzo in
+      `docs/CONTRACTS.md`. Chi non lo conosce lo ignora.

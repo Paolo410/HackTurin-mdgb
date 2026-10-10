@@ -115,7 +115,8 @@ Cosa guardare:
    accompagnato o un animale libero scatta il rosso dopo un giallo breve; con chi cammina piano il rosso dei
    veicoli dura di più. Servono la calibrazione e lo sketch nuovo.
 3. **Tecnico:** dal telefono sulla stessa Wi-Fi, `http://<scheda>:8090/` dice "BLOCCATO". Passando il badge chiede
-   utente e password; dopo il login mostra numeri e vista dal vivo. Cinque password sbagliate: va ripassato il badge.
+   utente e password, da dare entro 2 minuti; dopo il login mostra numeri e vista dal vivo fino a "Esci". Cinque
+   password sbagliate: va ripassato il badge. Dal badge al logout il cicalino non suona (serve lo sketch con `tech`).
 4. **Antifurto:** scuotendo la scheda, sulla pagina compare "ultimo urto N s fa". La visione continua a lavorare.
 
 Se `--actuator bridge` scrive "no sketch provides mdgb_line", sulla scheda c'è ancora lo sketch senza `mdgb_line`:
@@ -142,8 +143,12 @@ ssh arduino@<scheda> 'journalctl -u mdgb-ai -f'
 
 `--operator-port 8090`. Dal telefono, via Wi-Fi, sulla stessa rete della scheda.
 
-- **Accesso in due passi:** badge sul lettore, poi utente e password. La sessione dura 10 minuti dal badge
-  (`operator.unlock_s`); un altro badge aggiunge tempo.
+- **Accesso in due passi:** badge sul lettore, poi utente e password entro 2 minuti (`operator.login_s`). La
+  sessione resta aperta finché il tecnico non preme "Esci" (`operator.session_s: 0`). Login e logout consumano il
+  badge: per rientrare va ripassato.
+- **Cicalino muto mentre c'è il tecnico:** dal badge al logout, o ai 2 minuti se non entra, il comando C1 porta
+  `"tech": true` e lo sketch non suona (solo il bip di conferma del badge). Lo sketch tiene da solo i 2 minuti dal
+  badge, anche senza visione; senza heartbeat il campo non vale più e il cicalino torna attivo.
 - **Cosa mostra:** stato, motivo, FPS, tempi, conteggi, sensori, ultimo urto; e la vista dal vivo della camera con
   i riquadri della visione.
 - **Interruttore delle immagini:** `operator.share_images: false` in `config.yaml` spegne la vista dal vivo e

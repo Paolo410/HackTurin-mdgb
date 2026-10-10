@@ -131,6 +131,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         while True:
             pipeline.external_fault = mcu.fault()   # shock or lamp fault reported by the microcontroller
+            # Technician at the node, from the badge to the logout: the sketch keeps the buzzer quiet.
+            pipeline.technician = operator.technician_present() if operator is not None else mcu.unlocked()
             item = source.read()
             if item is None:
                 if not source.is_live or frames == 0:

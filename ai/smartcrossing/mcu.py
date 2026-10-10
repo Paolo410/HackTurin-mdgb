@@ -9,8 +9,8 @@ The lines arrive from two places, and both end in McuState.on_line:
   badge reach the vision with the sketch as it is, and nothing is reported twice to the central.
 
 What the vision does with them:
-- badge of the technician (tamper code 3): opens the technician's page for operator.unlock_s (then the
-  technician logs in with user name and password, see status_page.py);
+- badge of the technician (tamper code 3): the technician has operator.login_s to log in on the
+  technician's page with user name and password (status_page.py);
 - shock or open case (tamper code 1, 2): it is the anti-theft alarm of the node. The vision keeps working
   as before and only shows it on the technician's page. Telling the central that the node was tampered
   with is the job of the network part (comms/), to be wired when the two parts are merged;
@@ -32,12 +32,12 @@ _NOT_VALUES = ("v", "src", "type", "ts")
 class McuState:
     def __init__(self, cfg: dict, monotonic: Callable[[], float] = time.monotonic):
         self.lamp_fault_hold_s = float(cfg["mcu"]["lamp_fault_hold_s"])
-        self.unlock_s = float(cfg["operator"]["unlock_s"])
+        self.login_s = float(cfg["operator"]["login_s"])
         self._monotonic = monotonic
         self._lock = threading.Lock()     # lines arrive from the Bridge thread and from the file reader
         self.env: dict = {}
         self.badges = 0
-        self.window = 0                   # counts the periods opened by a badge: a session belongs to one of them
+        self.window = 0                   # counts the periods opened by a badge (wrong passwords count per period)
         self._shock_at: float | None = None
         self._lamp_fault_at: float | None = None
         self._unlocked_until = -float("inf")
@@ -57,7 +57,7 @@ class McuState:
                     self.badges += 1
                     if now >= self._unlocked_until:
                         self.window += 1          # a badge while still open only adds time
-                    self._unlocked_until = now + self.unlock_s
+                    self._unlocked_until = now + self.login_s
                 else:
                     self._shock_at = now
             elif kind == "lamp_fault":
@@ -74,11 +74,11 @@ class McuState:
         return None
 
     def unlocked(self) -> bool:
-        """True for operator.unlock_s after the technician's badge."""
+        """True for operator.login_s after the technician's badge: the time to log in."""
         return self._monotonic() < self._unlocked_until
 
     def lock(self) -> None:
-        """Closes the technician's page until the next badge (too many wrong passwords)."""
+        """Ends the time to log in: the badge was used (login, logout) or too many wrong passwords."""
         with self._lock:
             self._unlocked_until = -float("inf")
 
@@ -93,7 +93,7 @@ class McuState:
                 "shock_s_ago": round(now - self._shock_at) if self._shock_at is not None else None,
                 "firmware_failsafe": ({"reason": self._failsafe[1], "s_ago": round(now - self._failsafe[0])}
                                       if self._failsafe else None),
-                "unlock_s_left": round(max(0.0, self._unlocked_until - now)),
+                "login_s_left": round(max(0.0, self._unlocked_until - now)),
             }
 
 

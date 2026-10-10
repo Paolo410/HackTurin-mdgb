@@ -1,7 +1,9 @@
 """Page for the technician at the crossing, reached from a phone on the same Wi-Fi: http://<board>:<port>/
 
-Access needs two things: the technician's badge on the reader (McuState.unlocked, for operator.unlock_s)
-and then a login with user name and password. Without both, nothing is shown.
+Access needs two things: the technician's badge on the reader, and then within operator.login_s (2 min)
+a login with user name and password. Without both, nothing is shown. The session lasts until the
+technician logs out (or operator.session_s, if set). From the badge until then the technician is present
+(technician_present): the vision tells the sketch, which keeps the buzzer quiet.
 
 What it shows: the numbers (state, reason, FPS, times, counts, sensors) and, if operator.share_images is
 true, a live view of what the vision sees. With share_images false no image ever leaves the vision
@@ -25,6 +27,7 @@ import time
 from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Callable
 from urllib.parse import parse_qs
 
 import cv2
@@ -52,12 +55,12 @@ button{background:#1f6f54;border-color:#1f6f54;font-weight:600}#view{max-width:1
 </style></head><body>
 <h1>MDGB &middot; tecnico</h1>
 <div id="locked" hidden><p class="big warn">BLOCCATO</p><p>Passa il badge del tecnico sul lettore.</p></div>
-<form id="login" hidden><p>Badge riconosciuto. Accedi:</p>
+<form id="login" hidden><p>Badge riconosciuto. Accedi entro <span id="login_left"></span> s:</p>
 <input id="user" autocomplete="username" placeholder="utente" required>
 <input id="password" type="password" autocomplete="current-password" placeholder="password" required>
 <button>Accedi</button><p id="error" class="warn"></p></form>
 <div id="open" hidden><p id="state" class="big"></p><p id="reason"></p><div id="live"></div><table id="rows"></table>
-<p class="muted"><span id="images"></span> La sessione si chiude fra <span id="left"></span>.
+<p class="muted"><span id="images"></span> <span id="left"></span> Il cicalino resta muto finch&eacute; non esci.
 <a href="#" id="logout" style="color:inherit">Esci</a></p></div>
 <script>
 const $ = id => document.getElementById(id);
@@ -66,7 +69,7 @@ function show(which) { for (const id of ["locked", "login", "open"]) $(id).hidde
 async function tick() {
   try {
     const r = await fetch("status.json", {cache: "no-store"});
-    if (r.status === 401) return show("login");
+    if (r.status === 401) { $("login_left").textContent = (await r.json()).login_s_left; return show("login"); }
     if (r.status !== 200) return show("locked");
     show("open");
     const s = await r.json(), m = s.mcu || {}, e = m.env || {}, l = s.lat_ms || {};
@@ -85,7 +88,8 @@ async function tick() {
     h += row("Acceso da", Math.round(s.uptime_s / 60) + " min") + row("Camera", s.source) + row("Calibrazione", s.calib);
     $("rows").innerHTML = h;
     $("images").textContent = s.images ? "Vista dal vivo, non registrata." : "Immagini disattivate: solo statistiche.";
-    $("left").textContent = Math.ceil(s.session_s_left / 60) + " min";
+    $("left").textContent = s.session_s_left === null ? "Sessione aperta finch\u00e9 non premi Esci."
+      : "La sessione si chiude fra " + Math.ceil(s.session_s_left / 60) + " min.";
   } catch (err) { /* the board is restarting: try again */ }
 }
 $("login").addEventListener("submit", async ev => {
@@ -137,19 +141,23 @@ class OperatorPage:
     """Small HTTP server in its own threads. The vision loop only calls update() and, when someone is
     watching, push_frame(): neither waits for the network."""
 
-    def __init__(self, port: int, mcu, cfg: dict, host: str = "0.0.0.0"):
+    def __init__(self, port: int, mcu, cfg: dict, host: str = "0.0.0.0",
+                 monotonic: Callable[[], float] = time.monotonic):
         o = cfg["operator"]
         self.mcu = mcu
+        self._monotonic = monotonic
         self.credentials = load_credentials(cfg)
         self.share_images = bool(o["share_images"])
         self.max_failed = int(o["max_failed_logins"])
+        self.session_s = float(o["session_s"])     # 0 = until logout
         self.stream_period = 1.0 / float(o["stream_fps"])
         self.stream_width = int(o["stream_width"])
         self.jpeg_quality = int(o["jpeg_quality"])
         self._status: dict = {}
         self._started = time.monotonic()
         self._lock = threading.Lock()
-        self._sessions: dict[str, int] = {}       # session token -> badge window it was opened in
+        self._sessions: dict[str, float] = {}     # session token -> monotonic time it ends (inf = at logout)
+        self._badges_seen = mcu.badges
         self._failed = 0
         self._failed_window = -1
         self._viewers = 0
@@ -167,7 +175,8 @@ class OperatorPage:
                     self._send(200, "text/html; charset=utf-8", PAGE.encode("utf-8"))
                 elif path == "/status.json":
                     code = page.access(self._token())
-                    body = page.status() if code == 200 else {"locked": code == 403, "login": code == 401}
+                    body = (page.status(self._token()) if code == 200 else
+                            {"locked": code == 403, "login": code == 401, "login_s_left": page.login_s_left()})
                     self._send(code, "application/json", json.dumps(body).encode("utf-8"))
                 elif path == "/stream.mjpg":
                     code = page.access(self._token())
@@ -242,13 +251,12 @@ class OperatorPage:
     # ---- access: badge first, then credentials
 
     def access(self, token: str) -> int:
-        """200 = badge and login, 401 = badge only (log in), 403 = no badge (or its time is over)."""
-        if not self.mcu.unlocked():
-            with self._lock:
-                self._sessions.clear()             # the time of the badge is over: everybody out
-            return 403
+        """200 = logged in, 401 = badge only (log in), 403 = no badge (or the time to log in is over)."""
         with self._lock:
-            return 200 if token and self._sessions.get(token) == self.mcu.window else 401
+            self._refresh()
+            if token and token in self._sessions:
+                return 200
+        return 401 if self.mcu.unlocked() else 403
 
     def login(self, user: str, password: str) -> tuple[int, str | None]:
         """(HTTP code, session token). Too many wrong attempts close the page until the next badge."""
@@ -270,12 +278,38 @@ class OperatorPage:
                     self.mcu.lock()
                 return 401, None
             token = secrets.token_urlsafe(32)
-            self._sessions[token] = window
+            self._sessions[token] = self._session_end()
+            self.mcu.lock()                        # the badge is used: the next login needs a new one
         return 200, token
 
     def logout(self, token: str) -> None:
         with self._lock:
-            self._sessions.pop(token, None)
+            if self._sessions.pop(token, None) is not None and not self._sessions:
+                self.mcu.lock()                    # the technician is done: the buzzer is back at once
+
+    def technician_present(self) -> bool:
+        """From the badge to the logout (or the end of the time to log in): the sketch keeps the buzzer quiet."""
+        with self._lock:
+            self._refresh()
+            return bool(self._sessions) or self.mcu.unlocked()
+
+    def login_s_left(self) -> int:
+        return self.mcu.snapshot()["login_s_left"]
+
+    def _session_end(self) -> float:
+        return self._monotonic() + self.session_s if self.session_s > 0 else float("inf")
+
+    def _refresh(self) -> None:
+        """Drops the sessions that are over; a badge while logged in starts them again. Call with the lock."""
+        now = self._monotonic()
+        for token in [t for t, end in self._sessions.items() if end <= now]:
+            del self._sessions[token]
+        badges = self.mcu.badges
+        if badges != self._badges_seen:
+            self._badges_seen = badges
+            if self._sessions:                     # already in: more time, no second window to log in
+                self._sessions = dict.fromkeys(self._sessions, self._session_end())
+                self.mcu.lock()
 
     # ---- numbers
 
@@ -283,10 +317,13 @@ class OperatorPage:
         """Called by the vision loop with the numbers of the last frame (a plain dict of text and numbers)."""
         self._status = status
 
-    def status(self) -> dict:
-        mcu = self.mcu.snapshot()
-        return {**self._status, "uptime_s": round(time.monotonic() - self._started), "mcu": mcu,
-                "images": self.share_images, "session_s_left": mcu["unlock_s_left"]}
+    def status(self, token: str = "") -> dict:
+        now = self._monotonic()
+        with self._lock:
+            end = self._sessions.get(token, now)
+        left = None if end == float("inf") else round(max(0.0, end - now))   # None = until logout
+        return {**self._status, "uptime_s": round(now - self._started), "mcu": self.mcu.snapshot(),
+                "images": self.share_images, "session_s_left": left}
 
     # ---- live view (only if operator.share_images, only while a logged-in technician is watching)
 

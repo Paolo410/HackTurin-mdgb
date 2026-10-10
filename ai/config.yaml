@@ -193,7 +193,11 @@ mcu:                              # what the microcontroller tells the vision (C
   lamp_fault_hold_s: 5            # DEGRADED while the firmware keeps reporting a lamp fault this often
 
 operator:                         # page for the technician (--operator-port): badge first, then login
-  unlock_s: 600                   # after the badge: time to log in, and how long the session lasts
+  login_s: 120                    # after the badge: time to log in. Logging in or out uses the badge up
+  session_s: 0                    # how long a session lasts after the login; 0 = until the technician logs out.
+                                  # With a limit, a badge while logged in starts it again
+                                  # From the badge to the logout the C1 command says "tech": true and the
+                                  # sketch keeps the buzzer quiet (the badge beep still sounds)
   max_failed_logins: 5            # wrong passwords before the page closes until the next badge
   credentials_file: .env          # relative to ai/, ignored by git; written by scripts/operator_login.py
   share_images: true              # live view of what the vision sees, for the logged-in technician.

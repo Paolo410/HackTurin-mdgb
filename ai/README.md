@@ -111,13 +111,17 @@ Sulla UNO Q la visione gira come programma a parte accanto all'app di App Lab de
 prova: [`docs/DEPLOY_UNOQ.md`](docs/DEPLOY_UNOQ.md) e `deploy/push_to_arduino.sh`.
 
 - **Cosa arriva dal microcontrollore** (`smartcrossing/mcu.py`, righe C5 del contratto):
-  - badge del tecnico: apre la pagina del tecnico per 10 minuti;
+  - badge del tecnico: dà 2 minuti per entrare nella pagina del tecnico (`operator.login_s`);
   - urto: è l'antifurto del nodo. La visione continua a lavorare e lo mostra al tecnico; l'avviso alla centrale
     è compito della rete (`comms/`), da collegare quando le due parti si uniscono;
   - guasto lampada: `DEGRADED` finché il firmware lo segnala.
 - **Pagina del tecnico** (`--operator-port`, `smartcrossing/status_page.py`), dal telefono via Wi-Fi:
-  - accesso in due passi: badge sul lettore, poi utente e password. Cinque password sbagliate chiudono la pagina
-    fino al badge successivo;
+  - accesso in due passi: badge sul lettore, poi utente e password entro 2 minuti. La sessione resta aperta
+    finché il tecnico non preme "Esci" (`operator.session_s: 0`; con un limite, un badge lo fa ripartire).
+    Cinque password sbagliate chiudono la pagina fino al badge successivo;
+  - **cicalino muto mentre c'è il tecnico:** dal badge al logout (o ai 2 minuti senza login) il comando C1 porta
+    `"tech": true` e lo sketch non suona (resta solo il bip di conferma del badge). Fermandosi la visione, lo sketch
+    torna a suonare: senza heartbeat il campo non vale più. Campo nuovo del contratto C1, da confermare con Lorenzo;
   - mostra stato, motivo, FPS, tempi, conteggi, sensori e la vista dal vivo con i riquadri della visione;
   - `operator.share_images: false` spegne le immagini e lascia solo le statistiche (per la produzione);
   - le immagini non vengono mai salvate: esistono in memoria solo mentre un tecnico connesso guarda;
