@@ -1,0 +1,177 @@
+"""Ponte verso l'MCU STM32U585 (Arduino Bridge / RPC MessagePack su UART interna).
+
+Sull'UNO Q:   Python (Linux)  --Bridge.call-->  sketch MCU  --UART D0/D1-->  modulo LoRa
+Sul laptop:   nessun Bridge disponibile -> SimulatedMcu registra le chiamate a log,
+              così puoi sviluppare e testare tutto il resto senza la scheda.
+"""
+import logging
+
+log = logging.getLogger("mcu")
+
+try:
+    from arduino.app_utils import Bridge      # disponibile solo dentro App Lab sull'UNO Q
+    ON_UNO_Q = True
+except ImportError:
+    Bridge = None
+    ON_UNO_Q = False
+
+
+class McuLink:
+    """Funzioni esposte dallo sketch con Bridge.provide(...)."""
+
+    def _call(self, name, *args):
+        try:
+            return Bridge.call(name, *args)
+        except Exception as e:                  # l'MCU non deve mai far cadere la pipeline
+            log.error("Bridge.call(%s) fallita: %s", name, e)
+            return False
+
+    def lora_send(self, payload: bytes) -> bool:
+        """Accoda un uplink LoRa. Ritorna subito: la trasmissione avviene nel loop() dell'MCU."""
+        return bool(self._call("lora_send", payload.hex().upper()))
+
+    def heartbeat(self) -> bool:
+        return bool(self._call("heartbeat"))
+
+    def pedestrian_alert(self, seconds: int) -> bool:
+        return bool(self._call("pedestrian_alert", int(seconds)))
+
+    def lora_joined(self) -> bool:
+        return bool(self._call("lora_joined"))
+
+
+class SimulatedMcu:
+    """Stessa interfaccia di McuLink, per girare sul laptop."""
+
+    def __init__(self):
+        self.sent = []          # payload "trasmessi via LoRa" (utile nei test)
+
+    def lora_send(self, payload: bytes) -> bool:
+        self.sent.append(payload)
+        log.info("[SIM LoRa] uplink %d byte: %s", len(payload), payload.hex().upper())
+        return True
+
+    def heartbeat(self) -> bool:
+        return True
+
+    def pedestrian_alert(self, seconds: int) -> bool:
+        log.info("[SIM semaforo] estensione verde pedonale di %d s", seconds)
+        return True
+
+    def lora_joined(self) -> bool:
+        return True
+
+
+def make_mcu():
+    return McuLink() if ON_UNO_Q else SimulatedMcu()
+
+
+# ======================================================================================
+# Canale di backup intercambiabile: LoRa (via MCU) oppure BLE (radio integrata nella UNO Q)
+#   config.BACKUP_LINK = "lora" | "ble" | "none"
+#   Interfaccia comune:  send(payload, port=1) -> bool   |   idle()  (chiamata quando MQTT è sano)
+# ======================================================================================
+import shlex
+import struct
+import subprocess
+
+BLE_COMPANY_ID = 0xFFFF            # ID riservato ai test dal Bluetooth SIG (in produzione: ID registrato)
+BLE_FRAME_SIZE = 27                # 31 byte di advertising - 4 di header manufacturer data
+PORT_AGGREGATE, PORT_DEAD, PORT_TAMPER, PORT_INCIDENT = 1, 9, 10, 11
+
+
+def ble_frame(payload: bytes, port: int = PORT_AGGREGATE) -> bytes:
+    """Converte un messaggio di backup nel frame BLE da 27 byte.
+    Aggregato (port 1): type(1) | window_start u32 | 10 x u16 conteggi | backlog/10 u16
+      -> dall'aggregato LoRa da 28 byte si tolgono il byte flag e il byte disco.
+    Allarmi (port 9/10/11): type(1) | primi 26 byte del payload (zero-padded)."""
+    if port == PORT_AGGREGATE:
+        if len(payload) != 28:
+            raise ValueError("atteso l'aggregato da 28 byte")
+        return bytes([port]) + payload[1:27]
+    return (bytes([port]) + payload[:BLE_FRAME_SIZE - 1]).ljust(BLE_FRAME_SIZE, b"\x00")
+
+
+class McuLoraBackup:
+    """Backup via LoRa: il payload va all'MCU con Bridge, l'MCU lo trasmette col Wio-E5."""
+
+    def __init__(self, mcu):
+        self.mcu = mcu
+
+    def send(self, payload: bytes, port: int = PORT_AGGREGATE) -> bool:
+        return self.mcu.lora_send(payload)
+
+    def idle(self):
+        pass
+
+
+class BleBackup:
+    """Backup via BLE advertising (beacon non connettibile) con la radio Bluetooth della UNO Q.
+    Usa `btmgmt` di BlueZ (serve root o CAP_NET_ADMIN). Il beacon resta attivo e viene
+    aggiornato a ogni nuovo messaggio; quando MQTT torna sano viene spento con idle()."""
+
+    INSTANCE = "1"
+
+    def __init__(self, sudo=False, runner=None):
+        self.prefix = ["sudo"] if sudo else []
+        self.run = runner or self._run
+        self.active = False
+        self.last_frame = None
+        self.run(["btmgmt", "power", "on"])
+
+    def _run(self, args):
+        try:
+            r = subprocess.run(self.prefix + args, capture_output=True, text=True, timeout=5)
+            if r.returncode != 0:
+                log.error("BLE: %s -> %s", " ".join(map(shlex.quote, args)), (r.stderr or r.stdout).strip())
+            return r.returncode == 0
+        except (OSError, subprocess.TimeoutExpired) as e:
+            log.error("BLE non disponibile (%s): verifica `which btmgmt` e i permessi", e)
+            return False
+
+    @staticmethod
+    def adv_data(frame: bytes) -> str:
+        """Struttura AD 'Manufacturer Specific Data' (tipo 0xFF): len | 0xFF | company_id LE | frame."""
+        ad = bytes([1 + 2 + len(frame), 0xFF]) + struct.pack("<H", BLE_COMPANY_ID) + frame
+        assert len(ad) <= 31
+        return ad.hex()
+
+    def send(self, payload: bytes, port: int = PORT_AGGREGATE) -> bool:
+        frame = ble_frame(payload, port)
+        self.run(["btmgmt", "rm-adv", self.INSTANCE])
+        ok = self.run(["btmgmt", "add-adv", "-d", self.adv_data(frame), self.INSTANCE])
+        if ok:
+            self.active, self.last_frame = True, frame
+            log.info("[BLE] beacon aggiornato (%d byte): %s", len(frame), frame.hex().upper())
+        return ok
+
+    def idle(self):
+        if self.active:
+            self.run(["btmgmt", "rm-adv", self.INSTANCE])
+            self.active = False
+            log.info("[BLE] beacon spento: MQTT di nuovo sano")
+
+
+class NoBackup:
+    def send(self, payload, port=PORT_AGGREGATE):
+        return False
+
+    def idle(self):
+        pass
+
+
+def make_backup(kind: str, mcu, ble_sudo=False):
+    kind = (kind or "lora").lower()
+    if kind == "ble":
+        return BleBackup(sudo=ble_sudo) if ON_UNO_Q else SimulatedBle()
+    if kind == "none":
+        return NoBackup()
+    return McuLoraBackup(mcu)
+
+
+class SimulatedBle(BleBackup):
+    """BLE simulato sul laptop: costruisce gli stessi comandi btmgmt ma non li esegue."""
+
+    def __init__(self):
+        self.commands = []
+        super().__init__(runner=lambda args: self.commands.append(args) or True)
