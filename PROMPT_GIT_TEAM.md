@@ -22,14 +22,14 @@ Hackathon hardware HackTurin: Arduino UNO Q + AI e computer vision in locale. Si
 
 ## Divisione del team
 
-Sfida: _da decidere_
+Sfida: GOMA - Smart Crossing Challenge
 
 | Persona        | Ruolo                  | Area                                                                                  | Cartelle                         |
 |----------------|------------------------|---------------------------------------------------------------------------------------|----------------------------------|
-| _da assegnare_ | Data scientist         | modelli AI e computer vision in locale (training, export, inferenza), dataset, analisi dei dati | ai/                     |
-| _da assegnare_ | Embedded engineer      | firmware dell'Arduino UNO Q (sketch sul microcontrollore, integrazione con il lato Linux), logica in tempo reale | firmware/ |
-| _da assegnare_ | Communication engineer | comunicazione tra dispositivi (seriale, WiFi, MQTT/HTTP), backend e dashboard          | comms/, app/, docs/CONTRACTS.md  |
-| _da assegnare_ | Electronics engineer   | circuito, sensori, LED e attuatori, alimentazione, schemi elettrici, BOM, pinout       | hardware/                        |
+| Paolo Malugani | Data scientist         | modelli AI e computer vision in locale (training, export, inferenza), dataset, analisi dei dati | ai/                     |
+| Salvatore Gullotta | Embedded engineer      | firmware dell'Arduino UNO Q (sketch sul microcontrollore, integrazione con il lato Linux), logica in tempo reale | firmware/ |
+| Lorenzo Dragoni | Communication engineer | comunicazione tra dispositivi (seriale, WiFi, MQTT/HTTP), backend e dashboard          | comms/, app/, docs/CONTRACTS.md  |
+| Kuzey Bicher | Electronics engineer   | circuito, sensori, LED e attuatori, alimentazione, schemi elettrici, BOM, pinout       | hardware/                        |
 
 - `docs/CONTRACTS.md` ha un owner: il communication engineer. La sezione pinout la decide l'electronics engineer.
 - `docs/` (pitch, presentazione) e il README principale sono condivisi: tutti possono aggiungere, nessuno riscrive il lavoro degli altri.

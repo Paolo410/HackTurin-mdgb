@@ -218,3 +218,23 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- HackTurin / MDGB ---
+.DS_Store
+.env
+arduino_secrets.h
+.claude/worktrees/
+ai/models/
+ai/samples/
+*.pt
+*.onnx
+*.tflite
+dataset/
+*.mp4
+*.mov
+logs/
+*.db
+*.pem
+*.key
+*.crt
+push_setup.sh

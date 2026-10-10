@@ -1,0 +1,1 @@
+Leggi e segui PROMPT_GIT_TEAM.md e PROMPT_SMART_CROSSING.md.
