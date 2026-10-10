@@ -141,6 +141,19 @@ def test_state_steps_up_at_once_and_down_after_the_hold_time():
     assert engine.step(Scene(W=W), t=0.3 + 2 * hold + 0.02)["state"] == "IDLE"
 
 
+def test_green_request_only_grows_while_somebody_is_there():
+    engine = RuleEngine(CFG)
+    ped = lambda speed: PedestrianInfo(1, "crosswalk", walk_speed_ms=speed, slow=True)
+    greens = [engine.step(Scene(W=12, pedestrians=[ped(v)]), t=i * 0.1)["green_s"]
+              for i, v in enumerate([0.9, 0.7, 0.75, 0.72, 0.8, 1.0])]
+    # 0.9 is not below the 0.8 of a slow pedestrian: 12 / 0.8 + 2 = 17; then 12 / 0.7 + 2 = 19 and no way back.
+    assert greens == [17, 19, 19, 19, 19, 19]
+    hold = CFG["rules"]["hold_s"]
+    assert engine.step(Scene(W=12), t=1.0 + hold + 0.1)["green_s"] == 0          # everybody left
+    brisk = PedestrianInfo(2, "crosswalk", walk_speed_ms=1.1)
+    assert engine.step(Scene(W=12, pedestrians=[brisk]), t=5.0)["green_s"] == 13   # a new pedestrian starts afresh
+
+
 def test_lcd_text_is_two_rows_of_16():
     assert lcd_text("PEDONE", "IN ATTESA") == "PEDONE          IN ATTESA"
     assert len(lcd_text("X" * 40, "Y" * 40)) == 32

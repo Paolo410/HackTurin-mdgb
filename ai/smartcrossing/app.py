@@ -4,7 +4,7 @@ AI-M1: source + detector + tracker + overlay.
 AI-M2: roles (pedestrian, cyclist, ...) and directional counting on the lines of calib.json.
 AI-M3: metres and speeds from the calibration, pedestrian attributes, the explicit rule and the actuator.
 AI-M4: animals, events from the trajectories and the C3 log for comms/ (metadata only, never frames).
-Thermal arrives with the next milestone.
+AI-M5: optional thermal camera for the night (--thermal).
 """
 from __future__ import annotations
 
@@ -19,15 +19,14 @@ from .actuator import make_actuator
 from .config import load_config
 from .geometry import load_calib
 from .logger import C3Logger, flat_counts
-from .overlay import draw_hud, draw_lines, draw_state, draw_tracks, draw_zones
+from .overlay import draw_hud, draw_lines, draw_state, draw_thermal, draw_tracks, draw_zones
 from .pipeline import PHASES, LatencyStats, Pipeline
 from .sources import FrameSource, default_source
+from .thermal import ThermalFusion, make_thermal_source
 
 _KEY_ESC = 27
 _MIN_DT = 1e-6  # avoids a division by zero in the instantaneous FPS
 _NO_FRAME_SLEEP_S = 0.05  # pause between two attempts when a live camera gives no frame
-# Options of the full CLI that are accepted but have no effect before their milestone.
-_NOT_ACTIVE_YET = {"thermal": "AI-M5"}
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -39,7 +38,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--emulate-unoq", action="store_true", help="UNO Q limits on the PC (FPS cap, threads, input size)")
     p.add_argument("--actuator", choices=["sim", "serial", "bridge"], default="sim")
     p.add_argument("--port", help="serial port of the firmware, with --actuator serial")
-    p.add_argument("--thermal", choices=["none", "uvc", "mlx90640"])
+    p.add_argument("--thermal", choices=["none", "sim", "mlx90621", "mlx90640", "uvc"], default="none",
+                   help="thermal camera: mlx90621 = the Grove 16x4 read by the MCU, sim = simulated")
+    p.add_argument("--night", action="store_true", help="force night mode (to try the thermal fusion in daylight)")
     p.add_argument("--max-fps", type=float, help="override source.max_fps")
     p.add_argument("--max-frames", type=int, default=0, help="stop after N frames (0 = until the source ends)")
     p.add_argument("--config", help="path to a config.yaml (default: ai/config.yaml)")
@@ -63,8 +64,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         calib, calib_path = load_calib(cfg, args.calib)
         actuator = make_actuator(args.actuator, cfg, **({"port": args.port} if args.port else {}))
+        thermal_source = make_thermal_source(args.thermal, cfg, actuator)
+        thermal = ThermalFusion(cfg, thermal_source, force_night=args.night) if thermal_source else None
         source = FrameSource(args.source or default_source(cfg), cfg)
-        pipeline = Pipeline(cfg, source.fps, calib, actuator, site=args.site)
+        pipeline = Pipeline(cfg, source.fps, calib, actuator, site=args.site, thermal=thermal)
     except (FileNotFoundError, RuntimeError, TypeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
@@ -81,9 +84,9 @@ def main(argv: list[str] | None = None) -> int:
     metric = pipeline.geometry is not None and pipeline.geometry.metric
     print(f"calib={calib_path}" + ("" if metric else
                                   "  (no metric calibration: no speeds and no rule; run scripts/calibrate.py)"))
-    ignored = [f"--{name} ({milestone})" for name, milestone in _NOT_ACTIVE_YET.items() if getattr(args, name)]
-    if ignored:
-        print("Not active yet: " + ", ".join(ignored))
+    if thermal is not None:
+        print(f"thermal={args.thermal} zones={ {name: len(cols) for name, cols in thermal.zones.items()} }"
+              + (" night forced" if args.night else ""))
 
     quit_keys = {ord(k) for k in o["quit_keys"]} | {_KEY_ESC}
     alpha = float(o["fps_ema_alpha"])
@@ -156,6 +159,7 @@ def main(argv: list[str] | None = None) -> int:
                     draw_tracks(view, result, pipeline.tracker, cfg)
                     draw_hud(view, [f"FPS {fps:.1f}   tracks {n_valid}/{n_tracks}", f"ms  {lat}", counts,
                                     pipeline.events.summary(), setup], cfg)
+                    draw_thermal(view, pipeline.thermal, cfg)
                 draw_state(view, command, cfg, failsafe=bool(getattr(actuator, "failsafe", False)))
                 cv2.imshow(o["window_name"], view)
                 if cv2.waitKey(1) & 0xFF in quit_keys:
@@ -181,6 +185,9 @@ def main(argv: list[str] | None = None) -> int:
     print(stats.table(float(cfg["bench"]["percentile"])))
     print("counts  " + (pipeline.counter.summary() if pipeline.counter else "no counting lines"))
     print("events  " + pipeline.events.summary())
+    if thermal is not None:
+        print(thermal.summary())
+        thermal_source.close()
     if log and log.written:
         print(f"c3  {log.written} lines, last file {log.path}")
     sent = len(getattr(actuator, "sent", []))

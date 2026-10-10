@@ -204,6 +204,11 @@ def test_commander_sends_on_change_and_repeats_every_second():
     clock.t += CFG["actuator"]["c1_repeat_s"] + 0.01
     assert commander.update({"state": "PRESENCE", "led": "WHITE_ON"}) is True   # repeated: a lost line heals
     assert [c["seq"] for c in sim.sent] == [1, 2, 3]
+    # Only the wording of the reason changes: no new line until the next repeat.
+    assert commander.update({"state": "PRESENCE", "led": "WHITE_ON", "reason": "pedone in attesa"}) is False
+    clock.t += CFG["actuator"]["c1_repeat_s"] + 0.01
+    assert commander.update({"state": "PRESENCE", "led": "WHITE_ON", "reason": "bambino in attesa"}) is True
+    assert sim.last_cmd["reason"] == "bambino in attesa"
 
 
 def test_heartbeat_stops_when_the_vision_loop_is_stuck():

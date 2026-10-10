@@ -108,6 +108,23 @@ def draw_state(frame: np.ndarray, command: dict | None, cfg: dict, failsafe: boo
         cv2.putText(frame, line, (line_h, top + line_h * (i + 1)), _FONT, scale, color, 1, cv2.LINE_AA)
 
 
+def draw_thermal(frame: np.ndarray, fusion, cfg: dict) -> None:
+    """The columns of the thermal camera in the top-right corner: filled = warm."""
+    if fusion is None:
+        return
+    o = cfg["overlay"]
+    cell = int(o["thermal_cell_px"])
+    width = frame.shape[1]
+    x0 = width - cell * len(fusion.warm) - cell
+    for i, warm in enumerate(fusion.warm):
+        top_left, bottom_right = (x0 + i * cell, cell), (x0 + (i + 1) * cell - 1, 2 * cell)
+        color = tuple(o["colors"]["thermal_warm"] if warm else o["colors"]["thermal_cold"])
+        cv2.rectangle(frame, top_left, bottom_right, color, cv2.FILLED)
+    label = "NIGHT" if fusion.night else "day"
+    cv2.putText(frame, f"thermal {label}", (x0, cell - int(o["thickness"])), _FONT, float(o["font_scale"]),
+                tuple(o["colors"]["text"]), 1, cv2.LINE_AA)
+
+
 def draw_hud(frame: np.ndarray, lines: list[str], cfg: dict) -> None:
     """Status lines in the top-left corner, on a filled background."""
     o = cfg["overlay"]

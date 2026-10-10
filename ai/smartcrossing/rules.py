@@ -231,8 +231,19 @@ def lcd_text(row1: str, row2: str = "") -> str:
     return text.rstrip()
 
 
-def command(decision: Decision, scene: Scene, cfg: dict) -> dict:
-    """The C1 fields decided by the rule (seq, t_ms and v are added when the command is sent)."""
+def green_needed(scene: Scene, cfg: dict) -> float:
+    """Pedestrian green needed by the slowest pedestrian present, 0 with nobody."""
+    present = [p for p in scene.pedestrians if is_present(p)]
+    if not present:
+        return 0.0
+    return green_time(scene.W, min(pedestrian_speed(p, cfg) for p in present), cfg)
+
+
+def command(decision: Decision, scene: Scene, cfg: dict, green_floor: float = 0.0) -> dict:
+    """The C1 fields decided by the rule (seq, t_ms and v are added when the command is sent).
+
+    green_floor: green already promised while these pedestrians were present; it is never reduced.
+    """
     r = cfg["rules"]
     state = decision.state
     present = [p for p in scene.pedestrians if is_present(p)] if state != "DEGRADED" else []
@@ -240,8 +251,7 @@ def command(decision: Decision, scene: Scene, cfg: dict) -> dict:
 
     green_s = extend_s = 0
     if present:
-        v_ped = min(pedestrian_speed(p, cfg) for p in present)
-        green = green_time(scene.W, v_ped, cfg)
+        green = max(green_needed(scene, cfg), green_floor)
         standard = green_time(scene.W, float(r["v_ped_default_ms"]), cfg)
         green_s = round(green)
         # Never ask for more than the controller accepts (fixed limit in the firmware).
@@ -290,6 +300,7 @@ class RuleEngine:
         self.decision = Decision("IDLE", "avvio")
         self._output: dict | None = None
         self._last_true = -math.inf   # last time the current state was what the scene called for
+        self._green = 0.0             # longest green needed since somebody arrived
 
     def step(self, scene: Scene, t: float = 0.0) -> dict:
         decision = evaluate(scene, self.cfg)
@@ -303,5 +314,9 @@ class RuleEngine:
             self.state = decision.state
             self._last_true = t
         self.decision = decision
-        self._output = command(decision, scene, self.cfg)
+        # The green asked for only grows while somebody is there: a speed estimate that wobbles must not
+        # make the request (and the pedestrians' display) flicker, and a promise is not taken back.
+        needed = green_needed(scene, self.cfg) if decision.state != "DEGRADED" else 0.0
+        self._green = max(self._green, needed) if needed > 0 else 0.0
+        self._output = command(decision, scene, self.cfg, self._green)
         return self._output
