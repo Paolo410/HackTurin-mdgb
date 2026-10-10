@@ -238,3 +238,8 @@ logs/
 *.key
 *.crt
 push_setup.sh
+# --- comms/app (Lorenzo) ---
+certs/
+*.db-wal
+*.db-shm
+mosquitto-data/
