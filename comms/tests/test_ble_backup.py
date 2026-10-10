@@ -250,8 +250,7 @@ class WifiProxy:
 
 
 def test_wifi_off_then_on_ble_backup_end_to_end():
-    import paho.mqtt.client as mqtt
-    from ble_receiver import Receiver
+    from central import ble_to_store
     from event_source import SimulatedSource
     from test_offline import Broker, _start_central, free_port, need_mosquitto, wait_until
     from uplink_mqtt import MqttUplink
@@ -273,10 +272,7 @@ def test_wifi_off_then_on_ble_backup_end_to_end():
     agg = Aggregator(ob, up, period_s=2, node_id=node)
     fo = Failover(ob, up, ble, agg, on_after_s=2, off_after_s=3, hb_period_s=1, alarm_hold_s=0.3)
 
-    gw = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id="ble-gw-test", protocol=mqtt.MQTTv5)
-    gw.connect("127.0.0.1", port)
-    gw.loop_start()
-    rx = Receiver(node, lambda topic, payload: gw.publish(topic, payload, qos=1))
+    rx = ble_to_store(store, node)        # come app/central.py: Bluetooth del PC -> database, senza broker
 
     stop_gen, stop_all = threading.Event(), threading.Event()
     sim = SimulatedSource(seed=3)
@@ -304,7 +300,7 @@ def test_wifi_off_then_on_ble_backup_end_to_end():
                 log["back"] = now
             time.sleep(0.05)
 
-    def air():                                         # la radio: il laptop vede i beacon in onda
+    def air():                                         # la radio: il PC vede i beacon in onda
         while not stop_all.is_set():
             for frame in list(ble.frames.values()):
                 rx.handle(frame, -65, "uno-q")
@@ -359,7 +355,6 @@ def test_wifi_off_then_on_ble_backup_end_to_end():
         stop_gen.set()
         stop_all.set()
         up.stop()
-        gw.loop_stop()
         ing_client.loop_stop()
         wifi.close()
         broker.stop()
