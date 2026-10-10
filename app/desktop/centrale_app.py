@@ -9,7 +9,7 @@ con dentro:
   certs/        certificati AWS del Thing della centrale (mdgb-ingest)
   nodes.json    camere sulla mappa (copiato al primo avvio; si modifica anche ad app aperta)
   central.db    database della centrale             centrale.log   log dell'app
-Se il broker è "localhost" e non risponde, l'app avvia Mosquitto se è installato (brew install mosquitto).
+Se il broker è "localhost" e non risponde, l'app avvia il Mosquitto che ha dentro (o quello installato nel sistema).
 
 Da sorgente:   python app/desktop/centrale_app.py        App:   app/desktop/build_mac.sh -> "MDGB Centrale.app"
 """
@@ -103,7 +103,9 @@ def port_open(port, host="127.0.0.1"):
 
 
 def find_mosquitto():
-    for p in (shutil.which("mosquitto"), "/opt/homebrew/sbin/mosquitto", "/usr/local/sbin/mosquitto",
+    """Prima la copia dentro l'app (build_mac.sh la include), poi quella installata nel sistema."""
+    for p in (os.path.join(RESOURCES, "mosquitto", "mosquitto"), shutil.which("mosquitto"),
+              "/opt/homebrew/sbin/mosquitto", "/usr/local/sbin/mosquitto",
               "/usr/sbin/mosquitto", r"C:\Program Files\mosquitto\mosquitto.exe"):
         if p and os.path.exists(p):
             return p

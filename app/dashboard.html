@@ -76,6 +76,7 @@
     <div class="hdr">
       <span class="pill" id="sys-mqtt"></span>
       <span class="pill" id="sys-ble"></span>
+      <span class="pill" id="sys-nodes" title="Indirizzo da scrivere in comms/.env sull'Arduino (MQTT_HOST e MQTT_PORT)"></span>
       <button class="btn" id="btn-config" hidden title="Apre config.env: broker, AWS, Bluetooth. Dopo le modifiche riavvia l'app.">Configurazione</button>
       <button class="btn" id="btn-folder" hidden title="Cartella con config.env, certs/ e nodes.json (posizioni delle camere)">Cartella</button>
       <span class="muted" id="updated">in attesa dei dati…</span>
@@ -338,6 +339,8 @@ async function refreshInfo() {
     document.getElementById("sys-mqtt").innerHTML =
       `${dot(i.mqtt.connected)}MQTT ${esc(i.mqtt.host)}:${i.mqtt.port}${i.mqtt.tls ? " (TLS)" : ""} · ${i.mqtt.connected ? "connesso" : "non connesso"}`;
     const bleColor = i.ble === "in ascolto" ? DOT.ok : i.ble === "spento" || i.ble === "in avvio" ? DOT.neutral : DOT["bad-b"];
+    document.getElementById("sys-nodes").innerHTML = i.mqtt.nodes_connect_to
+      ? `Arduino → <b>${esc(i.mqtt.nodes_connect_to)}</b>` : "";
     document.getElementById("sys-ble").innerHTML = `<span class="dot" style="background:${bleColor}"></span>Bluetooth ${esc(i.ble)}`;
     document.getElementById("btn-config").hidden = document.getElementById("btn-folder").hidden = !i.config_dir;
   } catch (e) { /* il banner di errore lo gestisce refresh() */ }

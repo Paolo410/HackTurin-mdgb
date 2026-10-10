@@ -20,6 +20,7 @@ import asyncio
 import json
 import logging
 import os
+import socket
 import threading
 import time
 
@@ -45,6 +46,16 @@ def log_status(store):
     for node in store.nodes():
         d = store.diagnose(node)
         log.info("STATO %s: %s%s", node, d["text"], f" via {d['via']}" if d["via"] else "")
+
+
+def lan_ip():
+    """Indirizzo di questo PC sulla rete locale: è quello da dare ai nodi (MQTT_HOST) in modalità locale."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("10.255.255.255", 1))        # nessun pacchetto parte: serve solo a scegliere l'interfaccia
+            return s.getsockname()[0]
+    except OSError:
+        return "127.0.0.1"
 
 
 class Central:
@@ -79,8 +90,10 @@ class Central:
 
     def info(self):
         """Stato della centrale stessa, mostrato in alto nella dashboard."""
+        local = ingest.MQTT_HOST in ("localhost", "127.0.0.1")
         return {"mqtt": {"host": ingest.MQTT_HOST, "port": ingest.MQTT_PORT, "tls": ingest.MQTT_TLS,
-                         "connected": bool(self.mqtt and self.mqtt.is_connected())},
+                         "connected": bool(self.mqtt and self.mqtt.is_connected()), "local": local,
+                         "nodes_connect_to": f"{lan_ip()}:{ingest.MQTT_PORT}" if local else None},
                 "ble": self.ble_status, "config_dir": os.environ.get("MDGB_HOME"), "db": self.db_path,
                 "maps_key": os.environ.get("GOOGLE_MAPS_API_KEY", "")}
 

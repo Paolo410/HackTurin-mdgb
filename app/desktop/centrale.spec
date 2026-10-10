@@ -1,13 +1,19 @@
 # PyInstaller: ricetta di "MDGB Centrale.app" (macOS). Non si lancia a mano: usa build_mac.sh.
 import os
+import shutil
 
 HERE = os.path.dirname(os.path.abspath(SPEC))      # noqa: F821  (SPEC lo definisce PyInstaller)
 APP = os.path.dirname(HERE)
 ICON = os.path.join(HERE, "build", "icon.icns")
+# Il broker Mosquitto va DENTRO l'app (con le sue librerie): il centralino non deve installare nulla.
+MOSQ = shutil.which("mosquitto") or "/opt/homebrew/sbin/mosquitto"
+if not os.path.exists(MOSQ):
+    raise SystemExit("Mosquitto non trovato: brew install mosquitto (build_mac.sh lo fa da solo)")
 
 a = Analysis(
     [os.path.join(HERE, "centrale_app.py")],
     pathex=[APP],
+    binaries=[(os.path.realpath(MOSQ), "mosquitto")],
     datas=[(os.path.join(APP, "dashboard.html"), "."), (os.path.join(APP, "nodes.json"), ".")],
     hiddenimports=["central", "ingest", "dashboard", "decoder", "diagnosis", "ble_receiver"],
     excludes=["tkinter"],
