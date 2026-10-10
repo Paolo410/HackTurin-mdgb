@@ -51,6 +51,7 @@ python scripts/calibrate.py --source samples/video.mp4     # calibra l'inquadrat
 python scripts/scenario.py                                 # elenco delle scene simulate (senza camera)
 python scripts/scenario.py elderly_fast_car                # pedone lento + auto a 50 km/h: regole e attuatore
 python scripts/animal_probe.py cartella_di_foto            # come il detector vede animali non previsti da COCO
+python scripts/evaluate.py samples/video.mp4 --calib c.json  # numeri e fotogrammi annotati di un video di prova
 python scripts/bench.py samples/video.mp4                  # ms medi e p95 per fase
 pytest                                                     # test, senza hardware
 ```
@@ -100,6 +101,9 @@ Senza una calibrazione in metri lo stato resta `IDLE`.
 
 - `d_stop = v·1,0 + v²/(2·7,0)`, `T_need = W/v_ped + 1,0`, `TTC = d/v`, `green_s = min(25, max(W/1,2, W/v_ped) + 2)`.
 - `v_ped`: 1,2 m/s; 0,8 per bambino, pedone lento o con ausilio; la velocità misurata se è più bassa.
+- Le velocità si misurano su una finestra di mezzo secondo, non tra un frame e l'altro: il box di un oggetto fermo
+  trema di qualche pixel e da un frame all'altro sembrerebbe muoversi. Non si misura la velocità quando il box è
+  tagliato dal bordo dell'immagine, né dove la calibrazione è troppo grossolana (un pixel vale più di mezzo metro).
 - Il pedone "vuole attraversare" se è sulle strisce, oppure in zona d'attesa da più di 1 s o in cammino verso la strada.
 - Lo stato sale subito e scende solo dopo 1 s, per non far tremolare le lampade.
 - Il verde richiesto può solo crescere finché c'è qualcuno: una stima di velocità che oscilla non fa cambiare la
@@ -206,6 +210,21 @@ Webcam, input 416 px (prima del passaggio a 320):
 |---|---|---|
 | profilo `pc` | 12,7 / 17,4 ms | 26,6 (la webcam ne dà circa 30) |
 | `--emulate-unoq` | 16,9 / 24,0 ms | 9,8 (limite imposto: 10) |
+
+## Risoluzione: forma dell'immagine e zona d'interesse
+
+Provando su video reali il limite principale è risultato la dimensione dei pedoni: in un'inquadratura larga, a
+320 px, una persona lontana occupa una decina di pixel e non viene vista. Due rimedi, senza costo in più:
+
+- **Input a forma di immagine** (`model.match_aspect`, attivo): lo stesso numero di pixel di 320x320, ma con le
+  proporzioni dell'immagine (416x256 per un 16:9). Niente pixel sprecati in bordi vuoti: sui video di prova le
+  persone trovate sono circa il doppio, con lo stesso tempo di calcolo.
+- **Zona d'interesse** (`"roi": [x0, y0, x1, y1]` in `calib.json`, oppure `calibrate.py --roi`): il detector guarda
+  solo la parte dell'immagine che serve, cioè le strisce e la strada prima. Gli oggetti diventano più grandi a
+  parità di costo. Sul video di New York, pedoni trovati sulle strisce per frame: 3,4 sull'immagine intera,
+  5,1 sulla fascia delle strisce, 8,8 portando il budget a 416.
+
+La regola pratica per chi monta la camera: le strisce e le zone d'attesa devono riempire l'inquadratura.
 
 ## Modello
 

@@ -275,3 +275,23 @@ con v_ped 0,3 → 25 s.
 24. **Verso AI-M6**: `docs/DEPLOY_UNOQ.md` è una bozza non provata sulla scheda. Da fonti non ufficiali risulta che
     la UNO Q monta Debian 13 (quindi Python 3.13, compatibile con le versioni fissate: punto 9) e che per la camera
     CSI va abilitata un'opzione di App Lab (punto 1). Entrambe le cose vanno verificate sulla scheda.
+25. **Modifiche nate dalla prova sui video reali** (branch `paolo/ai-video-tests`):
+    - input a forma di immagine (`model.match_aspect`) e zona d'interesse (`roi` in `calib.json`): più pixel sugli
+      oggetti a parità di costo;
+    - velocità su una finestra di 0,5 s (`kinematics.window_s`), con l'EMA della specifica applicata sopra;
+      accelerazione solo dopo una finestra piena di velocità;
+    - nessuna velocità per box tagliati dal bordo, per salti impossibili (cambio di ID) e dove un pixel vale più di
+      0,5 m a terra;
+    - velocità di camminata = avanzamento netto negli ultimi 2 s, misurata solo se il pedone si è mosso per tutto
+      quel tempo: chi aspetta fermo non risulta lento;
+    - eventi: `yield` una sola volta per veicolo, quando arriva alle strisce; near-miss per TTC solo sopra 3 m/s;
+      frenate e collisioni solo entro 30 m dalle strisce e solo per tracce con velocità nota;
+    - autodiagnosi: soglia del Laplaciano da 15 a 4 (scene reali misurate: da 8 in su; lente coperta: sotto 2) e
+      guasto confermato solo se si ripete al controllo successivo.
+26. **Limiti emersi dai video**, non risolti:
+    - nelle folle fitte (Shibuya, New York) il detector vede una parte dei pedoni e le tracce durano meno di un
+      secondo: i conteggi in quelle scene non sono affidabili;
+    - `child` dipende dall'altezza stimata, che con una camera molto dall'alto risulta troppo bassa: servirebbe
+      tarare `geometry.height_scale` su una persona di altezza nota, per ogni camera;
+    - con una calibrazione stimata a occhio le velocità sono buone vicino alle strisce e inaffidabili lontano;
+    - oggetti fermi scambiati per veicoli (un pannello stradale visto come `bus`) restano come tracce.
