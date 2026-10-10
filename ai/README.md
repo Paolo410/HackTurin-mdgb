@@ -26,7 +26,7 @@ Specifica completa: [`PROMPT_SMART_CROSSING.md`](../PROMPT_SMART_CROSSING.md), Â
 | AI-M3 | calibrazione, velocitÃ , attributi, regole, `SimActuator` | fatto |
 | AI-M4 | eventi, animali, logger, output C3 | fatto |
 | AI-M5 | termocamera | fatto in simulazione, da provare con il sensore |
-| AI-M6 | profilo `unoq`, prova sulla scheda, benchmark | da fare |
+| AI-M6 | profilo `unoq`, prova sulla scheda, benchmark | da fare sulla scheda; guida in [docs/DEPLOY_UNOQ.md](docs/DEPLOY_UNOQ.md) |
 
 ## Come si avvia
 

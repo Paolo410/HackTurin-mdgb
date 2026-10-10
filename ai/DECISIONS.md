@@ -272,3 +272,6 @@ con v_ped 0,3 → 25 s.
       (bozza di `docs/CONTRACTS.md`), mai provati sul firmware.
 23. **Stabilità dei comandi** (trovata provando AI-M5): il verde richiesto cresce soltanto finché c'è qualcuno, e un
     cambio della sola `reason` non fa partire un nuovo C1 prima della ripetizione di ogni secondo.
+24. **Verso AI-M6**: `docs/DEPLOY_UNOQ.md` è una bozza non provata sulla scheda. Da fonti non ufficiali risulta che
+    la UNO Q monta Debian 13 (quindi Python 3.13, compatibile con le versioni fissate: punto 9) e che per la camera
+    CSI va abilitata un'opzione di App Lab (punto 1). Entrambe le cose vanno verificate sulla scheda.

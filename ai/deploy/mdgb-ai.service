@@ -1,0 +1,17 @@
+# systemd unit for the vision process on the Arduino UNO Q (Linux side).
+# Install: sudo cp mdgb-ai.service /etc/systemd/system/ && sudo systemctl enable --now mdgb-ai
+# If this process stops, the heartbeat stops and the firmware falls back by itself within 500 ms;
+# systemd then starts it again.
+[Unit]
+Description=MDGB smartcrossing (vision and rules)
+After=network.target
+
+[Service]
+User=arduino
+WorkingDirectory=/home/arduino/HackTurin-mdgb/ai
+ExecStart=/home/arduino/venv/bin/python -m smartcrossing.app --source 0 --profile unoq --headless --actuator bridge
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
