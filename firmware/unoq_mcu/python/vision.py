@@ -23,6 +23,7 @@ import os
 import threading
 import time
 import traceback
+from collections import deque
 
 import cv2
 
@@ -33,7 +34,7 @@ from arduino.app_peripherals.camera import Camera  # noqa: E402
 from arduino.app_utils import Bridge, Logger  # noqa: E402
 
 from smartcrossing.config import load_config  # noqa: E402
-from smartcrossing.geometry import load_calib  # noqa: E402
+from smartcrossing.geometry import in_direction, load_calib  # noqa: E402
 from smartcrossing.logger import C3Logger, flat_counts  # noqa: E402
 from smartcrossing.mcu import McuState  # noqa: E402
 from smartcrossing.overlay import KMH, ROLE_GROUP  # noqa: E402
@@ -53,6 +54,8 @@ LIVE_VIEW = os.environ.get("MDGB_LIVE_VIEW", "1") != "0"   # 0 = the page gets o
 VIEW_FPS = 5
 VIEW_JPEG_QUALITY = 70
 FPS_WINDOW = 20                                      # frames used for the FPS shown
+EVENT_LOG_LEN = 40                                   # last events kept for the page (memory only)
+NOTE_REPEAT_S = 5.0                                  # the same log line again within this time is dropped
 
 
 class AppLabActuator:
@@ -171,6 +174,9 @@ class VisionService:
         self.ui = ui
         self.cfg = load_config(profile=PROFILE)
         self.mcu = McuState(self.cfg)
+        self.sensors: dict = {}                       # last values of the sketch notifications (main.py)
+        self.log: deque = deque(maxlen=EVENT_LOG_LEN)  # last events for the page: never written from here
+        self._started = time.time()
         self._viewers: set[str] = set()
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run_forever, name="mdgb-vision", daemon=True)
@@ -186,6 +192,19 @@ class VisionService:
             self.mcu.on_line(json.loads(line.decode("utf-8") if isinstance(line, bytes) else str(line)))
         except (ValueError, TypeError):
             logger.warning(f"C5 line not valid: {line!r}")
+
+    def set_sensor(self, name: str, value) -> None:
+        """Last value of a sketch notification (temperature, light, badge...), shown on the page."""
+        self.sensors[name] = value
+
+    def note(self, kind: str, text: str) -> None:
+        """One line of the event log of the page (alarms, badge, state changes).
+        The same line again within NOTE_REPEAT_S is dropped: the sketch repeats the shock alarm every 500 ms."""
+        now = time.time()
+        last = self.log[-1] if self.log else None
+        if last and last["type"] == kind and last["text"] == text and now - last["ts"] < NOTE_REPEAT_S:
+            return
+        self.log.append({"ts": round(now, 1), "type": kind, "text": text})
 
     def _on_connect(self, sid: str) -> None:
         self._viewers.add(sid)
@@ -239,6 +258,11 @@ class VisionService:
                     if len(stamps) > 1:
                         fps = (len(stamps) - 1) / max(stamps[-1] - stamps[0], 1e-6)
                     for event in result.events:
+                        if event["type"] == "crossing":
+                            text = f"{event['cls']} #{event['track_id']} {event['dir'].upper()} linea {event['line']}"
+                        else:
+                            text = " ".join(f"{k}={v}" for k, v in event.items() if k != "type")
+                        self.note(event["type"], text)
                         logger.info("event " + " ".join(f"{k}={v}" for k, v in event.items()))
                         if log:
                             log.write(event)
@@ -248,6 +272,7 @@ class VisionService:
 
                 if command["state"] != last_state:
                     last_state = command["state"]
+                    self.note("state", f"{command['state']}: {command['reason']}")
                     logger.info(f"state={command['state']} led={command['led']} | {command['reason']}")
                 now = time.monotonic()
                 if now - last_log >= STATUS_LOG_S and result is not None:
@@ -256,7 +281,7 @@ class VisionService:
                                 f"C1={actuator.sent} C2={actuator.heartbeats} failsafe={actuator.failsafe}")
                 if self._viewers and now - last_view >= 1.0 / VIEW_FPS:
                     last_view = now
-                    self._publish(self._view(command, result, frame, pipeline, actuator, fps))
+                    self._publish(self._view(command, result, frame, pipeline, actuator, fps, frames))
 
                 if max_fps > 0:   # same cap as the unoq profile of ai/
                     wait = 1.0 / max_fps - (time.monotonic() - loop_t)
@@ -268,14 +293,22 @@ class VisionService:
             if log:
                 log.close()
 
-    def _view(self, command, result, frame, pipeline, actuator, fps) -> dict:
+    def _view(self, command, result, frame, pipeline, actuator, fps, frames) -> dict:
         req = command.get("req", {})
+        ev = pipeline.events
         msg = {
             "state": command["state"], "led": command["led"], "reason": command["reason"],
             "green_s": command.get("green_s"), "req": req, "lcd": command.get("lcd"), "oled": command.get("oled"),
             "fps": round(fps, 1), "failsafe": actuator.failsafe,
             "counts": pipeline.counter.summary() if pipeline.counter else "",
-            "events": pipeline.events.summary(), "boxes": [],
+            "events": ev.summary(), "boxes": [],
+            "lines": self._counts(pipeline.counter),
+            "stats": {"yield_rate": ev.yield_rate, "yielded": ev.yields["yielded"], "approaching": ev.yields["total"],
+                      "near_miss": ev.near_misses, "incidents": ev.incidents},
+            "link": {"c1": actuator.sent, "c2": actuator.heartbeats, "rejected": actuator.rejected},
+            "frames": frames, "uptime_s": round(time.time() - self._started),
+            "mcu": self.mcu.snapshot(), "sensors": self.sensors, "log": list(self.log),
+            "scene": self._scene(pipeline),
         }
         if result is not None:
             msg["boxes"] = boxes_of(result, pipeline.tracker)
@@ -287,6 +320,30 @@ class VisionService:
                 if ok:
                     msg["jpg"] = base64.b64encode(jpg.tobytes()).decode("ascii")
         return msg
+
+    @staticmethod
+    def _counts(counter) -> dict:
+        """IN/OUT of each counting line, in total and per role."""
+        if counter is None:
+            return {}
+        return {name: {**counter.totals(name), "roles": counter.counts[name]} for name in counter.lines}
+
+    def _scene(self, pipeline) -> dict:
+        """Counting lines (with the IN direction) and calibration zones in frame pixels, for the overlay."""
+        scene: dict = {"lines": [], "zones": []}
+        if pipeline.counter is not None:
+            for name, line in pipeline.counter.lines.items():
+                dx, dy = in_direction(line["start"], line["end"])
+                scene["lines"].append({"name": name, "a": [int(v) for v in line["start"]],
+                                       "b": [int(v) for v in line["end"]], "in": [float(dx), float(dy)]})
+        geometry = pipeline.geometry
+        if geometry is not None and geometry.metric and geometry.width:
+            for name in self.cfg["overlay"]["zones"]:
+                polygon = geometry.zones.get(name)
+                if polygon:
+                    scene["zones"].append({"name": name, "points": [[round(float(c), 1) for c in geometry.to_image(x, y)]
+                                                                    for x, y in polygon]})
+        return scene
 
     def _publish(self, msg: dict) -> None:
         try:

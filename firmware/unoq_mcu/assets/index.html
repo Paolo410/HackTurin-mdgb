@@ -3,37 +3,124 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MDGB</title>
+    <title>MDGB · pannello tecnico</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <header>
-      <h1>🚦 MDGB</h1>
-      <span id="link" class="pill off">non collegato</span>
+    <header class="topbar">
+      <div class="brand">
+        <span class="logo">🚦</span>
+        <div>
+          <h1>MDGB</h1>
+          <small>pannello del tecnico</small>
+        </div>
+      </div>
+      <div class="pills">
+        <span id="pill-page" class="pill bad" title="Collegamento di questa pagina con la scheda">Pagina</span>
+        <span id="pill-vision" class="pill bad" title="Dati della visione negli ultimi 3 s">Visione</span>
+        <span id="pill-sketch" class="pill bad" title="Heartbeat accettati dallo sketch (fail-safe dopo 500 ms)">Sketch</span>
+        <span id="pill-fps" class="pill neutral" title="Fotogrammi elaborati al secondo">— FPS</span>
+      </div>
+      <div class="uptime" id="uptime" title="Da quanto gira la visione">—</div>
     </header>
 
-    <main>
-      <section class="view">
-        <canvas id="canvas" width="640" height="480"></canvas>
-        <p id="noimage" class="hint" hidden>Vista dal vivo disattivata (MDGB_LIVE_VIEW=0): solo i riquadri.</p>
+    <main class="layout">
+      <!-- Live view -->
+      <section class="card video-card">
+        <div class="card-head">
+          <h2>Vista dal vivo</h2>
+          <div class="tools">
+            <button id="btn-pause" class="btn" type="button" aria-pressed="false">⏸ Pausa</button>
+            <button id="btn-full" class="btn" type="button">⛶ Schermo intero</button>
+          </div>
+        </div>
+        <div class="filters" id="filters">
+          <label class="chip"><input type="checkbox" data-opt="labels" checked /> Etichette</label>
+          <label class="chip"><input type="checkbox" data-opt="scene" checked /> Zone e linee</label>
+          <label class="chip g-person"><input type="checkbox" data-group="person" checked /> Pedoni <b data-count="person">0</b></label>
+          <label class="chip g-two_wheeler"><input type="checkbox" data-group="two_wheeler" checked /> Due ruote <b data-count="two_wheeler">0</b></label>
+          <label class="chip g-vehicle"><input type="checkbox" data-group="vehicle" checked /> Veicoli <b data-count="vehicle">0</b></label>
+          <label class="chip g-animal"><input type="checkbox" data-group="animal" checked /> Animali <b data-count="animal">0</b></label>
+          <label class="chip g-pending"><input type="checkbox" data-group="pending" checked /> Non confermati <b data-count="pending">0</b></label>
+        </div>
+        <div class="stage" id="stage">
+          <canvas id="canvas" width="640" height="480"></canvas>
+          <div class="stage-banner" id="banner" hidden></div>
+        </div>
+        <p class="hint" id="privacy">Le immagini non vengono mai salvate: si producono solo mentre questa pagina è aperta.</p>
       </section>
 
-      <aside>
-        <div id="state" class="state">—</div>
-        <p id="reason" class="reason"></p>
-        <dl>
-          <dt>LED</dt><dd id="led">—</dd>
-          <dt>Verde pedonale</dt><dd id="green">—</dd>
-          <dt>Richieste</dt><dd id="req">—</dd>
-          <dt>LCD / OLED</dt><dd id="texts">—</dd>
-          <dt>FPS</dt><dd id="fps">—</dd>
-          <dt>ms per fase</dt><dd id="lat">—</dd>
-          <dt>Riconosciuti</dt><dd id="tracks">—</dd>
-          <dt>Conteggi</dt><dd id="counts">—</dd>
-          <dt>Eventi</dt><dd id="events">—</dd>
+      <!-- Traffic light and rule -->
+      <section class="card light-card">
+        <div class="card-head"><h2>Semaforo</h2><span class="muted" id="led">LED —</span></div>
+        <div class="light-row">
+          <div class="lantern" id="lantern" title="Lanterna veicoli accesa dallo sketch">
+            <span class="lamp red"></span>
+            <span class="lamp yellow"></span>
+            <span class="lamp green"></span>
+          </div>
+          <div class="rule">
+            <div class="state" id="state">—</div>
+            <p class="reason" id="reason">In attesa della visione…</p>
+            <div class="reqs" id="reqs"></div>
+          </div>
+        </div>
+        <div class="displays">
+          <div>
+            <small class="muted">LCD conducenti</small>
+            <pre class="lcd" id="lcd">                </pre>
+          </div>
+          <div>
+            <small class="muted">OLED pedoni</small>
+            <pre class="oled" id="oled"></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- Performance -->
+      <section class="card perf-card">
+        <div class="card-head"><h2>Prestazioni</h2><span class="muted" id="frames">0 frame</span></div>
+        <div class="bignum"><span id="fps">—</span><small>FPS</small></div>
+        <div class="bars" id="bars"></div>
+        <dl class="kv">
+          <dt>Comandi C1</dt><dd id="c1">—</dd>
+          <dt>Heartbeat C2</dt><dd id="c2">—</dd>
+          <dt>Righe rifiutate</dt><dd id="rej">—</dd>
         </dl>
-        <p class="hint">Le immagini non vengono mai salvate: si producono solo mentre questa pagina è aperta.</p>
-      </aside>
+      </section>
+
+      <!-- Counts -->
+      <section class="card counts-card">
+        <div class="card-head"><h2>Conteggi</h2></div>
+        <div id="lines" class="lines"></div>
+        <div class="stats">
+          <div class="stat"><span id="yield">—</span><small>veicoli che rallentano</small></div>
+          <div class="stat"><span id="nearmiss">0</span><small>quasi incidenti</small></div>
+          <div class="stat"><span id="incidents">0</span><small>incidenti</small></div>
+        </div>
+      </section>
+
+      <!-- Sensors -->
+      <section class="card sensors-card">
+        <div class="card-head"><h2>Sensori del nodo</h2></div>
+        <div class="tiles">
+          <div class="tile"><small>Temperatura</small><span id="s-temp">—</span></div>
+          <div class="tile"><small>Umidità</small><span id="s-rh">—</span></div>
+          <div class="tile"><small>eCO₂</small><span id="s-eco2">—</span></div>
+          <div class="tile"><small>TVOC</small><span id="s-tvoc">—</span></div>
+          <div class="tile wide"><small>Luce</small><span id="s-light">—</span><div class="meter"><i id="s-light-bar"></i></div></div>
+          <div class="tile wide"><small>Accelerazione</small><span id="s-accel">—</span></div>
+          <div class="tile wide"><small>Badge</small><span id="s-rfid">—</span></div>
+          <div class="tile" id="t-shock"><small>Ultimo urto</small><span id="s-shock">mai</span></div>
+          <div class="tile" id="t-fs"><small>Fail-safe sketch</small><span id="s-fs">—</span></div>
+        </div>
+      </section>
+
+      <!-- Event log -->
+      <section class="card log-card">
+        <div class="card-head"><h2>Registro eventi</h2><button id="btn-clear" class="btn small" type="button">Pulisci</button></div>
+        <ol class="log" id="log"><li class="empty">Nessun evento.</li></ol>
+      </section>
     </main>
 
     <script src="libs/socket.io.min.js"></script>
