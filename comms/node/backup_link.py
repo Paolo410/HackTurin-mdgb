@@ -59,7 +59,9 @@ def make_mcu():
 #   config.BACKUP_LINK = "lora" | "ble" | "none"
 #   Interfaccia comune:  send(payload, port=1) -> bool   |   idle()  (chiamata quando MQTT è sano)
 # ======================================================================================
+import os
 import shlex
+import shutil
 import struct
 import subprocess
 
@@ -161,10 +163,20 @@ class NoBackup:
         pass
 
 
+def ble_available() -> bool:
+    """BLE vero dove c'è BlueZ (il Linux della UNO Q, anche fuori da App Lab); sul Mac/PC di sviluppo no.
+    BLE_SIMULATE=1 forza la simulazione."""
+    return shutil.which("btmgmt") is not None and os.environ.get("BLE_SIMULATE", "0") != "1"
+
+
 def make_backup(kind: str, mcu, ble_sudo=False):
     kind = (kind or "lora").lower()
     if kind == "ble":
-        return BleBackup(sudo=ble_sudo) if ON_UNO_Q else SimulatedBle()
+        if ble_available():
+            log.info("backup BLE reale (btmgmt)")
+            return BleBackup(sudo=ble_sudo)
+        log.warning("backup BLE SIMULATO: btmgmt non trovato (normale sul Mac; sulla UNO Q: sudo apt install bluez)")
+        return SimulatedBle()
     if kind == "none":
         return NoBackup()
     return McuLoraBackup(mcu)

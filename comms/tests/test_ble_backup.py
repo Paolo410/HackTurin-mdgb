@@ -138,6 +138,20 @@ def test_backup_turns_on_if_mqtt_never_comes_up(tmp_path):
     assert fo.active, "30 s dall'avvio senza MQTT -> backup acceso"
 
 
+def test_real_ble_is_chosen_where_btmgmt_exists(monkeypatch):
+    """Sulla UNO Q il nodo gira come Python normale (non in App Lab): il BLE vero dipende da btmgmt, non dal Bridge."""
+    import backup_link
+    monkeypatch.setattr(backup_link.shutil, "which", lambda name: "/usr/bin/btmgmt" if name == "btmgmt" else None)
+    monkeypatch.setattr(backup_link.BleBackup, "_run", lambda self, args: True)
+    real = backup_link.make_backup("ble", mcu=None)
+    assert type(real) is backup_link.BleBackup
+    monkeypatch.setenv("BLE_SIMULATE", "1")
+    assert isinstance(backup_link.make_backup("ble", mcu=None), SimulatedBle)
+    monkeypatch.setattr(backup_link.shutil, "which", lambda name: None)
+    monkeypatch.delenv("BLE_SIMULATE")
+    assert isinstance(backup_link.make_backup("ble", mcu=None), SimulatedBle), "senza btmgmt (Mac): simulato"
+
+
 # ------------------------------------------------------------------ ricevitore BLE
 def test_receiver_forwards_each_frame_once_and_retries_on_failure():
     from ble_receiver import Receiver

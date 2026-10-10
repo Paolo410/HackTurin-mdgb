@@ -83,7 +83,7 @@ class Node:
                                  disk_free=lambda: disk_free_pct(cfg.DB_PATH))
         self.source = make_source(cfg.EVENT_SOURCE, cfg.SIM_RATE_HZ, cfg.C3_DIR, self.ob)
         self._t_hb = self._t_prune = 0.0
-        log.info("nodo %s | UNO Q=%s | broker %s:%d | backup=%s | sorgente=%s | backlog iniziale %d",
+        log.info("nodo %s | App Lab=%s | broker %s:%d | backup=%s | sorgente=%s | backlog iniziale %d",
                  cfg.NODE_ID, ON_UNO_Q, cfg.MQTT_HOST, cfg.MQTT_PORT, cfg.BACKUP_LINK, cfg.EVENT_SOURCE,
                  self.ob.backlog())
 
