@@ -78,6 +78,9 @@ rules:
   video_timeout_s: 1.0            # (spec) no frames for longer than this = DEGRADED
   hold_s: 1.0                     # a state is kept this long before stepping down (no flicker)
   default_W_m: 7.0                # road width used when calib.json has no metric calibration
+  herd_min_size: 2                # animals close together that make a herd
+  animal_margin_m: 30             # (spec) ANIMAL_WARN: vehicle within d_stop + this (40 on the "collina" site)
+  animal_alert_hold_s: 2.0        # (spec) the alert stays on 2 s after the last animal left the road
   led:                            # proposal, to be confirmed with firmware
     IDLE: "OFF"
     PRESENCE: WHITE_ON
@@ -87,6 +90,47 @@ rules:
     ANIMAL_ALERT: AMBER_BLINK_4HZ
     DEGRADED: YELLOW_FAILSAFE
   lcd_max_chars: 32               # 2 rows of 16 ASCII characters
+
+site: urbano                      # default --site
+sites:                            # (spec) which animals matter where
+  urbano:     {animal_classes: [dog, cat], birds: false, animal_margin_m: 30}
+  lungofiume: {animal_classes: [dog, cat], birds: true, animal_margin_m: 30}
+  collina:    {animal_classes: [dog, cat, horse, sheep, cow, bear], birds: false, animal_margin_m: 40}
+
+animals:
+  large_length_m: 0.8             # (spec) large: length >= 0.8 m or height >= 0.6 m
+  large_height_m: 0.6
+  medium_length_m: 0.3            # (spec) medium: 0.3-0.8 m; below: small, log only
+  leash_distance_m: 2.0           # (spec) a person within 2 m ...
+  leash_angle_deg: 45             # (spec) ... moving in a similar direction ...
+  leash_time_s: 1.0               # (spec) ... for at least 1 s: the animal is on a leash
+  herd_distance_m: 3.0            # (spec) animals within 3 m are one herd
+  bird_min_length_m: 0.5          # (spec) a bird counts only if this long (goose, swan) ...
+  bird_min_time_s: 2.0            # (spec) ... and on the road for more than 2 s
+
+events:
+  collision_distance_m: 1.0       # (spec) two tracks closer than this ...
+  collision_fast_ms: 3.0          # (spec) ... at least one was faster than this ...
+  collision_stopped_ms: 0.3       # (spec) ... then both slower than this ...
+  collision_window_s: 1.5         # (spec) ... within this time
+  person_down_aspect: 1.2         # (spec) box width / height above this ...
+  person_down_time_s: 3.0         # (spec) ... for longer than this, on the road
+  hard_brake_ms2: 6.0             # (spec) deceleration above this
+  hard_brake_min_speed_ms: 3.0    # only for vehicles that were actually moving
+  near_miss_ttc_s: 1.0            # (spec) TTC below this ...
+  near_miss_pet_s: 1.0            # (spec) ... or PET below this, between a vehicle and a pedestrian or animal
+  near_miss_lateral_m: 1.5        # the vehicle must be heading at the pedestrian within this side distance
+  pet_radius_m: 1.0               # two tracks passed "through the same point" within this distance
+  stopped_on_crosswalk_s: 10.0    # (spec) vehicle standing on the stripes for longer than this
+  stopped_ms: 0.3                 # below this speed a vehicle is standing
+  yield_speed_ms: 2.0             # (spec) a vehicle yields if it slows below this before the stripes
+
+logger:
+  enabled: true                   # C3 events for comms/ (docs/CONTRACTS.md); never frames
+  dir: ../logs/c3                 # relative to ai/; the environment variable MDGB_C3_DIR wins
+  prefix: c3
+  rotate_s: 3600                  # a new file every hour
+  status_every_s: 5.0             # period of the "status" event
 
 selfcheck:
   every_n_frames: 10              # how often a frame is checked

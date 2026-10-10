@@ -96,14 +96,53 @@ def pedestrian_crossing() -> tuple[list[Actor], float]:
     return [Actor("person", 1.75, 0.5, path)], 12.0
 
 
-SCENARIOS = {"elderly_fast_car": elderly_and_fast_car, "pedestrian_crossing": pedestrian_crossing}
+def loose_dog_and_leashed_dog() -> tuple[list[Actor], float]:
+    """A dog walks across the road with its owner (no alarm), then a large loose dog runs across (alert)."""
+    def owner(t: float):
+        y = -0.7 + 1.2 * t
+        return (1.5, y) if y < 9.0 else None
+
+    def leashed(t: float):
+        position = owner(t)
+        return (position[0] + 0.8, position[1]) if position else None
+
+    def loose(t: float):
+        if t < 10.0:
+            return None
+        y = -3.0 + 2.5 * (t - 10.0)
+        return (-6.0, y) if y < 10.0 else None
+    return [Actor("person", 1.75, 0.5, owner), Actor("dog", 0.5, 0.7, leashed), Actor("dog", 0.7, 1.0, loose)], 18.0
 
 
-def run_scenario(cfg: dict, name: str, fps: float = 10.0, actuator=None, realtime: bool = False,
-                 on_step: Callable[[float, dict, Pipeline], None] | None = None) -> Pipeline:
-    """Runs a scenario through the pipeline (no detector). Returns the pipeline for inspection."""
-    actors, duration = SCENARIOS[name]()
-    pipeline = Pipeline(cfg, frame_rate=fps, calib=demo_calib(cfg), actuator=actuator, load_detector=False)
+def car_yields() -> tuple[list[Actor], float]:
+    """A pedestrian waits at the kerb; a car slows almost to a stop before the stripes, then drives on."""
+    def car(t: float):
+        if t < 1.0:
+            return None
+        t -= 1.0
+        if t < 3.0:                                   # 10 m/s for 3 s: from -42 to -12
+            return -42.0 + 10.0 * t, 1.75
+        if t < 5.0:                                   # brakes at 4.5 m/s^2 down to 1 m/s
+            k = t - 3.0
+            return -12.0 + 10.0 * k - 2.25 * k * k, 1.75
+        x = -1.0 + 1.0 * (t - 5.0) if t < 7.0 else 1.0 + 6.0 * (t - 7.0)
+        return (x, 1.75) if x < 40.0 else None
+    return [Actor("person", 1.75, 0.5, lambda t: (2.0, -0.7)), Actor("car", 1.5, 4.4, car)], 16.0
+
+
+SCENARIOS = {
+    "elderly_fast_car": elderly_and_fast_car,
+    "pedestrian_crossing": pedestrian_crossing,
+    "loose_dog_and_leashed_dog": loose_dog_and_leashed_dog,
+    "car_yields": car_yields,
+}
+
+
+def run_actors(cfg: dict, actors: list[Actor], duration: float, fps: float = 10.0, actuator=None,
+               realtime: bool = False, site: str | None = None,
+               on_step: Callable[[float, "object", Pipeline], None] | None = None) -> Pipeline:
+    """Runs the actors through the pipeline (no detector). on_step gets (t, FrameResult, pipeline)."""
+    pipeline = Pipeline(cfg, frame_rate=fps, calib=demo_calib(cfg), actuator=actuator, load_detector=False, site=site)
     pipeline._setup_size(*FRAME_SIZE)
     if pipeline.commander is not None and realtime:
         pipeline.commander.start()
@@ -116,5 +155,13 @@ def run_scenario(cfg: dict, name: str, fps: float = 10.0, actuator=None, realtim
                 time.sleep(delay)
         result = pipeline.process(detections_at(actors, t, pipeline.geometry), t, FRAME_SIZE)
         if on_step is not None:
-            on_step(t, result.command, pipeline)
+            on_step(t, result, pipeline)
     return pipeline
+
+
+def run_scenario(cfg: dict, name: str, fps: float = 10.0, actuator=None, realtime: bool = False,
+                 site: str | None = None, on_step: Callable[[float, dict, Pipeline], None] | None = None) -> Pipeline:
+    """Runs a named scenario. on_step gets (t, C1 command, pipeline). Returns the pipeline for inspection."""
+    actors, duration = SCENARIOS[name]()
+    step = (lambda t, result, pipeline: on_step(t, result.command, pipeline)) if on_step else None
+    return run_actors(cfg, actors, duration, fps, actuator, realtime, site, step)
