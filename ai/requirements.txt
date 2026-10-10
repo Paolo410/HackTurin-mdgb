@@ -1,0 +1,10 @@
+# Runtime dependencies of ai/ (pinned). Every package must ship a Linux aarch64 wheel (Arduino UNO Q).
+# Works on Python 3.11, 3.12 and 3.13.
+numpy==2.4.6
+onnxruntime==1.30.0
+# GUI build on the PC (overlay window), headless build on the board.
+opencv-python==4.14.0.94 ; sys_platform != "linux" or platform_machine != "aarch64"
+opencv-python-headless==4.14.0.94 ; sys_platform == "linux" and platform_machine == "aarch64"
+# Keep below 0.31: sv.ByteTrack (decided in the spec) is removed there.
+supervision==0.30.5
+pyyaml==6.0.3
