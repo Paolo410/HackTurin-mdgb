@@ -8,7 +8,7 @@ End-to-end con Mosquitto (si saltano se manca):
   - broker acceso -> SPENTO -> RIACCESO: backlog che cresce, aggregati sul backup, backfill, 0 buchi, 0 doppioni;
   - PUBACK negativo vero (ACL di Mosquitto, 0x87): gli eventi restano in coda; ACL corretta -> arrivano tutti.
 
-Requisiti: pip install -r comms/requirements.txt ; per gli end-to-end mosquitto (macOS: brew install mosquitto)
+Requisiti: pip install -r comms/requirements-dev.txt -r app/requirements.txt ; per gli end-to-end mosquitto (macOS: brew install mosquitto)
 Uso:       python -m pytest comms/tests/test_offline.py -q      oppure      python comms/tests/test_offline.py
 """
 import json
