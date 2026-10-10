@@ -28,6 +28,8 @@ class TrackState:
     role_votes: Counter = field(default_factory=Counter)    # role per frame, see derive.py
     # Metric state, filled only with a metric calibration (see geometry.Geometry).
     ground: tuple[float, float] | None = None      # last position on the ground, metres
+    ground_history: deque = field(default_factory=deque)   # (t, x, y) in metres
+    aspect: float = 0.0                            # width / height of the last box
     velocity: tuple[float, float] = (0.0, 0.0)     # smoothed, m/s in the ground frame
     speed: float = 0.0                             # m/s
     speed_samples: int = 0                         # speed measures taken so far
@@ -92,7 +94,8 @@ class Tracker:
             state = self.tracks.get(track_id)
             if state is None:
                 state = TrackState(track_id=track_id, first_t=t, history=deque(maxlen=self.history_len),
-                                   heights=deque(maxlen=self.height_samples))
+                                   heights=deque(maxlen=self.height_samples),
+                                   ground_history=deque(maxlen=self.history_len))
                 self.tracks[track_id] = state
             foot = (float((xyxy[0] + xyxy[2]) / 2), float(xyxy[3]))   # bottom centre: on the ground
             if metric:
@@ -125,6 +128,9 @@ class Tracker:
             # Too long a gap: start again.
             state.velocity, state.speed, state.accel, state.speed_samples = (0.0, 0.0), 0.0, 0.0, 0
         state.ground = position
+        state.ground_history.append((t, position[0], position[1]))
+        box_h = float(xyxy[3] - xyxy[1])
+        state.aspect = float(xyxy[2] - xyxy[0]) / box_h if box_h > 0 else 0.0
 
         height = geometry.size_in_metres(float(xyxy[3] - xyxy[1]), *foot)
         if height is not None:
