@@ -1,0 +1,9 @@
+{
+  "v": 1,
+  "sensor": "MLX90621 16x4",
+  "zones": {
+    "waiting_zone_left": [0, 1, 2, 3, 4],
+    "crosswalk": [5, 6, 7, 8, 9, 10],
+    "waiting_zone_right": [11, 12, 13, 14, 15]
+  }
+}
