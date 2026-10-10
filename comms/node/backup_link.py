@@ -103,7 +103,8 @@ class BleBackup:
 
     def _run(self, args):
         try:
-            r = subprocess.run(self.prefix + args, capture_output=True, text=True, timeout=5)
+            # input="\n": btmgmt di BlueZ 5.82 (UNO Q) resta fermo se l'input e' /dev/null, come sotto systemd.
+            r = subprocess.run(self.prefix + args, capture_output=True, text=True, timeout=5, input="\n")
             if r.returncode != 0:
                 log.error("BLE: %s -> %s", " ".join(map(shlex.quote, args)), (r.stderr or r.stdout).strip())
             return r.returncode == 0
