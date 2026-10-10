@@ -45,10 +45,24 @@ class PedestrianInfo:
 @dataclass
 class VehicleInfo:
     track_id: int
-    d: float                              # distance to the stripes, metres
-    v: float                              # speed towards the stripes, m/s
+    d: float                              # distance to the stripes, metres (negative = not approaching them)
+    v: float                              # speed along the road, m/s
     a: float = 0.0                        # acceleration along the motion, m/s^2 (negative = braking)
     role: str = "car"
+    x: float | None = None                # position along the road, metres (ground frame)
+    vx: float = 0.0                       # signed speed along the road
+
+
+@dataclass
+class AnimalInfo:
+    track_id: int
+    coco: str                             # original COCO class (dog, cow, ...)
+    size: str                             # large | medium | small
+    on_road: bool                         # on the carriageway or on the stripes
+    free: bool = True                     # False = on a leash: the rules of its pedestrian apply
+    herd_size: int = 1                    # animals in its herd, itself included
+    x: float | None = None                # position along the road, metres
+    length_m: float | None = None
 
 
 @dataclass
@@ -56,8 +70,10 @@ class Scene:
     W: float                              # road width, metres
     pedestrians: list[PedestrianInfo] = field(default_factory=list)
     vehicles: list[VehicleInfo] = field(default_factory=list)
+    animals: list[AnimalInfo] = field(default_factory=list)
     video_age_s: float = 0.0              # time since the last frame
     fault: str | None = None              # see FAULT_TEXT
+    animal_margin_m: float | None = None  # margin of ANIMAL_WARN for this site (None = config default)
 
 
 @dataclass
@@ -130,6 +146,31 @@ def describe(ped: PedestrianInfo) -> str:
     return "pedone"
 
 
+def evaluate_animals(scene: Scene, cfg: dict) -> Decision | None:
+    """ANIMAL_ALERT for a large free animal or a herd on the road, ANIMAL_WARN for a medium one with a vehicle near."""
+    r = cfg["rules"]
+    loose = [a for a in scene.animals if a.on_road and a.free]
+    for animal in loose:
+        if animal.herd_size >= int(r["herd_min_size"]):
+            return Decision("ANIMAL_ALERT", f"branco di {animal.herd_size} animali in carreggiata ({animal.coco})")
+    for animal in loose:
+        if animal.size == "large":
+            size = f", {animal.length_m:.1f} m" if animal.length_m else ""
+            return Decision("ANIMAL_ALERT", f"animale grande libero in carreggiata ({animal.coco}{size})")
+    margin = float(scene.animal_margin_m if scene.animal_margin_m is not None else r["animal_margin_m"])
+    for animal in loose:
+        if animal.size != "medium" or animal.x is None:
+            continue
+        for veh in scene.vehicles:
+            if veh.x is None or abs(veh.vx) < float(r["vehicle_min_speed_ms"]):
+                continue
+            gap = (animal.x - veh.x) * (1 if veh.vx > 0 else -1)   # positive = the animal is ahead of the vehicle
+            if 0 <= gap < stopping_distance(abs(veh.vx), cfg) + margin:
+                return Decision("ANIMAL_WARN", f"animale medio libero ({animal.coco}); {veh.role} "
+                                               f"{abs(veh.vx) * KMH:.0f} km/h a {gap:.0f} m", vehicle=veh)
+    return None
+
+
 def evaluate(scene: Scene, cfg: dict) -> Decision:
     """The state the scene calls for, without memory (see RuleEngine for the hold time)."""
     r = cfg["rules"]
@@ -137,7 +178,15 @@ def evaluate(scene: Scene, cfg: dict) -> Decision:
         return Decision("DEGRADED", f"video assente da {scene.video_age_s:.1f} s")
     if scene.fault:
         return Decision("DEGRADED", FAULT_TEXT.get(scene.fault, scene.fault))
+    people = evaluate_pedestrians(scene, cfg)
+    animals = evaluate_animals(scene, cfg)
+    if animals is not None and _RANK[animals.state] < _RANK[people.state]:
+        return animals
+    return people
 
+
+def evaluate_pedestrians(scene: Scene, cfg: dict) -> Decision:
+    r = cfg["rules"]
     present = [p for p in scene.pedestrians if is_present(p)]
     if not present:
         return Decision("IDLE", "nessun pedone")
@@ -235,6 +284,8 @@ class RuleEngine:
     def __init__(self, cfg: dict):
         self.cfg = cfg
         self.hold_s = float(cfg["rules"]["hold_s"])
+        # (spec) an animal alert stays on a little longer after the last animal left the road.
+        self.hold_by_state = {"ANIMAL_ALERT": float(cfg["rules"]["animal_alert_hold_s"])}
         self.state = "IDLE"
         self.decision = Decision("IDLE", "avvio")
         self._output: dict | None = None
@@ -245,7 +296,8 @@ class RuleEngine:
         if decision.state == self.state:
             self._last_true = t
         steps_down = _RANK[decision.state] > _RANK[self.state]
-        if self._output is not None and steps_down and t - self._last_true < self.hold_s:
+        hold = self.hold_by_state.get(self.state, self.hold_s)
+        if self._output is not None and steps_down and t - self._last_true < hold:
             return self._output   # hold the more important state a little longer
         if decision.state != self.state:
             self.state = decision.state
