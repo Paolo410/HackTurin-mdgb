@@ -291,7 +291,55 @@ con v_ped 0,3 → 25 s.
 26. **Limiti emersi dai video**, non risolti:
     - nelle folle fitte (Shibuya, New York) il detector vede una parte dei pedoni e le tracce durano meno di un
       secondo: i conteggi in quelle scene non sono affidabili;
-    - `child` dipende dall'altezza stimata, che con una camera molto dall'alto risulta troppo bassa: servirebbe
-      tarare `geometry.height_scale` su una persona di altezza nota, per ogni camera;
+    - `child` dipende dall'altezza stimata, che con una camera molto dall'alto risultava troppo bassa: corretto al
+      punto 27;
     - con una calibrazione stimata a occhio le velocità sono buone vicino alle strisce e inaffidabili lontano;
     - oggetti fermi scambiati per veicoli (un pannello stradale visto come `bus`) restano come tracce.
+27. **Modifiche nate dai video di Torino** (branch `paolo/ai-video-tests`):
+    - linea dei veicoli al centro delle strisce (`geometry.veh_line_offset_m: middle`). Con la linea 2 m prima delle
+      strisce, i veicoli di una direzione entravano dal bordo dell'immagine già oltre la linea e non venivano contati;
+    - la calibrazione accetta quattro punti che non sono gli angoli dell'attraversamento (`ground` in
+      `build_metric_calib`), per quando un cordolo è coperto o fuori dall'immagine. A Torino i punti sono gli estremi
+      di due strisce distanti 10 m, contate una per una: strisce e intervalli sono di 50 cm (regolamento del Codice
+      della Strada, D.P.R. 495/1992, art. 145);
+    - **altezza delle persone.** Prima l'altezza di un riquadro si convertiva in metri con la stessa scala della
+      larghezza: da una camera in alto una persona appare accorciata e un adulto risultava alto 1,3–1,5 m. Ora dalla
+      calibrazione si ricostruiscono lunghezza focale e posizione della camera (Zhang 2000, i due vincoli sulle prime
+      due colonne dell'omografia) e l'altezza è quella esatta lungo la verticale sopra i piedi. Ipotesi: pixel
+      quadrati e asse ottico al centro dell'immagine. Su quattro camere simulate, per una persona di 1,70 m:
+      1,70 m senza errori di clic; con 3 px di errore sui quattro angoli il 90% delle stime sta fra 1,51 e 1,88 m
+      (prima fra 1,23 e 1,86 m, con mediana 1,41 m dalla camera più alta);
+    - **controllo della calibrazione** (`geometry.camera_tolerance: 0.2`). Se i quattro punti e le due misure non
+      tornano con una camera reale, la posizione non viene ricostruita e `calibrate.py` lo dice. Con 0,2 passano
+      almeno l'86% delle calibrazioni corrette cliccate con 4 px di errore (simulazione, 4 posizioni di camera);
+      angoli scambiati o misure sbagliate non passano. Vale per obiettivi normali, non per immagini ritagliate da un lato;
+    - `child` si decide solo se la calibrazione passa il controllo e il riquadro è alto almeno 30 px
+      (`attributes.height_min_box_px`) e non tocca il bordo alto. Altrimenti resta non deciso: non è un bambino, e
+      vale la velocità di camminata misurata. Le taglie degli animali usano comunque l'altezza approssimata;
+    - `scripts/evaluate.py`: `--stabilize` compensa il tremolio di un video girato a mano (solo per le prove: il
+      prodotto presume una camera fissa), `--save-video` scrive il video annotato, e il resoconto riporta le altezze
+      stimate e la camera ricostruita.
+    - **a 10 FPS una traccia vale dopo 2 fotogrammi, non 5** (`tracking.min_track_age` nei profili `unoq` e
+      `--emulate-unoq`; su PC resta 5 come da specifica). Cinque fotogrammi a 10 FPS sono mezzo secondo: un'auto a
+      30 km/h passa la linea prima che la sua traccia conti. Veicoli contati su Torino_1 (in un verso + nell'altro):
+
+      | | 512 px | 320 px |
+      |---|---|---|
+      | 30 FPS, valida dopo 5 | 22 + 13 | 21 + 9 |
+      | 10 FPS, valida dopo 5 | 11 + 5 | 11 + 0 |
+      | 10 FPS, valida dopo 2 | 20 + 8 | 18 + 2 |
+
+      È una deroga al default della specifica (§5.1.3), limitata ai profili a 10 FPS: da confermare.
+28. **Limiti emersi dai video di Torino**, non risolti:
+    - i pedoni vengono visti in parte: circa 4 per fotogramma quando ce ne sono fra 6 e 10 (budget 512), 2,4 con il
+      budget di 320 previsto per la scheda. I file sono 478x850 e molto compressi, un pedone è alto 30–50 px;
+    - con i limiti della scheda (10 FPS, 320 px) il verso lontano dei veicoli quasi non viene contato (2 invece di 13);
+    - ciclisti, monopattini e rider non vengono riconosciuti: la bici, piccola, non viene rilevata;
+    - `child`: su Torino_1 restano 4 falsi su 24 pedoni. I riquadri dei pedoni sono più corti di quanto la
+      calibrazione prevede per un adulto (47 px contro 56–71): o il modello taglia le figure piccole, o la
+      calibrazione a occhio ha un errore del 15%. Serve una persona di altezza nota in un video;
+    - la calibrazione di Torino_2 non passa il controllo e non sono riuscito a correggerla a occhio: le velocità e
+      le altezze di quel video non valgono;
+    - un incrocio con veicoli in svolta (Torino_3) non si conta con una sola linea diritta;
+    - pedoni lontani letti come `bird`, un'auto scura letta come `motorcycle`.
+
