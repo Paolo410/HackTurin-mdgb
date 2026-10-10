@@ -342,22 +342,33 @@ con v_ped 0,3 → 25 s.
       le altezze di quel video non valgono;
     - un incrocio con veicoli in svolta (Torino_3) non si conta con una sola linea diritta;
     - pedoni lontani letti come `bird`, un'auto scura letta come `motorcycle`.
-29. **Integrazione sulla UNO Q** (branch `paolo/ai-unoq`, decisa con Paolo il 10/10 sera):
-    - **la visione gira come servizio su Linux, fuori da App Lab**, come già previsto da `comms/` e dalla guida.
-      Scartata l'alternativa "dentro `main.py` dell'app": onnxruntime e supervision andrebbero installati nel
-      container di App Lab, mai provato, con il rischio di conflitti con le sue librerie;
+29. **Integrazione sulla UNO Q** (branch `paolo/ai-unoq`, decisa con Paolo e il team il 10/10 sera):
+    - **ordine:** prima sketch (Salvatore) + visione, provati sulla scheda; la rete verso la centrale e il backup
+      (Lorenzo) dopo;
+    - **la visione gira su Linux fuori da App Lab**. Scartata l'alternativa "dentro `main.py` dell'app":
+      onnxruntime e supervision andrebbero installati nel container di App Lab, mai provato, con il rischio di
+      conflitti con le sue librerie;
     - **la camera la apre solo la visione**: il `main.py` dell'app di App Lab oggi la apre per mostrarla su una
-      pagina web, e va tolta da lì (proposta consegnata a Salvatore e Lorenzo);
-    - **urto, badge e sensori si leggono dai file `applab-*.jsonl`** scritti da `comms/applab/mdgb_link.py`, non da
-      nuove notifiche `mcu_event`: funziona con lo sketch com'è e in centrale non arriva niente due volte. Le righe
-      `mcu_event` (fail-safe, lampada, termocamera) arrivano comunque dal Bridge;
-    - **urto → `DEGRADED` per 30 s** (`mcu.tamper_hold_s`), non "fino al badge": lo sketch scatta a ogni scossa
-      sopra 1,35 g e in una demo su un tavolo capita. Il badge riarma subito. Da rivedere per la strada;
-    - **pagina del tecnico con soli numeri**, aperta per 10 minuti dal badge. Scartato il video dal vivo: mostrare
-      persone riconoscibili a un telefono è un trattamento di dati personali anche senza registrare, e la
-      specifica dice "mai salvare frame, solo metadati". Via Bluetooth un video non passerebbe comunque;
+      pagina web, e va tolta da lì (proposta consegnata a Salvatore);
+    - **per parlare con lo sketch si usa `comms/actuators.py` di Lorenzo così com'è** (`BridgeActuator`): è il
+      collegamento visione–sketch, non la rete. Finché non è su main, `push_to_arduino.sh --bridge` lo prende dal
+      suo ramo. Dipendenza sulla scheda: `arduino-router-bridge==0.5.1`, come in `comms/requirements.txt`;
+    - **l'urto è l'antifurto del nodo e non cambia lo stato della visione.** (La prima versione metteva la visione
+      in `DEGRADED`, come dice §5.2 della specifica: Paolo ha chiarito che non è quello lo scopo.) La visione lo
+      mostra al tecnico e basta;
+    - **pagina del tecnico:** badge, poi login con utente e password, via Wi-Fi. Mostra numeri e vista dal vivo.
+      `operator.share_images: false` lascia solo le statistiche: è l'interruttore per la produzione. Le immagini non
+      si salvano mai (specifica: "mai salvare frame su disco") e si producono solo mentre un tecnico connesso guarda.
+      Via Bluetooth un video non passerebbe: il BLE non ha la banda;
+    - **credenziali:** nome utente e impronta PBKDF2 della password in `ai/.env`, mai nel repo. Limite noto: HTTP in
+      chiaro;
     - **proposta di sketch per Salvatore** (fuori dal repo): `mdgb_line` per C1/C2, centralina simulata sui tre
-      LED, fail-safe a 500 ms, blocco RFID e bip senza `delay()`. Logica provata su PC con un finto Arduino, non
-      compilata per la scheda. Aperto: lo stato della visione usato come chiamata pedonale (accorcia il verde
-      dei veicoli fino a 8 s) non è scritto nel contratto.
-
+      LED, fail-safe a 500 ms, blocco RFID e bip senza `delay()`, badge e antifurto anche verso la visione
+      (`mcu_event`). Logica provata su PC con un finto Arduino, non compilata per la scheda. Aperto: lo stato della
+      visione usato come chiamata pedonale (verde dei veicoli da 20 a 8 s) non è scritto nel contratto.
+30. **Da fare quando si unisce la rete di Lorenzo:**
+    - **antifurto verso la centrale:** l'allarme dell'accelerometro deve arrivare alla sua applicazione. Le righe
+      `mcu_event` dello sketch passano già da `comms/actuators.py`, che le scrive in `mcu-*.jsonl` per il nodo; va
+      verificato sulla scheda e va evitato che l'allarme arrivi due volte (anche `mdgb_link.py` lo inoltra);
+    - cartella unica degli eventi (`--applab`, `MDGB_C3_DIR`) e permessi di scrittura in `~/ArduinoApps/<app>/data`;
+    - stato del nodo "manomesso" in centrale: come si presenta e chi lo azzera (il badge del tecnico?).

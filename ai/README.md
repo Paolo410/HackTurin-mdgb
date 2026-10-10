@@ -47,7 +47,8 @@ python -m smartcrossing.app --source 0                     # webcam, finestra co
 python -m smartcrossing.app --source samples/video.mp4     # file video
 python -m smartcrossing.app --source 0 --emulate-unoq      # limiti della UNO Q: 10 FPS, 4 thread
 python -m smartcrossing.app --source 0 --headless          # senza finestra, una riga di stato al secondo
-python -m smartcrossing.app --source 0 --operator-port 8090  # in più la pagina di stato per il tecnico
+python -m smartcrossing.app --source 0 --operator-port 8090  # in più la pagina del tecnico (badge + login)
+python scripts/operator_login.py                           # imposta utente e password del tecnico
 python scripts/calibrate.py --source samples/video.mp4     # calibra l'inquadratura e salva calib.json (vedi sotto)
 python scripts/scenario.py                                 # elenco delle scene simulate (senza camera)
 python scripts/scenario.py elderly_fast_car                # pedone lento + auto a 50 km/h: regole e attuatore
@@ -106,17 +107,22 @@ almeno 30 pixel (`attributes.height_min_box_px`). Altrimenti resta non deciso, e
 
 ## Sulla scheda: microcontrollore e tecnico
 
-Sulla UNO Q la visione gira come servizio accanto all'app di App Lab dello sketch. Come si copia e si prova:
-[`docs/DEPLOY_UNOQ.md`](docs/DEPLOY_UNOQ.md) e `deploy/push_to_arduino.sh`.
+Sulla UNO Q la visione gira come programma a parte accanto all'app di App Lab dello sketch. Come si copia e si
+prova: [`docs/DEPLOY_UNOQ.md`](docs/DEPLOY_UNOQ.md) e `deploy/push_to_arduino.sh`.
 
-- **Cosa arriva dal microcontrollore** (`smartcrossing/mcu.py`): le righe C5 del contratto, dal Bridge e dai file
-  `applab-*.jsonl` che l'app di App Lab scrive nella cartella degli eventi.
-  - urto o sportello aperto: la camera può essersi mossa, quindi stato `DEGRADED` per `mcu.tamper_hold_s`
-    (30 s; `null` = fino al badge);
-  - badge del tecnico: riarma subito dopo un urto e apre la pagina di stato;
+- **Cosa arriva dal microcontrollore** (`smartcrossing/mcu.py`, righe C5 del contratto):
+  - badge del tecnico: apre la pagina del tecnico per 10 minuti;
+  - urto: è l'antifurto del nodo. La visione continua a lavorare e lo mostra al tecnico; l'avviso alla centrale
+    è compito della rete (`comms/`), da collegare quando le due parti si uniscono;
   - guasto lampada: `DEGRADED` finché il firmware lo segnala.
-- **Pagina del tecnico** (`--operator-port`, `smartcrossing/status_page.py`): stato, motivo, FPS, tempi, conteggi,
-  sensori. **Solo numeri, mai immagini.** Risponde per `operator.unlock_s` (10 minuti) dopo il badge.
+- **Pagina del tecnico** (`--operator-port`, `smartcrossing/status_page.py`), dal telefono via Wi-Fi:
+  - accesso in due passi: badge sul lettore, poi utente e password. Cinque password sbagliate chiudono la pagina
+    fino al badge successivo;
+  - mostra stato, motivo, FPS, tempi, conteggi, sensori e la vista dal vivo con i riquadri della visione;
+  - `operator.share_images: false` spegne le immagini e lascia solo le statistiche (per la produzione);
+  - le immagini non vengono mai salvate: esistono in memoria solo mentre un tecnico connesso guarda;
+  - credenziali: `python scripts/operator_login.py` salva in `ai/.env` (ignorato da git) il nome utente e la sola
+    impronta della password. Limite: HTTP in chiaro, per la strada serve HTTPS.
 
 ## Regola
 
