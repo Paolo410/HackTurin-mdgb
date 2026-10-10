@@ -1,6 +1,8 @@
 """Entry point: python -m smartcrossing.app --source 0|file.mp4|rtsp://... [--emulate-unoq] [--headless]
 
-AI-M1: source + detector + tracker + overlay. Counting, rules, events and thermal arrive with the next milestones.
+AI-M1: source + detector + tracker + overlay.
+AI-M2: roles (pedestrian, cyclist, ...) and directional counting on the lines of calib.json.
+Rules, events and thermal arrive with the next milestones.
 """
 from __future__ import annotations
 
@@ -11,7 +13,8 @@ from time import perf_counter
 import cv2
 
 from .config import load_config
-from .overlay import draw_hud, draw_tracks
+from .geometry import load_calib
+from .overlay import draw_hud, draw_lines, draw_tracks
 from .pipeline import PHASES, LatencyStats, Pipeline
 from .sources import FrameSource, default_source
 
@@ -33,6 +36,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--max-fps", type=float, help="override source.max_fps")
     p.add_argument("--max-frames", type=int, default=0, help="stop after N frames (0 = until the source ends)")
     p.add_argument("--config", help="path to a config.yaml (default: ai/config.yaml)")
+    p.add_argument("--calib", help="path to a calib.json (default: ai/calib.json, else ai/calib.example.json)")
     return p.parse_args(argv)
 
 
@@ -48,8 +52,9 @@ def main(argv: list[str] | None = None) -> int:
     o = cfg["overlay"]
 
     try:
+        calib, calib_path = load_calib(cfg, args.calib)
         source = FrameSource(args.source or default_source(cfg), cfg)
-        pipeline = Pipeline(cfg, source.fps)
+        pipeline = Pipeline(cfg, source.fps, calib)
     except (FileNotFoundError, RuntimeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
@@ -60,6 +65,7 @@ def main(argv: list[str] | None = None) -> int:
              f"input={pipeline.detector.input_size}px threads={threads or 'auto'} "
              f"max_fps={cfg['source']['max_fps'] or 'unlimited'}")
     print(setup)
+    print(f"calib={calib_path}")
     ignored = [f"--{name} ({milestone})" for name, milestone in _NOT_ACTIVE_YET.items() if getattr(args, name)]
     if ignored:
         print("Not active yet: " + ", ".join(ignored))
@@ -90,14 +96,20 @@ def main(argv: list[str] | None = None) -> int:
             n_tracks = len(result.tracked)
             n_valid = int(result.valid.sum())
             lat = " ".join(f"{phase}={_fmt_ms(result.lat_ms[phase])}" for phase in PHASES)
+            counts = pipeline.counter.summary() if pipeline.counter else "no counting lines"
+            for event in result.events:
+                print(f"t={now - first:6.1f}s crossing line={event['line']} dir={event['dir']} "
+                      f"cls={event['cls']} track=#{event['track_id']}")
 
             if args.headless:
                 if now - last_status >= float(o["status_every_s"]):
-                    print(f"t={now - first:6.1f}s frame={frames} fps={fps:.1f} ms[{lat}] tracks={n_tracks} valid={n_valid}")
+                    print(f"t={now - first:6.1f}s frame={frames} fps={fps:.1f} ms[{lat}] "
+                          f"tracks={n_tracks} valid={n_valid} | {counts}")
                     last_status = now
             else:
+                draw_lines(frame, pipeline.counter, cfg)
                 draw_tracks(frame, result, pipeline.tracker, cfg)
-                draw_hud(frame, [f"FPS {fps:.1f}   tracks {n_valid}/{n_tracks}", f"ms  {lat}", setup], cfg)
+                draw_hud(frame, [f"FPS {fps:.1f}   tracks {n_valid}/{n_tracks}", f"ms  {lat}", counts, setup], cfg)
                 cv2.imshow(o["window_name"], frame)
                 if cv2.waitKey(1) & 0xFF in quit_keys:
                     break
@@ -117,6 +129,7 @@ def main(argv: list[str] | None = None) -> int:
     end_to_end = (frames - 1) / elapsed if frames > 1 and elapsed > 0 else 0.0
     print(f"\nframes={frames} elapsed={elapsed:.1f}s end-to-end FPS={end_to_end:.1f}")
     print(stats.table(float(cfg["bench"]["percentile"])))
+    print("counts  " + (pipeline.counter.summary() if pipeline.counter else "no counting lines"))
     return 0
 
 
