@@ -25,7 +25,7 @@ Specifica completa: [`PROMPT_SMART_CROSSING.md`](../PROMPT_SMART_CROSSING.md), �
 | AI-M2 | conteggio per direzione + ciclista/motociclista | fatto |
 | AI-M3 | calibrazione, velocità, attributi, regole, `SimActuator` | fatto |
 | AI-M4 | eventi, animali, logger, output C3 | fatto |
-| AI-M5 | termocamera | da fare |
+| AI-M5 | termocamera | fatto in simulazione, da provare con il sensore |
 | AI-M6 | profilo `unoq`, prova sulla scheda, benchmark | da fare |
 
 ## Come si avvia
@@ -61,7 +61,8 @@ pytest                                                     # test, senza hardwar
 - `--site urbano|lungofiume|collina` sceglie quali animali contano (default `urbano`).
 - Gli eventi C3 finiscono in `logs/c3/` nella root del repo (ignorata da git). `--c3-dir` cambia cartella,
   `--no-c3` li spegne.
-- `--thermal` è già accettato ma non ha effetto fino ad AI-M5.
+- `--thermal mlx90621` usa la termocamera Grove 16x4 letta dal microcontrollore; `--thermal sim` ne simula una.
+  `--night` forza la modalità notte per provare la fusione di giorno.
 - **Non tenere il repo in una cartella sincronizzata** (Desktop o Documenti con iCloud, OneDrive, Dropbox): il
   virtualenv e `.git` vengono spostati nel cloud e l'avvio resta bloccato.
 
@@ -101,6 +102,8 @@ Senza una calibrazione in metri lo stato resta `IDLE`.
 - `v_ped`: 1,2 m/s; 0,8 per bambino, pedone lento o con ausilio; la velocità misurata se è più bassa.
 - Il pedone "vuole attraversare" se è sulle strisce, oppure in zona d'attesa da più di 1 s o in cammino verso la strada.
 - Lo stato sale subito e scende solo dopo 1 s, per non far tremolare le lampade.
+- Il verde richiesto può solo crescere finché c'è qualcuno: una stima di velocità che oscilla non fa cambiare la
+  richiesta a ogni frame, e un tempo già promesso non viene ritirato.
 - Il comando C1 parte a ogni cambio e viene ripetuto almeno ogni secondo. L'heartbeat C2 parte ogni 100 ms da un
   thread separato, ma solo se il ciclo della visione è vivo: se la visione si blocca l'heartbeat si ferma e il
   firmware va in fail-safe da solo.
@@ -119,6 +122,7 @@ Scene simulate (`scripts/scenario.py`): fanno girare tracker, geometria, regole 
 | `pedestrian_crossing` | un pedone attraversa: un conteggio, rosso veicolare trattenuto finché è sulle strisce |
 | `loose_dog_and_leashed_dog` | cane al guinzaglio (nessun allarme), poi cane grande libero (ANIMAL_ALERT) |
 | `car_yields` | un'auto rallenta per il pedone in attesa: yield rate 100% |
+| `night_pedestrian_seen_by_heat` | di notte la camera non vede il pedone, la termocamera sì: scatta l'avviso |
 
 ## Animali
 
@@ -130,6 +134,23 @@ Scene simulate (`scripts/scenario.py`): fanno girare tracker, geometria, regole 
 - Branco (animali entro 3 m): allerta finché l'ultimo è in carreggiata, più 2 s.
 - `bird` conta solo sul sito `lungofiume`, a terra in carreggiata, lungo almeno 0,5 m e presente da più di 2 s.
 - Nessun segnale acustico verso gli animali.
+
+## Notte: termocamera
+
+Opzionale, con `--thermal`. Il sensore del kit è la Grove MLX90621: 16 colonne per 4 righe. Con 4 righe non si
+cercano sagome: il sensore guarda lungo il cordolo e ogni colonna è una fetta di marciapiede.
+
+- **Colonna calda:** almeno un punto sopra la temperatura ambiente (mediana dell'immagine) di 3 °C.
+- **Zone:** `calib_thermal.json` dice quali colonne guardano quale zona (`waiting_zone_left`, `crosswalk`,
+  `waiting_zone_right`). Senza quel file si usa `calib_thermal.example.json`.
+- **Modalità notte:** l'immagine della camera è buia (luminosità media sotto 50) da più di 5 s. Si esce con la
+  stessa attesa.
+- **Recupero:** di notte, calore in una zona senza nessuna persona vista lì dalla camera per almeno 0,5 s diventa
+  un "pedone non classificato", trattato come vulnerabile (`v_ped` 0,8 m/s).
+- **Conferma:** una persona vista dalla camera senza calore nella sua zona, di notte, viene segnata come non
+  confermata. Resta comunque protetta: per ignorarla va attivato `thermal.drop_unconfirmed`.
+- I dati arrivano dal microcontrollore con le righe C5 `thermal` (64 temperature). Questo percorso non è ancora
+  provato sul sensore vero.
 
 ## Eventi (contratto C3)
 

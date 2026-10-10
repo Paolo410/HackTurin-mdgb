@@ -258,3 +258,17 @@ con v_ped 0,3 → 25 s.
 21. **Da proporre a Lorenzo**: un evento C3 `animal` (track_id, coco, size, free) per gli avvistamenti, compresi
     gli animali piccoli che la specifica vuole "solo nel log". Per ora escono solo sul terminale, perché la bozza
     del contratto non prevede quel tipo.
+22. **Scelte di AI-M5**, tutte in `config.yaml` (`thermal`):
+    - `--thermal` accetta `mlx90621` (il sensore del kit) e `sim`; `mlx90640` e `uvc` restano nell'elenco ma
+      rispondono che il sensore non c'è (chiude il punto 2);
+    - con 16x4 le zone sono insiemi di colonne, non poligoni: stanno in `calib_thermal.json`;
+    - la temperatura ambiente è la mediana delle 64 letture;
+    - il recupero del pedone vale solo in modalità notte: di giorno un cofano caldo darebbe falsi allarmi;
+    - la persona vista dalla camera ma senza calore viene solo segnalata, non ignorata: in dubbio si protegge;
+    - soglia di buio: luminosità media sotto 50 su 255. Da tarare sulla camera vera;
+    - **da verificare:** al buio l'autodiagnosi "lente coperta" (immagine senza dettaglio) potrebbe scattare e
+      mandare tutto in DEGRADED. Serve un video notturno vero per tarare le due soglie insieme;
+    - **da verificare con Salvatore e Lorenzo:** formato della riga C5 `thermal` e `Actuator.set_listener`
+      (bozza di `docs/CONTRACTS.md`), mai provati sul firmware.
+23. **Stabilità dei comandi** (trovata provando AI-M5): il verde richiesto cresce soltanto finché c'è qualcuno, e un
+    cambio della sola `reason` non fa partire un nuovo C1 prima della ripetizione di ogni secondo.
