@@ -155,6 +155,9 @@ Trasporto **[da confermare: Paolo]** (chiude la questione 6 di Paolo; l'endpoint
 
 ## C4 — Nodo → centrale (MQTT 5, AWS IoT Core)
 
+**Demo (senza crediti AWS):** broker Mosquitto dentro l'app della centrale sul PC, porta 1883 sulla rete locale, senza
+TLS né certificati. Topic e messaggi sono identici; in produzione si torna alla connessione qui sotto.
+
 Connessione: TLS mutuo sulla porta 8883 (443 con ALPN `x-amzn-mqtt-ca` se la rete blocca la 8883), un certificato X.509
 per nodo, client ID = `node_id` = nome del Thing (`^[a-z0-9-]{1,32}$`, es. `nodo07`). MQTT 5, QoS 1 ovunque,
 `clean_start=false`, Session Expiry 3600 s.
