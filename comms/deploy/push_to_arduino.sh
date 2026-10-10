@@ -5,6 +5,8 @@
 #   ./comms/deploy/push_to_arduino.sh arduino@192.168.1.50 --service     in più avvio automatico (chiede la password)
 #   ./comms/deploy/push_to_arduino.sh arduino@192.168.1.50 --tools       in più i 3 strumenti di collaudo (prima prova)
 #   ./comms/deploy/push_to_arduino.sh arduino@192.168.1.50 --broker 192.168.1.20    broker su un altro PC
+#   ./comms/deploy/push_to_arduino.sh arduino@192.168.1.50 --applab <cartella>      legge anche l'app di App Lab
+#        (la cartella in ~/ArduinoApps che contiene mdgb_link.py: eventi in ~/ArduinoApps/<cartella>/data/c3)
 #   ./comms/deploy/push_to_arduino.sh --pack [--tools]                    crea mdgb-nodo.tar.gz da copiare a mano
 #
 # Il broker (MQTT_HOST in comms/.env) diventa QUESTO PC visto dalla scheda: lancialo dal PC dove gira l'app
@@ -30,15 +32,17 @@ if [ "${1:-}" = "--pack" ]; then
   echo "poi: python3 -m venv ~/venv && ~/venv/bin/pip install -r ~/HackTurin-mdgb/comms/requirements.txt"
   exit 0
 fi
-TARGET="${1:?uso: push_to_arduino.sh utente@ip-della-scheda [--service] [--tools] [--broker IP]   oppure   --pack}"
+TARGET="${1:?uso: push_to_arduino.sh utente@ip-della-scheda [--service] [--tools] [--broker IP] [--applab CARTELLA]   oppure   --pack}"
 shift
 SERVICE=0
 BROKER=""
+APPLAB=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --service) SERVICE=1 ;;
     --tools) ;;
     --broker) BROKER="${2:?--broker vuole un indirizzo IP}"; shift ;;
+    --applab) APPLAB="${2:?--applab vuole il nome della cartella in ~/ArduinoApps}"; shift ;;
     *) echo "opzione sconosciuta: $1"; exit 2 ;;
   esac
   shift
@@ -48,7 +52,7 @@ echo "1/3 copio il codice della rete su $TARGET:~/HackTurin-mdgb"
 pack | ssh "$TARGET" "mkdir -p ~/HackTurin-mdgb && tar -xzf - -C ~/HackTurin-mdgb"
 
 echo "2/3 preparo Python sulla scheda (~/venv, serve Internet la prima volta) e comms/.env"
-ssh "$TARGET" "BROKER='$BROKER' bash -s" <<'REMOTE'
+ssh "$TARGET" "BROKER='$BROKER' APPLAB='$APPLAB' bash -s" <<'REMOTE'
 set -e
 cd ~/HackTurin-mdgb
 [ -x ~/venv/bin/python ] || python3 -m venv ~/venv \
@@ -61,6 +65,12 @@ if grep -q '^MQTT_TLS=1' comms/.env; then
 elif [ -n "$BROKER" ]; then
   sed -i.bak "s/^MQTT_HOST=.*/MQTT_HOST=$BROKER/" comms/.env && rm -f comms/.env.bak
   echo "   broker MQTT = $BROKER:1883 (l'app MDGB Centrale deve essere aperta lì)"
+fi
+if [ -n "$APPLAB" ]; then                        # eventi in una sola cartella: app di App Lab (+ visione)
+  [ -d ~/ArduinoApps/"$APPLAB" ] || echo "   ATTENZIONE: ~/ArduinoApps/$APPLAB non esiste (ls ~/ArduinoApps)"
+  sed -i.bak '/^MDGB_C3_DIR=/d' comms/.env && rm -f comms/.env.bak
+  echo "MDGB_C3_DIR=$HOME/ArduinoApps/$APPLAB/data/c3" >> comms/.env
+  echo "   eventi letti da ~/ArduinoApps/$APPLAB/data/c3 (la visione deve scrivere lì: --c3-dir)"
 fi
 command -v btmgmt >/dev/null || echo "   ATTENZIONE: manca btmgmt, il backup Bluetooth non può partire: sudo apt install bluez"
 [ -S /var/run/arduino-router.sock ] || echo "   ATTENZIONE: arduino-router non attivo (serve a ai/ per il semaforo): systemctl status arduino-router"

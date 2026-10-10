@@ -1,5 +1,5 @@
-"""Sorgente degli eventi del nodo: i file JSONL scritti sulla scheda da ai/ (C3) e da comms/actuators.py (C5),
-docs/CONTRACTS.md v1. Le righe `status` (C3) ed `env`/`thermal` (C5) aggiornano solo lo stato del nodo (on_info);
+"""Sorgente degli eventi del nodo: i file JSONL scritti sulla scheda da ai/ (C3), da comms/actuators.py (C5) e
+dall'app di App Lab dello sketch (C5, comms/applab/mdgb_link.py), docs/CONTRACTS.md v1. Le righe `status` (C3) ed `env`/`thermal` (C5) aggiornano solo lo stato del nodo (on_info);
 tutte le altre sono eventi e vanno nello Store & Forward.
 Per provare la rete senza la visione: comms/tools/c3_sim.py scrive righe C3 negli stessi file.
 """
@@ -14,12 +14,12 @@ log = logging.getLogger("source")
 
 
 class C3FileSource:
-    """Legge i file JSONL di $MDGB_C3_DIR: c3-*.jsonl (scritti da ai/) e mcu-*.jsonl (righe C5, scritte da
-    comms/actuators.py). Gli eventi vanno nell'outbox INSIEME al cursore (file, offset), nella stessa transazione:
+    """Legge i file JSONL di $MDGB_C3_DIR: c3-*.jsonl (scritti da ai/), mcu-*.jsonl (righe C5 scritte da
+    comms/actuators.py) e applab-*.jsonl (righe C5 scritte dall'app di App Lab). Una serie per scrittore. Gli eventi vanno nell'outbox INSIEME al cursore (file, offset), nella stessa transazione:
     se il processo cade non si perde e non si duplica nessuna riga. Una riga senza "\\n" si legge solo quando è
     completa; in un file ormai ruotato (ne esiste uno più nuovo) un resto incompleto si salta."""
 
-    SERIES = ("c3", "mcu")
+    SERIES = ("c3", "mcu", "applab")
     MAX_READ = 256 * 1024             # per file e per giro: il backlog si recupera a pezzi
 
     def __init__(self, directory, outbox, poll_s=0.2):
