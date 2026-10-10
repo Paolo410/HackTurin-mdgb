@@ -27,6 +27,7 @@ def main() -> int:
     p.add_argument("--realtime", action="store_true", help="play at real speed (needed with a real actuator)")
     p.add_argument("--actuator", choices=["sim", "serial", "bridge"], default="sim")
     p.add_argument("--port", help="serial port of the firmware, with --actuator serial")
+    p.add_argument("--site", choices=["urbano", "lungofiume", "collina"])
     args = p.parse_args()
     if args.name is None:
         for name, make in sorted(SCENARIOS.items()):
@@ -50,9 +51,11 @@ def main() -> int:
             print(f"         LCD [{command['lcd']}]  OLED [{command['oled']}]")
             print(f"         {command['reason']}")
 
-    pipeline = run_scenario(cfg, args.name, fps=args.fps, actuator=actuator, realtime=args.realtime, on_step=show)
+    pipeline = run_scenario(cfg, args.name, fps=args.fps, actuator=actuator, realtime=args.realtime,
+                            site=args.site, on_step=show)
     pipeline.commander.close()
     print("counts  " + pipeline.counter.summary())
+    print("events  " + pipeline.events.summary())
     return 0
 
 

@@ -244,3 +244,17 @@ con v_ped 0,3 → 25 s.
 19. **Chiuse dalla bozza di `docs/CONTRACTS.md` di Lorenzo** (branch `lorenzo/ble-backup`): punto 3 (dati dal
     microcontrollore: contratto C5), punto 6 (C3 solo su file in `logs/c3/`), punto 7 (pedone solo termico:
     `attrs.thermal_only`).
+20. **Scelte di AI-M4**, tutte in `config.yaml`:
+    - quali classi COCO contano per sito: `urbano` dog e cat; `lungofiume` come urbano più gli uccelli grandi;
+      `collina` anche horse, sheep, cow, bear (cinghiali e caprioli vengono visti come una di queste);
+    - un branco è fatto da almeno 2 animali liberi entro 3 m: vale come allerta anche se sono di taglia media;
+    - near-miss per TTC solo se il pedone è entro 1,5 m di lato dalla traiettoria del veicolo; per PET i due devono
+      passare entro 1 m dallo stesso punto;
+    - la frenata brusca vale solo per veicoli che andavano ad almeno 3 m/s;
+    - una collisione richiede almeno un veicolo tra le due tracce;
+    - `yield`: conta il veicolo che arriva mentre un pedone è in zona d'attesa; ha dato la precedenza se è sceso
+      sotto 2 m/s prima delle strisce, anche se poi è ripartito;
+    - i file C3 vanno in `logs/c3/` (o `$MDGB_C3_DIR`), un file nuovo ogni ora, come nella bozza di Lorenzo.
+21. **Da proporre a Lorenzo**: un evento C3 `animal` (track_id, coco, size, free) per gli avvistamenti, compresi
+    gli animali piccoli che la specifica vuole "solo nel log". Per ora escono solo sul terminale, perché la bozza
+    del contratto non prevede quel tipo.

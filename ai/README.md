@@ -24,7 +24,7 @@ Specifica completa: [`PROMPT_SMART_CROSSING.md`](../PROMPT_SMART_CROSSING.md), �
 | AI-M1 | sorgente video + detector + tracker + overlay, `bench.py` | fatto |
 | AI-M2 | conteggio per direzione + ciclista/motociclista | fatto |
 | AI-M3 | calibrazione, velocità, attributi, regole, `SimActuator` | fatto |
-| AI-M4 | eventi, animali, logger, output C3 | da fare |
+| AI-M4 | eventi, animali, logger, output C3 | fatto |
 | AI-M5 | termocamera | da fare |
 | AI-M6 | profilo `unoq`, prova sulla scheda, benchmark | da fare |
 
@@ -48,7 +48,9 @@ python -m smartcrossing.app --source samples/video.mp4     # file video
 python -m smartcrossing.app --source 0 --emulate-unoq      # limiti della UNO Q: 10 FPS, 4 thread
 python -m smartcrossing.app --source 0 --headless          # senza finestra, una riga di stato al secondo
 python scripts/calibrate.py --source samples/video.mp4     # calibra l'inquadratura e salva calib.json (vedi sotto)
-python scripts/scenario.py elderly_fast_car                # scena simulata senza camera: regole e attuatore
+python scripts/scenario.py                                 # elenco delle scene simulate (senza camera)
+python scripts/scenario.py elderly_fast_car                # pedone lento + auto a 50 km/h: regole e attuatore
+python scripts/animal_probe.py cartella_di_foto            # come il detector vede animali non previsti da COCO
 python scripts/bench.py samples/video.mp4                  # ms medi e p95 per fase
 pytest                                                     # test, senza hardware
 ```
@@ -56,7 +58,10 @@ pytest                                                     # test, senza hardwar
 - Senza `--source` si usa il primo video in `ai/samples/` (ignorata da git); se è vuota, la webcam.
 - Su macOS la prima volta va autorizzato il terminale: Impostazioni di Sistema > Privacy e sicurezza > Fotocamera.
 - `--actuator sim` (default) non richiede hardware. `--actuator serial --port ...` usa `comms/actuators.py`.
-- `--site` e `--thermal` sono già accettati ma non hanno effetto fino alle rispettive milestone.
+- `--site urbano|lungofiume|collina` sceglie quali animali contano (default `urbano`).
+- Gli eventi C3 finiscono in `logs/c3/` nella root del repo (ignorata da git). `--c3-dir` cambia cartella,
+  `--no-c3` li spegne.
+- `--thermal` è già accettato ma non ha effetto fino ad AI-M5.
 - **Non tenere il repo in una cartella sincronizzata** (Desktop o Documenti con iCloud, OneDrive, Dropbox): il
   virtualenv e `.git` vengono spostati nel cloud e l'avvio resta bloccato.
 
@@ -107,6 +112,41 @@ Attributi del pedone, decisi una volta per traccia: `child` (altezza mediana su 
 
 Scene simulate (`scripts/scenario.py`): fanno girare tracker, geometria, regole e attuatore senza camera. Con
 `--realtime --actuator serial --port ...` muovono lampade e display veri.
+
+| Scena | Cosa mostra |
+|---|---|
+| `elderly_fast_car` | pedone lento in attesa, auto a 50 km/h: WARN_DRIVER, poi WARN_PEDESTRIAN |
+| `pedestrian_crossing` | un pedone attraversa: un conteggio, rosso veicolare trattenuto finché è sulle strisce |
+| `loose_dog_and_leashed_dog` | cane al guinzaglio (nessun allarme), poi cane grande libero (ANIMAL_ALERT) |
+| `car_yields` | un'auto rallenta per il pedone in attesa: yield rate 100% |
+
+## Animali
+
+- `animal` = dog, cat, horse, sheep, cow, bear; la classe COCO originale resta negli eventi (`coco`).
+- Taglia dalla calibrazione: `large` (lunghezza ≥ 0,8 m o altezza ≥ 0,6 m), `medium` (0,3–0,8 m), `small` (solo log).
+- `large` libero in carreggiata → `ANIMAL_ALERT` (`AMBER_BLINK_4HZ`), anche senza veicoli. `medium` libero →
+  `ANIMAL_WARN` solo con un veicolo entro `d_stop` + 30 m (40 m sul sito `collina`).
+- Al guinzaglio (persona entro 2 m, stessa direzione, da almeno 1 s): nessun allarme proprio.
+- Branco (animali entro 3 m): allerta finché l'ultimo è in carreggiata, più 2 s.
+- `bird` conta solo sul sito `lungofiume`, a terra in carreggiata, lungo almeno 0,5 m e presente da più di 2 s.
+- Nessun segnale acustico verso gli animali.
+
+## Eventi (contratto C3)
+
+Dalle traiettorie, senza modelli video. Ogni evento esce una volta sola, sul terminale e nei file C3.
+
+| Evento | Regola |
+|---|---|
+| `crossing` | attraversamento di una linea di conteggio, con `attrs` per i pedoni e `coco` per gli animali |
+| `near_miss` | veicolo diretto verso un pedone o un animale con TTC < 1 s, oppure passaggio sullo stesso punto a meno di 1 s di distanza (PET) |
+| `incident` `collision` | due tracce a meno di 1 m, entrambe ferme, una delle due era sopra 3 m/s meno di 1,5 s prima |
+| `incident` `person_down` | box più largo che alto (rapporto > 1,2) per più di 3 s in carreggiata |
+| `incident` `hard_brake` | decelerazione oltre 6 m/s² |
+| `incident` `vehicle_on_crosswalk` | veicolo fermo sulle strisce per più di 10 s |
+| `yield` | per ogni veicolo arrivato con un pedone in attesa: ha rallentato sotto 2 m/s prima delle strisce? |
+| `status` | ogni 5 s: stato, FPS, ms per fase, conteggi |
+
+A schermo e a fine corsa: yield rate, near-miss e incidenti.
 
 ## Conteggio
 
