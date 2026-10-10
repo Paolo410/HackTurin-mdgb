@@ -127,18 +127,18 @@ def test_ble_frame_roundtrip():
     from ble_receiver import frame_to_message
     from decoder import decode
     agg = p.summarize([{"type": "crossing", "cls": "pedestrian", "dir": "in"}] * 5, 1739011500, 1739012400, "n")
-    for type_, body in ((p.TYPE_AGG, p.pack_agg(agg, 40)), (p.TYPE_HB, p.pack_hb(1739012400, backlog=40)),
-                        (p.TYPE_TAMPER, p.pack_alarm(1739012123, 2))):
+    for type_, body, inst in ((p.TYPE_AGG, p.pack_agg(agg, 40), "1"), (p.TYPE_HB, p.pack_hb(1739012400, backlog=40), "2"),
+                              (p.TYPE_TAMPER, p.pack_alarm(1739012123, 2), "3")):
         ble = SimulatedBle()
         assert ble.send(body, type_)
         cmd = ble.commands[-1]
-        assert cmd[:3] == ["btmgmt", "add-adv", "-d"]
+        assert cmd[:3] == ["btmgmt", "add-adv", "-d"] and cmd[-1] == inst   # un beacon per tipo
         ad = bytes.fromhex(cmd[3])
         assert len(ad) == 31 and ad[1] == 0xFF and int.from_bytes(ad[2:4], "little") == BLE_COMPANY_ID
         rx_type, rx_body = frame_to_message(ad[4:])
         assert rx_type == type_ and decode(rx_type, rx_body) == decode(type_, body)
         ble.idle()
-        assert ble.commands[-1] == ["btmgmt", "rm-adv", "1"]
+        assert ble.commands[-1] == ["btmgmt", "rm-adv", inst]
     print("OK  BLE: frame 27 byte nodo -> ricevitore -> decoder coerente (AGG, HB, allarme)")
 
 
@@ -227,6 +227,7 @@ def test_offline_end_to_end():
     from aggregator import Aggregator
     from backup_link import McuLoraBackup, SimulatedMcu
     from event_source import SimulatedSource
+    from failover import Failover
     from outbox import Outbox
     from payload import TYPE_AGG
     from uplink_mqtt import MqttUplink
@@ -241,7 +242,8 @@ def test_offline_end_to_end():
     ob = Outbox(os.path.join(work, "outbox.db"))
     mcu = SimulatedMcu()
     up = MqttUplink(ob, "nodo-test", "mdgb", "127.0.0.1", port, batch=50, ack_timeout_s=5)
-    agg = Aggregator(ob, up, McuLoraBackup(mcu), period_s=2, node_id="nodo-test")
+    agg = Aggregator(ob, up, period_s=2, node_id="nodo-test")
+    fo = Failover(ob, up, McuLoraBackup(mcu), agg, on_after_s=1, off_after_s=2, hb_period_s=1)
     assert wait_until(up.connected, 5), "il nodo non si connette al broker"
 
     stop = threading.Event()          # ferma la generazione di eventi
@@ -259,6 +261,7 @@ def test_offline_end_to_end():
         while not stop_node.is_set():
             up.pump()
             agg.tick()
+            fo.tick()
             if time.time() - t_hb >= 1:
                 up.publish("hb", {"v": 1, "node_id": "nodo-test", "type": "hb", "online": True}, retain=True)
                 t_hb = time.time()

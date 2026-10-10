@@ -29,6 +29,7 @@ import time
 import paho.mqtt.client as mqtt
 
 from decoder import decode
+from diagnosis import diagnose
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s ingest %(levelname)-7s %(message)s")
 log = logging.getLogger("ingest")
@@ -105,6 +106,21 @@ class Store:
             self.add_aggregate(node, data["t0"], via, True, data)
         return bool(new)
 
+    def nodes(self):
+        with self.lock:
+            return [r[0] for r in self.db.execute(
+                "SELECT node FROM hb UNION SELECT node FROM backup UNION SELECT DISTINCT node FROM events")]
+
+    def diagnose(self, node, now=None, **windows):
+        """Diagnosi del nodo incrociando l'ultimo `hb` MQTT e i messaggi di backup dell'ultima ora."""
+        now = time.time() if now is None else now
+        with self.lock:
+            row = self.db.execute("SELECT data, rx_at FROM hb WHERE node=?", (node,)).fetchone()
+            rows = self.db.execute("SELECT rx_at, via, data FROM backup WHERE node=? AND rx_at>=?",
+                                   (node, now - 3600)).fetchall()
+        hb, hb_rx = (json.loads(row[0]), row[1]) if row else (None, None)
+        return diagnose(now, hb, hb_rx, [(t, v, json.loads(d)) for t, v, d in rows], **windows)
+
     def report(self):
         with self.lock:
             rows = self.db.execute(
@@ -118,6 +134,8 @@ class Store:
                     "SELECT COUNT(*) FROM aggregates WHERE node=? AND provisional=1", (node,)).fetchone()[0]
                 out.append({"node": node, "events": n, "seq_range": [smin, smax], "gaps": gaps,
                             "by_type": by_type, "backup_aggregates": prov, "duplicates_dropped": self.dups})
+        for r in out:
+            r["diagnosis"] = self.diagnose(r["node"])["text"]
         return out
 
 
@@ -219,5 +237,8 @@ if __name__ == "__main__":
             for r in store.report():
                 log.info("RIEPILOGO %s: %d eventi, buchi=%d, duplicati scartati=%d, aggregati di backup=%d",
                          r["node"], r["events"], r["gaps"], r["duplicates_dropped"], r["backup_aggregates"])
+            for node in store.nodes():
+                d = store.diagnose(node)
+                log.info("STATO %s: %s%s", node, d["text"], f" via {d['via']}" if d["via"] else "")
     except KeyboardInterrupt:
         pass
