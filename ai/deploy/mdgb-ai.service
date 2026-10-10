@@ -15,6 +15,10 @@ Environment=MDGB_C3_DIR=/home/arduino/HackTurin-mdgb/logs/c3
 ExecStart=/usr/bin/libcamerify /home/arduino/venv/bin/python -m smartcrossing.app --source 0 --profile unoq --headless --actuator bridge --operator-port 8090
 Restart=always
 RestartSec=2
+# Stop like Ctrl+C: the vision closes the camera and the link cleanly. A camera left half open (SIGKILL) can stay
+# locked in the driver until the board is restarted.
+KillSignal=SIGINT
+TimeoutStopSec=15
 
 [Install]
 WantedBy=multi-user.target

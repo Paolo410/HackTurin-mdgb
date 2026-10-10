@@ -10,9 +10,13 @@ LOG="$LOGS/vision.log"
 PIDFILE="$LOGS/vision.pid"
 running() { [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; }
 
+service_on() { systemctl is-active --quiet mdgb-ai 2>/dev/null; }
+
 case "${1:-status}" in
   start)
     if running; then echo "La visione è già accesa (pid $(cat "$PIDFILE"))."; exit 0; fi
+    # Installed as a service it starts by itself: a second copy could not open the camera.
+    if service_on; then echo "La visione gira già come servizio (mdgb-ai): sudo systemctl restart mdgb-ai"; exit 0; fi
     mkdir -p "$LOGS"
     cd "$AI"
     C3="$(cat .c3_dir 2>/dev/null || echo "$LOGS/c3")"
@@ -35,7 +39,9 @@ case "${1:-status}" in
     rm -f "$PIDFILE"
     ;;
   status)
-    if running; then echo "Visione accesa (pid $(cat "$PIDFILE"))."; grep -a "state=" "$LOG" | tail -2; else echo "Visione spenta."; fi
+    if running; then echo "Visione accesa (pid $(cat "$PIDFILE"))."; grep -a "state=" "$LOG" | tail -2
+    elif service_on; then echo "Visione accesa come servizio (mdgb-ai). Log: journalctl -u mdgb-ai -n 20"
+    else echo "Visione spenta."; fi
     ;;
   log)
     tail -f "$LOG"
