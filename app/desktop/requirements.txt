@@ -1,0 +1,4 @@
+# App per il PC: dipendenze della centrale + finestra + build
+-r ../requirements.txt
+pywebview==6.2.1
+pyinstaller==6.22.3

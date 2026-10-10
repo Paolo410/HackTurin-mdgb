@@ -2,6 +2,8 @@
 
     GET /            la pagina (app/dashboard.html, nessuna risorsa esterna: funziona senza Internet)
     GET /api/state   tutto quello che la pagina mostra, in JSON (aggiornato dalla pagina ogni 2 s)
+    GET /api/info    stato della centrale stessa (MQTT, Bluetooth, cartella delle impostazioni)
+    POST /api/open/folder|config   apre la cartella delle impostazioni o il file di configurazione (app per il PC)
 
 Cosa mostra: mappa delle camere (posizioni in app/nodes.json; con Internet OpenStreetMap, senza una mappa schematica),
 stato di ogni nodo (diagnosi, canale attivo, coda, batteria, semaforo), allarmi arrivati via MQTT o via
@@ -10,6 +12,8 @@ della rete (eventi persi, doppioni scartati). Nessuna immagine: la centrale rice
 """
 import json
 import os
+import subprocess
+import sys
 import time
 
 ALARM_EVENT_TYPES = ("incident", "tamper", "lamp_fault", "failsafe")
@@ -163,8 +167,18 @@ def _vulnerable(ev):
     return ev.get("cls") == "pedestrian" and bool(a.get("child") or a.get("slow") or a.get("aid") not in (None, "normal"))
 
 
-def create_app(store, config=None):
-    from flask import Flask, Response, jsonify
+def open_path(path, edit=False):
+    """Apre una cartella o un file con l'app predefinita del sistema (Finder / TextEdit su macOS)."""
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", "-e", path] if edit else ["open", path])
+    elif sys.platform.startswith("win"):
+        os.startfile(path)                                       # noqa: S606 (solo percorsi della centrale)
+    else:
+        subprocess.Popen(["xdg-open", path])
+
+
+def create_app(store, config=None, info=None):
+    from flask import Flask, Response, abort, jsonify
 
     app = Flask(__name__)
     page = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
@@ -178,16 +192,28 @@ def create_app(store, config=None):
     def api_state():
         return jsonify(state(store, config))
 
+    @app.get("/api/info")
+    def api_info():
+        return jsonify(info() if info else {})
+
+    @app.post("/api/open/<what>")
+    def api_open(what):
+        home = os.environ.get("MDGB_HOME")          # impostato solo dall'app per il PC
+        if not home or what not in ("folder", "config"):
+            abort(404)
+        open_path(home if what == "folder" else os.path.join(home, "config.env"), edit=what == "config")
+        return jsonify({"ok": True})
+
     return app
 
 
-def serve(store, host="127.0.0.1", port=8080, config=None):
+def serve(store, host="127.0.0.1", port=8080, config=None, info=None):
     """Avvia la dashboard in un thread (server di Werkzeug, va bene per la demo)."""
     import logging
     import threading
     from werkzeug.serving import make_server
 
     logging.getLogger("werkzeug").setLevel(logging.WARNING)       # niente riga di log ogni 2 s
-    srv = make_server(host, port, create_app(store, config), threaded=True)
+    srv = make_server(host, port, create_app(store, config, info), threaded=True)
     threading.Thread(target=srv.serve_forever, name="dashboard", daemon=True).start()
     return srv

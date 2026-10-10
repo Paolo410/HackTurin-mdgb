@@ -60,13 +60,26 @@
   .err { background: var(--bad-bg); color: var(--bad); padding: 8px 12px; border-radius: 8px; margin-bottom: 12px; display: none; }
   .note { background: var(--soft); border-radius: 8px; padding: 8px 10px; font-size: 12px; color: var(--muted); margin-top: 10px; }
   .leaflet-container { background: var(--map); font: inherit; }
+  .hdr { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .btn { font: inherit; font-size: 12px; background: var(--card); color: var(--text); border: 1px solid var(--line);
+         border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+  .btn:hover { border-color: var(--muted); }
+  .links { display: flex; gap: 8px; margin-top: 8px; }
+  .links a { text-decoration: none; }
+  .pill { font-size: 12px; display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
 </style>
 </head>
 <body>
 <main>
   <header>
     <h1>Centrale MDGB</h1>
-    <span class="muted" id="updated">in attesa dei dati…</span>
+    <div class="hdr">
+      <span class="pill" id="sys-mqtt"></span>
+      <span class="pill" id="sys-ble"></span>
+      <button class="btn" id="btn-config" hidden title="Apre config.env: broker, AWS, Bluetooth. Dopo le modifiche riavvia l'app.">Configurazione</button>
+      <button class="btn" id="btn-folder" hidden title="Cartella con config.env, certs/ e nodes.json (posizioni delle camere)">Cartella</button>
+      <span class="muted" id="updated">in attesa dei dati…</span>
+    </div>
   </header>
   <div class="err" id="err">La centrale non risponde: controlla che app/central.py sia in esecuzione.</div>
   <section class="grid row1">
@@ -98,26 +111,66 @@ const label = n => n.mock && n.diagnosis.code === "unknown" ? "mockup, nessun da
 
 function select(id) { picked = id; if (S) render(S); }
 
-/* ---------- mappa: Leaflet + OpenStreetMap se c'è Internet, altrimenti mappa schematica in SVG ---------- */
-function loadLeaflet() {
+/* ---------- mappa: Google Maps (con GOOGLE_MAPS_API_KEY), altrimenti mappa web senza chiave, senza Internet schematica.
+   Google: https://developers.google.com/maps/documentation/javascript/advanced-markers/start ---------- */
+let gmap = null, gmarkers = {};
+
+async function loadMap() {
+  let key = "";
+  try { key = (await (await fetch("/api/info", { cache: "no-store" })).json()).maps_key || ""; } catch (e) {}
+  if (key) loadGoogle(key); else loadLeaflet();
+}
+
+function loadGoogle(key) {
+  const fallback = setTimeout(() => { if (mapMode === "loading") loadLeaflet(); }, 6000);
+  window.gm_authFailure = () => { clearTimeout(fallback); dropGoogle(); loadLeaflet("chiave Google non valida: mappa senza chiave"); };
+  window.mdgbGoogleReady = () => { clearTimeout(fallback); useGoogle(); };
+  const js = document.createElement("script");
+  js.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&libraries=marker&loading=async&callback=mdgbGoogleReady`;
+  js.async = true;
+  js.onerror = () => { clearTimeout(fallback); loadLeaflet(); };
+  document.head.appendChild(js);
+}
+
+function useGoogle() {
+  if (mapMode !== "loading") return;
+  mapMode = "google";
+  document.getElementById("maptype").textContent = "Google Maps";
+  gmap = new google.maps.Map(document.getElementById("map"), {
+    center: { lat: 45.07, lng: 7.68 }, zoom: 13, mapId: "DEMO_MAP_ID",
+    streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
+  });
+  if (S) { drawMap(S); fit(); }
+}
+
+function dropGoogle() {
+  Object.values(gmarkers).forEach(m => { m.map = null; });
+  gmarkers = {}; gmap = null; mapMode = "loading";
+  document.getElementById("map").innerHTML = "";
+}
+
+function loadLeaflet(why) {
+  if (window.L) { useLeaflet(why); return; }
   const css = document.createElement("link");
   css.rel = "stylesheet"; css.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
   document.head.appendChild(css);
   const js = document.createElement("script");
   js.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
   const fallback = setTimeout(() => useSvg("senza Internet: mappa schematica"), 4000);
-  js.onload = () => { clearTimeout(fallback); useLeaflet(); };
+  js.onload = () => { clearTimeout(fallback); useLeaflet(why); };
   js.onerror = () => { clearTimeout(fallback); useSvg("senza Internet: mappa schematica"); };
   document.head.appendChild(js);
 }
 
-function useLeaflet() {
+function useLeaflet(why) {
   if (mapMode !== "loading") return;
   mapMode = "leaflet";
-  document.getElementById("maptype").textContent = "OpenStreetMap";
+  document.getElementById("maptype").textContent = why || "mappa (aggiungi GOOGLE_MAPS_API_KEY per Google Maps)";
   leaflet = L.map("map", { zoomControl: true, attributionControl: true }).setView([45.07, 7.68], 13);
+  leaflet.attributionControl.setPrefix(false);
   let ok = 0, bad = 0;
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" })
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+              { maxZoom: 20, subdomains: "abcd", attribution: "© OpenStreetMap contributors © CARTO" })
     .on("tileload", () => ok++)
     .on("tileerror", () => { if (++bad >= 4 && ok === 0) useSvg("tile non raggiungibili: mappa schematica"); })
     .addTo(leaflet);
@@ -134,17 +187,49 @@ function useSvg(why) {
 
 function fit() {
   const pts = (S?.nodes || []).filter(n => n.lat != null).map(n => [n.lat, n.lon]);
-  if (leaflet && pts.length) leaflet.fitBounds(pts, { padding: [40, 40], maxZoom: 15 });
+  if (!pts.length) return;
+  if (leaflet) leaflet.fitBounds(pts, { padding: [40, 40], maxZoom: 15 });
+  if (gmap) {
+    const b = new google.maps.LatLngBounds();
+    pts.forEach(([lat, lng]) => b.extend({ lat, lng }));
+    gmap.fitBounds(b, 40);
+  }
+}
+
+function markerStyle(n) {
+  const color = DOT[cls(n)], sel = n.node === picked, faint = n.mock && n.diagnosis.code === "unknown";
+  return { color, sel, faint };
 }
 
 function drawMap(s) {
   const placed = s.nodes.filter(n => n.lat != null && n.lon != null);
+  if (mapMode === "google") {
+    const fresh = !Object.keys(gmarkers).length;
+    for (const n of placed) {
+      const { color, sel, faint } = markerStyle(n);
+      let m = gmarkers[n.node];
+      if (!m) {
+        const dot = document.createElement("div");
+        m = new google.maps.marker.AdvancedMarkerElement({ map: gmap, position: { lat: n.lat, lng: n.lon }, content: dot });
+        m.addListener("click", () => select(n.node));
+        gmarkers[n.node] = m;
+      }
+      const size = sel ? 24 : 18;
+      Object.assign(m.content.style, { width: size + "px", height: size + "px", borderRadius: "50%", background: color,
+        opacity: faint ? 0.45 : 1, border: `${sel ? 3 : 2}px solid ${sel ? "#1f1e1c" : "#ffffff"}`,
+        boxShadow: "0 1px 3px rgba(0,0,0,.4)", cursor: "pointer" });
+      m.title = `${n.node} · ${n.name} · ${label(n)}`;
+      m.position = { lat: n.lat, lng: n.lon };
+    }
+    if (fresh) fit();
+    return;
+  }
   if (mapMode === "leaflet") {
     const fresh = !Object.keys(markers).length;
     for (const n of placed) {
-      const color = DOT[cls(n)], sel = n.node === picked;
+      const { color, sel, faint } = markerStyle(n);
       const style = { radius: sel ? 11 : 8, color: sel ? "#1f1e1c" : color, weight: sel ? 3 : 2, fillColor: color,
-                      fillOpacity: n.mock && n.diagnosis.code === "unknown" ? 0.25 : 0.9 };
+                      fillOpacity: faint ? 0.25 : 0.9 };
       if (!markers[n.node]) {
         markers[n.node] = L.circleMarker([n.lat, n.lon], style).addTo(leaflet).on("click", () => select(n.node));
       }
@@ -200,7 +285,10 @@ function detailView(n, s) {
   const c = cls(n), t = s.traffic[n.node] || {}, today = t.today || {};
   const head = `<div class="top"><span><b>${esc(n.node)}</b>${n.name ? " · " + esc(n.name) : ""}</span>
     <span class="badge ${c}">${esc(label(n))}</span></div>
-    <div class="muted">${n.site ? "profilo " + esc(n.site) + " · " : ""}${n.lat != null ? n.lat.toFixed(4) + ", " + n.lon.toFixed(4) : "senza coordinate"}${n.mock ? " · camera di esempio" : ""}</div>`;
+    <div class="muted">${n.site ? "profilo " + esc(n.site) + " · " : ""}${n.lat != null ? n.lat.toFixed(4) + ", " + n.lon.toFixed(4) : "senza coordinate"}${n.mock ? " · camera di esempio" : ""}</div>
+    ${n.lat != null ? `<div class="links">
+      <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${n.lat},${n.lon}">Apri in Google Maps</a>
+      <a class="btn" target="_blank" rel="noopener" href="https://maps.apple.com/?ll=${n.lat},${n.lon}&q=${encodeURIComponent(n.name || n.node)}">Apri in Mappe</a></div>` : ""}`;
   if (n.diagnosis.code === "unknown") {
     return head + `<div class="note">${n.mock
       ? `Camera del mockup: nessun nodo collegato. Per vederla viva avvia un nodo simulato con <code>NODE_ID=${esc(n.node)}</code>.`
@@ -242,6 +330,22 @@ function render(s) {
   drawMap(s);
 }
 
+async function refreshInfo() {
+  try {
+    const i = await (await fetch("/api/info", { cache: "no-store" })).json();
+    if (!i.mqtt) return;
+    const dot = ok => `<span class="dot" style="background:${ok ? DOT.ok : DOT["bad-b"]}"></span>`;
+    document.getElementById("sys-mqtt").innerHTML =
+      `${dot(i.mqtt.connected)}MQTT ${esc(i.mqtt.host)}:${i.mqtt.port}${i.mqtt.tls ? " (TLS)" : ""} · ${i.mqtt.connected ? "connesso" : "non connesso"}`;
+    const bleColor = i.ble === "in ascolto" ? DOT.ok : i.ble === "spento" || i.ble === "in avvio" ? DOT.neutral : DOT["bad-b"];
+    document.getElementById("sys-ble").innerHTML = `<span class="dot" style="background:${bleColor}"></span>Bluetooth ${esc(i.ble)}`;
+    document.getElementById("btn-config").hidden = document.getElementById("btn-folder").hidden = !i.config_dir;
+  } catch (e) { /* il banner di errore lo gestisce refresh() */ }
+}
+for (const [id, what] of [["btn-config", "config"], ["btn-folder", "folder"]]) {
+  document.getElementById(id).addEventListener("click", () => fetch(`/api/open/${what}`, { method: "POST" }));
+}
+
 async function refresh() {
   try {
     const res = await fetch("/api/state", { cache: "no-store" });
@@ -258,9 +362,11 @@ for (const id of ["chips", "map"]) {
   });
 }
 window.addEventListener("resize", () => { if (mapMode === "svg" && S) drawMap(S); });
-loadLeaflet();
+loadMap();
 refresh();
+refreshInfo();
 setInterval(refresh, 2000);
+setInterval(refreshInfo, 5000);
 </script>
 </body>
 </html>

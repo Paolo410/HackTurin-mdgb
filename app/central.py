@@ -1,4 +1,5 @@
-"""Programma della centrale: È L'UNICO DA LANCIARE SUL PC (docs/CONTRACTS.md v1).
+"""Programma della centrale (docs/CONTRACTS.md v1). Sul PC si usa l'app "MDGB Centrale" (app/desktop/), che avvia
+questa stessa classe Central; da terminale: python app/central.py.
 
     canale principale:  nodo ──Wi-Fi/MQTT──► AWS IoT Core (o Mosquitto) ──► qui   (ingest.py)
     canale di backup:   nodo ──BLE──────────────────────────────────────► qui   (Bluetooth del PC, SENZA Internet)
@@ -18,6 +19,8 @@ import argparse
 import asyncio
 import json
 import logging
+import os
+import threading
 import time
 
 import dashboard
@@ -44,33 +47,87 @@ def log_status(store):
         log.info("STATO %s: %s%s", node, d["text"], f" via {d['via']}" if d["via"] else "")
 
 
-async def run(store, node, use_ble, addr=None):
-    scanner = None
-    if use_ble:
+class Central:
+    """Tutti i servizi della centrale: MQTT (+ TTN), Bluetooth, dashboard. start() non blocca; stop() ferma tutto."""
+
+    def __init__(self, db_path=None, node="nodo01", use_ble=True, addr=None, web=True, host="127.0.0.1", port=8080):
+        self.db_path = db_path or ingest.DB_PATH
+        self.node, self.use_ble, self.addr = node, use_ble, addr
+        self.web, self.host, self.port = web, host, port
+        self.ble_status = "spento" if not use_ble else "in avvio"
+        self.store = self.mqtt = self.ttn = self.server = None
+        self._stop = threading.Event()
+        self._thread = None
+
+    @property
+    def url(self):
+        return f"http://localhost:{self.server.server_port}" if self.server else None
+
+    def start(self):
+        self.store = ingest.Store(self.db_path)
+        self.mqtt = ingest.main_loop(self.store)
+        self.ttn = ingest.ttn_loop(self.store)
+        if self.web:
+            try:
+                self.server = dashboard.serve(self.store, self.host, self.port, info=self.info)
+            except OSError:                       # porta occupata: ne sceglie una libera
+                self.server = dashboard.serve(self.store, self.host, 0, info=self.info)
+            log.info("dashboard: %s", self.url)
+        self._thread = threading.Thread(target=lambda: asyncio.run(self._run()), name="central", daemon=True)
+        self._thread.start()
+        return self
+
+    def info(self):
+        """Stato della centrale stessa, mostrato in alto nella dashboard."""
+        return {"mqtt": {"host": ingest.MQTT_HOST, "port": ingest.MQTT_PORT, "tls": ingest.MQTT_TLS,
+                         "connected": bool(self.mqtt and self.mqtt.is_connected())},
+                "ble": self.ble_status, "config_dir": os.environ.get("MDGB_HOME"), "db": self.db_path,
+                "maps_key": os.environ.get("GOOGLE_MAPS_API_KEY", "")}
+
+    async def _run(self):
+        scanner = None
+        if self.use_ble:
+            try:
+                from bleak import BleakScanner
+                rx = ble_to_store(self.store, self.node)
+
+                def on_adv(device, adv):
+                    if self.addr and device.address.upper() != self.addr.upper():
+                        return
+                    frame = adv.manufacturer_data.get(COMPANY_ID)
+                    if frame and rx.handle(frame, adv.rssi, device.address):
+                        log.info("BLE: beacon type %d da %s (RSSI %s)", frame[0], device.address, adv.rssi)
+
+                # TODO(verify): scansione BLE da un thread non principale su macOS (CoreBluetooth via bleak)
+                scanner = BleakScanner(detection_callback=on_adv)
+                await scanner.start()
+                self.ble_status = "in ascolto"
+                log.info("BLE in ascolto (company 0x%04X) per il nodo %s", COMPANY_ID, self.node)
+            except Exception as e:                  # niente Bluetooth o permesso negato: si continua solo MQTT
+                self.ble_status = f"non disponibile ({e})"
+                log.error("BLE non disponibile (%s): la centrale continua solo con MQTT", e)
+                scanner = None
+        t_log = time.time()
         try:
-            from bleak import BleakScanner
-            rx = ble_to_store(store, node)
+            while not self._stop.is_set():
+                await asyncio.sleep(0.5)
+                if time.time() - t_log >= 10:
+                    log_status(self.store)
+                    t_log = time.time()
+        finally:
+            if scanner is not None:
+                await scanner.stop()
 
-            def on_adv(device, adv):
-                if addr and device.address.upper() != addr.upper():
-                    return
-                frame = adv.manufacturer_data.get(COMPANY_ID)
-                if frame and rx.handle(frame, adv.rssi, device.address):
-                    log.info("BLE: beacon type %d da %s (RSSI %s)", frame[0], device.address, adv.rssi)
-
-            scanner = BleakScanner(detection_callback=on_adv)
-            await scanner.start()
-            log.info("BLE in ascolto (company 0x%04X) per il nodo %s", COMPANY_ID, node)
-        except Exception as e:                      # niente Bluetooth o permesso negato: si continua solo MQTT
-            log.error("BLE non disponibile (%s): la centrale continua solo con MQTT", e)
-            scanner = None
-    try:
-        while True:
-            await asyncio.sleep(10)
-            log_status(store)
-    finally:
-        if scanner is not None:
-            await scanner.stop()
+    def stop(self):
+        self._stop.set()
+        if self._thread:
+            self._thread.join(timeout=5)
+        for c in (self.mqtt, self.ttn):
+            if c is not None:
+                c.loop_stop()
+                c.disconnect()
+        if self.server:
+            self.server.shutdown()
 
 
 def main():
@@ -83,19 +140,18 @@ def main():
     ap.add_argument("--port", type=int, default=8080)
     ap.add_argument("--report", action="store_true")
     a = ap.parse_args()
-    store = ingest.Store(ingest.DB_PATH)
     if a.report:
-        print(json.dumps(store.report(), indent=2, ensure_ascii=False))
+        print(json.dumps(ingest.Store(ingest.DB_PATH).report(), indent=2, ensure_ascii=False))
         return
-    ingest.main_loop(store)
-    ingest.ttn_loop(store)
-    if not a.no_web:
-        dashboard.serve(store, a.host, a.port)
-        log.info("dashboard: http://%s:%d", "localhost" if a.host in ("127.0.0.1", "0.0.0.0") else a.host, a.port)
+    central = Central(node=a.node, use_ble=not a.no_ble, addr=a.addr, web=not a.no_web, host=a.host,
+                      port=a.port).start()
     try:
-        asyncio.run(run(store, a.node, not a.no_ble, a.addr))
+        while True:
+            time.sleep(1)
     except KeyboardInterrupt:
         pass
+    finally:
+        central.stop()
 
 
 if __name__ == "__main__":
