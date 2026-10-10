@@ -1,0 +1,64 @@
+# MDGB smartcrossing configuration.
+# Every threshold lives here: no magic numbers in the code.
+# "(spec)" = value fixed by PROMPT_SMART_CROSSING.md. The others are tunable defaults.
+
+model:
+  path: models/yolox_nano.onnx    # relative to ai/, downloaded by scripts/get_model.sh
+  input_size: 416                 # (spec) 320 is the target, 416 optional. The official ONNX is fixed at 416.
+  conf: 0.30                      # minimum score (objectness * class probability)
+  nms: 0.45                       # IoU threshold of the per-class NMS
+  nms_cross_class: 0.85           # boxes of different classes above this IoU are one object: keep the best
+  intra_op_num_threads: 0         # 0 = let onnxruntime decide
+  detect_every_n: 1               # run the detector every N frames; in between the last tracks are held
+  strides: [8, 16, 32]            # YOLOX head strides
+  pad_value: 114                  # (spec) letterbox padding value
+  keep_classes:                   # (spec) COCO classes kept
+    [person, bicycle, car, motorcycle, bus, truck, dog, cat, horse, sheep, cow, bear, bird]
+
+source:
+  resize_width: 960               # frames wider than this are downscaled, keeping the aspect ratio; 0 = keep
+  max_fps: 0                      # processing rate cap; 0 = unlimited
+  file_realtime: true             # play video files at their own speed (false = as fast as possible)
+  samples_dir: samples            # default video folder (git-ignored); if empty the webcam is used
+  video_extensions: [.mp4, .mov, .avi, .mkv, .m4v]
+
+tracking:
+  track_activation_threshold: 0.30
+  lost_track_buffer: 30           # frames a lost track is kept before its ID is dropped
+  minimum_matching_threshold: 0.8
+  minimum_consecutive_frames: 1
+  min_track_age: 5                # (spec) frames before a track is considered valid
+  history_len: 60                 # positions kept per track
+  default_frame_rate: 30          # rate given to ByteTrack when the source does not report one
+
+overlay:
+  window_name: MDGB smartcrossing
+  font_scale: 0.5
+  thickness: 2
+  fps_ema_alpha: 0.1              # smoothing of the FPS shown on screen
+  status_every_s: 1.0             # period of the status line in --headless mode
+  quit_keys: [q, Q]
+  colors:                         # BGR
+    person: [80, 200, 80]
+    two_wheeler: [0, 200, 255]
+    vehicle: [255, 160, 0]
+    animal: [200, 80, 200]
+    pending: [150, 150, 150]      # track younger than min_track_age
+    text: [255, 255, 255]
+    hud_bg: [0, 0, 0]
+
+bench:
+  frames: 300                     # frames measured
+  warmup_frames: 10               # frames discarded before measuring
+  percentile: 95
+
+profiles:
+  pc: {}
+  unoq:
+    model: {input_size: 320, intra_op_num_threads: 4}
+    source: {max_fps: 10, resize_width: 640}
+
+# Applied on top of the profile by --emulate-unoq. (spec) 10 FPS, input 320, 4 onnxruntime threads.
+emulate_unoq:
+  model: {input_size: 320, intra_op_num_threads: 4}
+  source: {max_fps: 10}
