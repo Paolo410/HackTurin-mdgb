@@ -37,18 +37,18 @@ Il codice è lo stesso: cambiano solo le righe `MQTT_*` e `BACKUP_LINK` in `comm
 ## Installazione sull'Arduino UNO Q
 
 Sulla scheda va **solo** il codice che gira lì. Dal PC dello sviluppatore, un comando copia via ssh la rete
-(`comms/node`, gli strumenti per la scheda, la configurazione d'esempio e il servizio di avvio) in `~/mdgb` e prepara
+(`comms/node`, gli strumenti per la scheda, la configurazione d'esempio e il servizio di avvio) in `~/HackTurin-mdgb` e prepara
 Python. Niente app del PC, test, AWS o documentazione:
 
 ```bash
 ./comms/deploy/push_to_arduino.sh arduino@<IP della scheda>     # oppure --pack: crea mdgb-nodo.tar.gz per la chiavetta
 ```
 
-Poi sulla scheda: `nano ~/mdgb/comms/.env` (in `MQTT_HOST` l'indirizzo che l'app sul PC mostra in alto) e
-`sudo ~/venv/bin/python ~/mdgb/comms/node/main.py` (`sudo` serve per il Bluetooth). Avvio automatico all'accensione:
+Poi sulla scheda: `nano ~/HackTurin-mdgb/comms/.env` (in `MQTT_HOST` l'indirizzo che l'app sul PC mostra in alto) e
+`sudo ~/venv/bin/python ~/HackTurin-mdgb/comms/node/main.py` (`sudo` serve per il Bluetooth). Avvio automatico all'accensione:
 [`deploy/mdgb-comms.service`](deploy/mdgb-comms.service). Rilanciare lo script aggiorna il codice: `.env` e dati restano.
 
-La visione di Paolo (`ai/`) gira sulla stessa scheda, in `~/mdgb/ai`: così scrive gli eventi in `~/mdgb/logs/c3/`, dove
+La visione di Paolo (`ai/`) gira sulla stessa scheda, in `~/HackTurin-mdgb/ai`: così scrive gli eventi in `~/HackTurin-mdgb/logs/c3/`, dove
 questo programma li legge, e importa `comms/actuators.py`. Come portarla sulla scheda lo decide Paolo.
 Procedura completa: [`docs/INSTRUCTIONS_FOR_OTHERS.md`](../docs/INSTRUCTIONS_FOR_OTHERS.md#7-arduino-uno-q).
 

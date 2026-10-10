@@ -3,14 +3,14 @@
 #   sudo systemctl daemon-reload && sudo systemctl enable --now mdgb-comms
 #   journalctl -u mdgb-comms -f            # log in diretta
 # Gira come root perché btmgmt (beacon BLE) richiede CAP_NET_ADMIN.
-# Percorsi di push_to_arduino.sh (~/mdgb e ~/venv). TODO(verify) sulla scheda: nome utente "arduino".
+# Percorsi di push_to_arduino.sh (~/HackTurin-mdgb e ~/venv). TODO(verify) sulla scheda: nome utente "arduino".
 [Unit]
 Description=MDGB comms: Store & Forward, MQTT verso la centrale, backup BLE
 After=network-online.target bluetooth.target
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=/home/arduino/mdgb/comms/node
+WorkingDirectory=/home/arduino/HackTurin-mdgb/comms/node
 ExecStart=/home/arduino/venv/bin/python main.py
 Restart=always
 RestartSec=2
