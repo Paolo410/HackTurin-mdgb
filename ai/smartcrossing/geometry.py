@@ -182,6 +182,16 @@ class Geometry:
         metres = ((bx - ax) ** 2 + (by - ay) ** 2) ** 0.5
         return 2 * probe / metres if metres > 0 else 0.0
 
+    def metres_per_pixel(self, x_px: float, y_px: float) -> float:
+        """How far on the ground one pixel of error moves this point: the precision of the calibration here.
+
+        Far from the camera one pixel is metres of road, and a speed measured there is noise.
+        """
+        x0, y0 = self.to_ground(x_px, y_px)
+        ax, ay = self.to_ground(x_px + 1.0, y_px)
+        bx, by = self.to_ground(x_px, y_px + 1.0)
+        return max(((ax - x0) ** 2 + (ay - y0) ** 2) ** 0.5, ((bx - x0) ** 2 + (by - y0) ** 2) ** 0.5)
+
     def size_in_metres(self, size_px: float, x_px: float, y_px: float) -> float | None:
         """Height or length of a box in metres, from its size in pixels and its foot point."""
         scale = self.pixels_per_metre(x_px, y_px)

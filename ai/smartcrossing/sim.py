@@ -5,6 +5,7 @@ so a scenario shows and tests the whole chain, and can drive the real firmware t
 """
 from __future__ import annotations
 
+import copy
 import time
 from dataclasses import dataclass
 from typing import Callable
@@ -30,6 +31,13 @@ class Actor:
     height_m: float
     width_m: float
     path: Callable[[float], tuple[float, float] | None]     # t -> ground position, None = not in the scene
+
+
+def virtual_camera_config(cfg: dict) -> dict:
+    """The virtual camera has no borders: actors may be outside the image and are still measured."""
+    cfg = copy.deepcopy(cfg)
+    cfg["kinematics"]["edge_margin"] = None
+    return cfg
 
 
 def demo_calib(cfg: dict) -> dict:
@@ -156,6 +164,7 @@ def run_actors(cfg: dict, actors: list[Actor], duration: float, fps: float = 10.
 
     thermal_script(t) -> warm columns of the thermal camera; luminance = brightness of the virtual image.
     """
+    cfg = virtual_camera_config(cfg)
     clock = {"t": 0.0}
     thermal = None
     if thermal_script is not None:

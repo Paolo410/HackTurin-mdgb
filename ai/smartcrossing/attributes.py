@@ -55,28 +55,47 @@ class AttributeEstimator:
         self.slow_min_time = float(a["slow_min_time_s"])
         self.moving_min = float(a["moving_min_speed_ms"])
         self.walk_samples = int(a["walk_speed_samples"])
+        self.slow_min_samples = int(a["slow_min_samples"])
         self.aid = aid_classifier
         self.aid_votes = int(a["aid_votes"])
         self.aid_min_votes = int(a["aid_min_votes"])
         self.aid_every = int(a["aid_every_n_frames"])
 
+    def _progress(self, state: TrackState) -> float | None:
+        """Net speed over the last `slow_min_time` seconds (straight line from there to here), or None."""
+        if not state.ground_history:
+            return None
+        now_t, now_x, now_y = state.ground_history[-1]
+        for past_t, x, y in reversed(state.ground_history):
+            elapsed = now_t - past_t
+            if elapsed >= self.slow_min_time:
+                return ((now_x - x) ** 2 + (now_y - y) ** 2) ** 0.5 / elapsed
+        return None
+
     def update(self, state: TrackState, dt: float, frame: np.ndarray | None = None, xyxy=None) -> dict:
         """Updates and returns state.attrs: child, slow, aid (None = not decided), walk_speed."""
         attrs = state.attrs
         if not attrs:
-            attrs.update(child=None, slow=None, aid=None, walk_speed=None, _walk_time=0.0,
+            attrs.update(child=None, slow=None, aid=None, walk_speed=None, _moving_since=None,
                          _walk_speeds=deque(maxlen=self.walk_samples), _aid_votes=Counter())
 
         if attrs["child"] is None and len(state.heights) >= self.height_samples:
             attrs["child"] = median(state.heights) < self.child_height
 
-        # Walking speed: only the time spent moving counts, a pedestrian standing at the kerb is not slow.
-        # The median ignores the moments of starting and stopping.
-        if state.zone in MEASURE_ZONES and state.speed >= self.moving_min and dt > 0:
-            attrs["_walk_time"] += dt
-            attrs["_walk_speeds"].append(state.speed)
+        # Walking speed = real progress over the last `slow_min_time` seconds, while the pedestrian is moving.
+        # A person standing at the kerb is not slow, and the box of a standing person jitters: summing those
+        # small moves would look like a very slow walk. The median ignores starting and stopping.
+        if state.speed >= self.moving_min:
+            if attrs["_moving_since"] is None:
+                attrs["_moving_since"] = state.last_t
+        else:
+            attrs["_moving_since"] = None
+        walking = attrs["_moving_since"] is not None and state.last_t - attrs["_moving_since"] >= self.slow_min_time
+        progress = self._progress(state) if walking else None   # the whole window was spent walking
+        if state.zone in MEASURE_ZONES and progress is not None and progress >= self.moving_min:
+            attrs["_walk_speeds"].append(progress)
             attrs["walk_speed"] = median(attrs["_walk_speeds"])
-            if attrs["slow"] is None and attrs["_walk_time"] >= self.slow_min_time:
+            if attrs["slow"] is None and len(attrs["_walk_speeds"]) >= self.slow_min_samples:
                 attrs["slow"] = attrs["walk_speed"] < self.slow_speed
 
         if (self.aid is not None and attrs["aid"] is None and frame is not None and xyxy is not None

@@ -29,11 +29,13 @@ class TrackState:
     # Metric state, filled only with a metric calibration (see geometry.Geometry).
     ground: tuple[float, float] | None = None      # last position on the ground, metres
     ground_history: deque = field(default_factory=deque)   # (t, x, y) in metres
+    speed_history: deque = field(default_factory=deque)    # (t, speed)
     aspect: float = 0.0                            # width / height of the last box
     velocity: tuple[float, float] = (0.0, 0.0)     # smoothed, m/s in the ground frame
     speed: float = 0.0                             # m/s
     speed_samples: int = 0                         # speed measures taken so far
     accel: float = 0.0                             # m/s^2 along the motion (negative = braking)
+    speed_before: float = 0.0                      # speed one window ago, the start of that acceleration
     heights: deque = field(default_factory=deque)  # recent box heights in metres
     length_m: float | None = None                  # last box width in metres
     zone: str | None = None
@@ -64,6 +66,11 @@ class Tracker:
         k = cfg["kinematics"]
         self.ema_alpha = 2.0 / (int(k["ema_samples"]) + 1)
         self.max_dt = float(k["max_dt_s"])
+        self.window = float(k["window_s"])
+        self.min_window = float(k["min_window_s"])
+        self.max_speed = float(k["max_speed_ms"])
+        self.max_metres_per_px = float(k["max_metres_per_px"])
+        self.edge_margin = None if k["edge_margin"] is None else float(k["edge_margin"])
         self.height_samples = int(cfg["attributes"]["height_samples"])
         with warnings.catch_warnings():
             # Known deprecation of sv.ByteTrack: the version is pinned, see the module docstring.
@@ -95,7 +102,8 @@ class Tracker:
             if state is None:
                 state = TrackState(track_id=track_id, first_t=t, history=deque(maxlen=self.history_len),
                                    heights=deque(maxlen=self.height_samples),
-                                   ground_history=deque(maxlen=self.history_len))
+                                   ground_history=deque(maxlen=self.history_len),
+                                   speed_history=deque(maxlen=self.history_len))
                 self.tracks[track_id] = state
             foot = (float((xyxy[0] + xyxy[2]) / 2), float(xyxy[3]))   # bottom centre: on the ground
             if metric:
@@ -108,25 +116,56 @@ class Tracker:
         self._drop_stale()
         return tracked
 
+    def _measurable(self, xyxy, foot: tuple[float, float], geometry) -> bool:
+        """False when the foot point cannot be trusted for a speed: box cut by the border, or too far."""
+        if self.edge_margin is not None and geometry.width:
+            mx, my = self.edge_margin * geometry.width, self.edge_margin * geometry.height
+            if xyxy[0] <= mx or xyxy[2] >= geometry.width - 1 - mx or xyxy[3] >= geometry.height - 1 - my:
+                return False   # the object is entering or leaving the image: its box is cut
+        return geometry.metres_per_pixel(*foot) <= self.max_metres_per_px
+
     def _update_metric(self, state: TrackState, xyxy, foot: tuple[float, float], t: float, geometry) -> None:
         position = geometry.to_ground(*foot)
-        dt = t - state.last_t
-        if state.ground is not None and 0 < dt <= self.max_dt:
-            raw = ((position[0] - state.ground[0]) / dt, (position[1] - state.ground[1]) / dt)
-            if state.speed_samples == 0:
-                vx, vy = raw   # first measure: start from it, not from zero
-                speed = (vx * vx + vy * vy) ** 0.5
-            else:
-                # Exponential moving average over `ema_samples` samples.
-                vx = state.velocity[0] + self.ema_alpha * (raw[0] - state.velocity[0])
-                vy = state.velocity[1] + self.ema_alpha * (raw[1] - state.velocity[1])
-                speed = (vx * vx + vy * vy) ** 0.5
-                state.accel += self.ema_alpha * ((speed - state.speed) / dt - state.accel)
-            state.velocity, state.speed = (vx, vy), speed
-            state.speed_samples += 1
-        elif dt > self.max_dt:
-            # Too long a gap: start again.
+        if not self._measurable(xyxy, foot, geometry):
+            # Keep the position (zones still work) but forget the speed: it is not known here.
+            state.ground = position
+            state.ground_history.clear()
+            state.speed_history.clear()
             state.velocity, state.speed, state.accel, state.speed_samples = (0.0, 0.0), 0.0, 0.0, 0
+            state.speed_before = 0.0
+            zone = geometry.zone_of(*position)
+            if zone != state.zone:
+                state.zone, state.zone_since = zone, t
+            return
+        # Speed over a time window, not between two frames: the box of a standing object jitters by a
+        # pixel or two, and from frame to frame that looks like metres per second.
+        reference = self._reference(state.ground_history, t)
+        if reference is not None:
+            ref_t, ref_x, ref_y = reference
+            dt = t - ref_t
+            raw = ((position[0] - ref_x) / dt, (position[1] - ref_y) / dt)
+            if (raw[0] * raw[0] + raw[1] * raw[1]) ** 0.5 > self.max_speed:
+                # Impossible jump: the tracker put this ID on another object. Start again from here.
+                state.ground_history.clear()
+                state.speed_history.clear()
+                state.velocity, state.speed, state.accel, state.speed_samples = (0.0, 0.0), 0.0, 0.0, 0
+            else:
+                if state.speed_samples == 0:
+                    vx, vy = raw   # first measure: start from it, not from zero
+                else:
+                    # Exponential moving average over `ema_samples` samples.
+                    vx = state.velocity[0] + self.ema_alpha * (raw[0] - state.velocity[0])
+                    vy = state.velocity[1] + self.ema_alpha * (raw[1] - state.velocity[1])
+                state.velocity, state.speed = (vx, vy), (vx * vx + vy * vy) ** 0.5
+                state.speed_samples += 1
+                # Acceleration only once the speed has a full window of history: the first speed
+                # estimates of a new track still move a lot and would look like hard braking.
+                past = self._reference(state.speed_history, t, full_window=True)
+                if past is not None:
+                    state.accel = (state.speed - past[1]) / (t - past[0])
+                    state.speed_before = past[1]
+                if dt >= self.window:
+                    state.speed_history.append((t, state.speed))   # only speeds measured on a full window
         state.ground = position
         state.ground_history.append((t, position[0], position[1]))
         box_h = float(xyxy[3] - xyxy[1])
@@ -157,6 +196,22 @@ class Tracker:
         if tracked.tracker_id is None:
             return []
         return [self.tracks[int(i)].class_name for i in tracked.tracker_id]
+
+    def _reference(self, history: deque, t: float, full_window: bool = False):
+        """The sample about `window_s` before t.
+
+        If the history is shorter: the oldest sample at least `min_window_s` old, or None with full_window.
+        """
+        chosen = None
+        for sample in reversed(history):
+            age = t - sample[0]
+            if age > self.max_dt:
+                break               # older than this is another episode
+            if age >= self.window:
+                return sample
+            if age >= self.min_window:
+                chosen = sample
+        return None if full_window else chosen
 
     def is_valid(self, track_id: int) -> bool:
         """A track counts only after min_track_age frames."""

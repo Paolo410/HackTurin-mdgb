@@ -9,13 +9,14 @@ from smartcrossing.geometry import (
     Geometry, apply_homography, build_metric_calib, find_homography, point_in_polygon,
 )
 from smartcrossing.sim import (
+    virtual_camera_config,
     DEMO_ALONG_M, DEMO_CORNERS, DEMO_WIDTH_M, FRAME_SIZE, Actor, demo_calib, detections_at, drive,
     run_scenario, walk_then_wait,
 )
 from smartcrossing.sources import frame_fault
 from smartcrossing.tracking import Tracker
 
-CFG = load_config()
+CFG = virtual_camera_config(load_config())   # scripted actors may be outside the image
 
 
 def geometry():
