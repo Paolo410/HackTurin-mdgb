@@ -51,6 +51,8 @@ class MqttUplink:
                                                     "ts": time.time(), "online": True})
         self._lock = threading.Lock()
         self._inflight = {}            # mid -> (lista seq, istante di invio)
+        self._publishing = False       # pump() sta pubblicando un batch (fuori dal lock, vedi pump)
+        self._early = {}               # mid -> reason code dei PUBACK arrivati prima che pump() registrasse il batch
         self.last_ack = 0.0            # ultimo PUBACK positivo (qualsiasi messaggio QoS 1)
         self.ok_since = None           # primo PUBACK positivo dopo l'ultimo problema (per l'isteresi)
         self.nacks = 0                 # PUBACK negativi ricevuti
@@ -96,6 +98,8 @@ class MqttUplink:
         now = time.time()
         with self._lock:
             item = self._inflight.pop(mid, None)
+            if item is None and self._publishing:
+                self._early[mid] = reason_code
             if reason_code.is_failure:                    # es. 0x87 Not authorized, 0x97 Quota exceeded
                 self.nacks += 1
                 self.ok_since = None
@@ -145,14 +149,29 @@ class MqttUplink:
             rows = self.ob.pending(self.batch)
             if not rows:
                 return 0
-            msg = {"v": C4_VERSION, "node_id": self.node,
-                   "events": [dict({"seq": seq, "event_id": event_id(self.node, seq)}, **json.loads(body))
-                              for seq, body in rows]}
+            self._publishing = True
+        seqs = [r[0] for r in rows]
+        msg = {"v": C4_VERSION, "node_id": self.node,
+               "events": [dict({"seq": seq, "event_id": event_id(self.node, seq)}, **json.loads(body))
+                          for seq, body in rows]}
+        # publish() SENZA self._lock: il thread di rete di paho chiama _on_publish tenendo il proprio mutex
+        # e poi prende self._lock; pubblicare col lock in mano causerebbe un deadlock (blocco dell'invio).
+        info, rc = None, None
+        try:
             info = self.c.publish(f"{self.base}/events", json.dumps(msg, separators=(",", ":")), qos=1)
-            if info.rc != mqtt.MQTT_ERR_SUCCESS:
-                return 0
-            self._inflight[info.mid] = ([r[0] for r in rows], time.time())
-            return len(rows)
+        finally:
+            with self._lock:                        # tutto insieme: nessun PUBACK può cadere "in mezzo"
+                self._publishing = False
+                early, self._early = self._early, {}
+                if info is not None and info.rc == mqtt.MQTT_ERR_SUCCESS:
+                    rc = early.get(info.mid)
+                    if rc is None:                  # caso normale: il PUBACK arriverà dopo
+                        self._inflight[info.mid] = (seqs, time.time())
+        if info.rc != mqtt.MQTT_ERR_SUCCESS:
+            return 0
+        if rc is not None and not rc.is_failure:    # PUBACK positivo arrivato prima della registrazione
+            self.ob.ack(seqs)
+        return len(rows)
 
     def publish(self, sub_topic: str, obj, qos=1, retain=False) -> bool:
         if not self.connected():
