@@ -1,0 +1,6 @@
+{
+  "_comment": "Camere sulla mappa della centrale: una per ogni Arduino. id = NODE_ID del nodo (comms/.env sulla scheda). site = profilo della specifica (urbano | lungofiume | collina). video (facoltativo) = indirizzo dello stream MJPEG dal vivo della visione sulla scheda, es. http://192.168.1.50:8090/stream.mjpg: si guarda solo dal vivo e non viene registrato. Un nodo che si collega senza essere qui compare lo stesso nella lista, senza posizione.",
+  "nodes": [
+    {"id": "nodo01", "name": "Via Roma, piazza San Carlo", "lat": 45.0679, "lon": 7.6829, "site": "urbano"}
+  ]
+}

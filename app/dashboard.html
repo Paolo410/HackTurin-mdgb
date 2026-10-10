@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Centrale MDGB</title>
+<style>
+  :root {
+    --bg: #f4f6f9; --card: #ffffff; --soft: #f1f3f7; --text: #111827; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #2563eb; --accent-bg: #dbeafe;
+    --ok: #166534; --ok-bg: #dcfce7; --warn: #92400e; --warn-bg: #fef3c7; --bad: #991b1b; --bad-bg: #fee2e2;
+    --info: #1e40af; --info-bg: #dbeafe; --neutral: #4b5563; --neutral-bg: #f3f4f6;
+    --bar: #3b82f6; --bar2: #93c5fd; --map: #eef1f5; --grid: #dfe4ea;
+    --shadow: 0 1px 2px rgba(16,24,40,.05), 0 2px 8px rgba(16,24,40,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0e13; --card: #141821; --soft: #1b202b; --text: #e5e7eb; --muted: #9ca3af; --line: #262c38;
+      --accent: #60a5fa; --accent-bg: #10233f;
+      --ok: #86efac; --ok-bg: #14321f; --warn: #fcd34d; --warn-bg: #3a2a0a; --bad: #fca5a5; --bad-bg: #3b1212;
+      --info: #93c5fd; --info-bg: #10233f; --neutral: #9ca3af; --neutral-bg: #1f2430;
+      --bar: #60a5fa; --bar2: #1e3a5f; --map: #1a1f27; --grid: #2a313d;
+      --shadow: 0 1px 2px rgba(0,0,0,.4);
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif; }
+  main { max-width: 1320px; margin: 0 auto; padding: 18px 20px 28px; }
+  h2 { font-size: 15px; font-weight: 600; margin: 0; display: flex; align-items: center; gap: 8px; }
+  h3 { font-size: 12px; font-weight: 600; margin: 18px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .ic { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 2;
+        stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px;
+          box-shadow: var(--shadow); min-width: 0; }
+  .card-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+
+  /* barra in alto */
+  .topbar { display: flex; justify-content: space-between; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo { width: 40px; height: 40px; border-radius: 11px; background: #1f2a37; display: grid; place-items: center; }
+  .title { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+  .sub { font-size: 12px; color: var(--muted); }
+  .sys { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .chip-s { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; padding: 5px 10px; border-radius: 999px;
+            background: var(--card); border: 1px solid var(--line); color: var(--text); white-space: nowrap; }
+  .chip-s:empty { display: none; }
+  .btn { font: inherit; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;
+         background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 9px;
+         padding: 6px 11px; cursor: pointer; text-decoration: none; }
+  .btn:hover { border-color: var(--muted); }
+  .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; flex: none; }
+
+  .err { background: var(--bad-bg); color: var(--bad); padding: 10px 14px; border-radius: 12px; margin-bottom: 14px;
+         display: none; font-weight: 500; }
+  .attention { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: var(--warn-bg); color: var(--warn);
+               border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-weight: 500; }
+  .attention.bad { background: var(--bad-bg); color: var(--bad); }
+  .attention button { font: inherit; font-size: 12px; border: 1px solid currentColor; background: transparent; color: inherit;
+                      border-radius: 999px; padding: 3px 10px; cursor: pointer; }
+
+  /* riepilogo */
+  .kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+  @media (max-width: 1000px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .kpi .k { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .kpi .v { font-size: 26px; font-weight: 700; letter-spacing: -.02em; margin-top: 2px; }
+  .kpi .s { font-size: 12px; color: var(--muted); }
+  .v.ok { color: var(--ok); } .v.warn { color: var(--warn); } .v.bad { color: var(--bad); }
+
+  /* mappa e dettaglio */
+  .main { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(340px, 1fr); gap: 14px; margin-bottom: 14px; align-items: start; }
+  @media (max-width: 1000px) { .main { grid-template-columns: minmax(0, 1fr); } }
+  #map { height: 470px; border-radius: 11px; overflow: hidden; background: var(--map); position: relative; }
+  #map svg.schematic { width: 100%; height: 100%; display: block; }
+  .mapbar { display: flex; align-items: center; gap: 8px; }
+  .mapbar select { font: inherit; font-size: 12px; background: var(--card); color: var(--text); border: 1px solid var(--line);
+                   border-radius: 8px; padding: 4px 8px; }
+  .nodelist { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; margin-top: 12px; }
+  .node { display: flex; align-items: center; gap: 10px; text-align: left; font: inherit; color: var(--text); cursor: pointer;
+          background: var(--soft); border: 1px solid transparent; border-radius: 10px; padding: 8px 10px; }
+  .node:hover { border-color: var(--line); }
+  .node.sel { border-color: var(--accent); background: var(--accent-bg); }
+  .node .n1 { font-weight: 600; font-size: 13px; }
+  .node .n2 { font-size: 12px; color: var(--muted); }
+  .detail { position: sticky; top: 14px; max-height: calc(100vh - 28px); overflow-y: auto; }
+  @media (max-width: 1000px) { .detail { position: static; max-height: none; overflow: visible; } }
+  .dh { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  .dname { font-size: 17px; font-weight: 700; line-height: 1.25; }
+  .badge { font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .ok-b { background: var(--ok-bg); color: var(--ok); } .warn-b { background: var(--warn-bg); color: var(--warn); }
+  .bad-b { background: var(--bad-bg); color: var(--bad); } .neutral { background: var(--neutral-bg); color: var(--neutral); }
+  .links { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .kv > div { background: var(--soft); border-radius: 10px; padding: 8px 10px; }
+  .kv .k { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 5px; }
+  .kv .v { font-size: 14px; font-weight: 600; margin-top: 1px; }
+  .kv .wide { grid-column: span 2; }
+  .bars { display: grid; grid-template-columns: 92px 1fr 44px; gap: 7px 10px; align-items: center; font-size: 13px; }
+  .bars span:last-child, .bars .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .track { height: 8px; background: var(--soft); border-radius: 99px; overflow: hidden; }
+  .fill { height: 100%; background: var(--bar); border-radius: 99px; min-width: 3px; }
+  .cols { display: flex; align-items: flex-end; gap: 3px; height: 64px; margin-top: 12px; }
+  .col { flex: 1; background: var(--bar); border-radius: 3px 3px 0 0; min-height: 3px; opacity: .85; }
+  .col.prov { background: repeating-linear-gradient(45deg, var(--bar) 0 3px, transparent 3px 6px); border: 1px solid var(--bar); }
+  .envs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .envs span { font-size: 12px; background: var(--soft); border-radius: 999px; padding: 3px 9px; }
+  .minis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .mini { background: var(--soft); border-radius: 10px; padding: 8px 10px; cursor: help; }
+  .mini .k { font-size: 11px; color: var(--muted); }
+  .mini .v { font-size: 18px; font-weight: 700; }
+  .live { position: relative; margin-top: 8px; border-radius: 10px; overflow: hidden; background: #000; }
+  .live img { width: 100%; display: block; min-height: 120px; }
+  .live .tag { position: absolute; top: 8px; left: 8px; background: #dc2626; color: #fff; font-size: 11px; font-weight: 700;
+               padding: 2px 8px; border-radius: 6px; letter-spacing: .04em; }
+  .empty { display: flex; align-items: center; gap: 10px; color: var(--muted); background: var(--soft); border-radius: 10px;
+           padding: 12px 14px; font-size: 13px; }
+
+  /* allarmi e rete */
+  .bottom { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(340px, 1fr); gap: 14px; }
+  @media (max-width: 1000px) { .bottom { grid-template-columns: minmax(0, 1fr); } }
+  .alarm { display: flex; gap: 10px; align-items: flex-start; padding: 9px 0; border-bottom: 1px solid var(--line); }
+  .alarm:last-child { border-bottom: 0; }
+  .aic { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; }
+  .aic.danger { background: var(--bad-bg); color: var(--bad); } .aic.warning { background: var(--warn-bg); color: var(--warn); }
+  .aic.info { background: var(--info-bg); color: var(--info); }
+  .at { font-weight: 600; font-size: 13px; }
+  .am { font-size: 12px; color: var(--muted); }
+  .via { font-size: 11px; background: var(--soft); border-radius: 6px; padding: 1px 6px; margin-left: 4px; }
+  .metrics { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .metric { background: var(--soft); border-radius: 10px; padding: 10px 12px; cursor: help; }
+  .metric .k { font-size: 12px; color: var(--muted); }
+  .metric .v { font-size: 22px; font-weight: 700; }
+  .good { color: var(--ok); } .badv { color: var(--bad); }
+  .hint { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
+  .foot { text-align: center; font-size: 12px; color: var(--muted); margin-top: 18px; }
+
+  /* marcatori sulla mappa */
+  #map .maplibregl-canvas { outline: none; }
+  .maplibregl-ctrl-attrib { font-size: 11px; }
+  .mk-root { cursor: pointer; }
+  .mk { width: 18px; height: 18px; border-radius: 50%; border: 3px solid #fff; position: relative;
+        box-shadow: 0 2px 8px rgba(0,0,0,.35); transition: transform .15s ease; }
+  .mk-root:hover .mk { transform: scale(1.18); }
+  .mk.sel { transform: scale(1.35); box-shadow: 0 0 0 5px rgba(59,130,246,.35), 0 2px 10px rgba(0,0,0,.45); }
+  .mk.faint { opacity: .55; }
+  .mk.pulse::after { content: ""; position: absolute; inset: -3px; border-radius: 50%; border: 2px solid currentColor;
+                     animation: mk-pulse 1.6s ease-out infinite; }
+  @keyframes mk-pulse { from { transform: scale(1); opacity: .9; } to { transform: scale(2.8); opacity: 0; } }
+  .mk-label { display: none; position: absolute; left: 50%; top: 100%; transform: translate(-50%, 7px); white-space: nowrap;
+              background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 7px;
+              font-size: 11px; font-weight: 500; padding: 2px 8px; box-shadow: 0 1px 4px rgba(0,0,0,.15); pointer-events: none; }
+  .mk-root:hover .mk-label, .mk-root.sel-root .mk-label { display: block; }
+  .maplibregl-ctrl-attrib, .maplibregl-ctrl-attrib.maplibregl-compact { background: var(--card) !important; color: var(--muted); }
+  .maplibregl-ctrl-attrib a, .maplibregl-ctrl-attrib-inner { color: var(--muted) !important; }
+  .maplibregl-ctrl-group { background: var(--card) !important; border: 1px solid var(--line); box-shadow: none !important; }
+  .maplibregl-ctrl-group button + button { border-top: 1px solid var(--line) !important; }
+  @media (prefers-color-scheme: dark) {
+    .maplibregl-ctrl button .maplibregl-ctrl-icon, .maplibregl-ctrl-attrib-button { filter: invert(1); }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><svg width="22" height="26" viewBox="0 0 22 26"><rect x="3" y="1" width="16" height="24" rx="5" fill="#111418"/>
+        <circle cx="11" cy="7" r="3" fill="#e24b4a"/><circle cx="11" cy="13" r="3" fill="#ef9f27"/><circle cx="11" cy="19" r="3" fill="#639922"/></svg></div>
+      <div><div class="title">MDGB Centrale</div><div class="sub">Attraversamenti pedonali intelligenti · dati anonimi</div></div>
+    </div>
+    <div class="sys">
+      <span class="chip-s" id="sys-mqtt" title="Collegamento della centrale con il broker MQTT, da cui arrivano i dati via Wi-Fi"></span>
+      <span class="chip-s" id="sys-ble" title="Ricezione Bluetooth: il canale di riserva dei nodi quando il loro Wi-Fi è giù"></span>
+      <span class="chip-s" id="sys-nodes" title="Indirizzo da scrivere nella configurazione dell'Arduino (comms/.env: MQTT_HOST e MQTT_PORT)"></span>
+      <button class="btn" id="btn-config" hidden title="Apre config.env: broker, Bluetooth, mappa. Dopo le modifiche riavvia l'app.">__IC_settings__ Impostazioni</button>
+      <button class="btn" id="btn-folder" hidden title="Cartella con config.env, nodes.json (posizioni delle camere) e il database">__IC_folder__ Cartella</button>
+    </div>
+  </header>
+  <div class="err" id="err">La centrale non risponde: riapri l'app (o controlla che app/central.py sia in esecuzione).</div>
+  <div class="attention" id="attention" hidden></div>
+  <section class="kpis" id="kpis"></section>
+  <section class="main">
+    <div class="card">
+      <div class="card-h"><h2>__IC_pin__ Mappa delle camere</h2>
+        <div class="mapbar"><span class="muted" id="maptype"></span>
+          <select id="mapstyle" aria-label="Stile della mappa" hidden>
+            <option value="auto">Mappa automatica</option><option value="light">Mappa chiara</option>
+            <option value="dark">Mappa scura</option><option value="detailed">Mappa dettagliata</option></select></div></div>
+      <div id="map"></div>
+      <div class="nodelist" id="nodelist"></div>
+    </div>
+    <aside class="card detail"><div id="detail"><div class="empty">Clicca una camera sulla mappa o nella lista per vederne i dettagli.</div></div>
+      <div id="videobox"></div></aside>
+  </section>
+  <section class="bottom">
+    <div class="card"><div class="card-h"><h2>__IC_alert__ Registro allarmi</h2><span class="muted" id="alarm-count"></span></div><div id="alarms"></div></div>
+    <div class="card"><div class="card-h"><h2>__IC_server__ Salute della rete</h2></div><div class="metrics" id="metrics"></div>
+      <p class="hint">Ogni evento delle camere ha un numero progressivo: la centrale vede subito se ne manca qualcuno.
+        I doppioni sono normali dopo un blackout (il nodo rimanda ciò che non era confermato) e vengono scartati.</p></div>
+  </section>
+  <div class="foot" id="updated">in attesa dei dati…</div>
+</main>
+<script>
+/* icone (SVG in linea: funzionano anche senza Internet) */
+const P = {
+  wifi: '<path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><path d="M12 19.5h.01"/>',
+  bt: '<path d="M7 7l10 10-5 5V2l5 5L7 17"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  battery: '<rect x="2" y="7" width="17" height="10" rx="2"/><path d="M22 11v2"/>',
+  light: '<rect x="8" y="2" width="8" height="20" rx="3"/><path d="M12 7h.01M12 12h.01M12 17h.01"/>',
+  queue: '<path d="M3 13h5l1 3h6l1-3h5"/><path d="M5 5h14l2 8v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z"/>',
+  alert: '<path d="M12 3l10 18H2z"/><path d="M12 10v4M12 17.5h.01"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16 9.5"/>',
+  pin: '<path d="M12 22s7-6.5 7-12a7 7 0 0 0-14 0c0 5.5 7 12 7 12z"/><circle cx="12" cy="10" r="2.5"/>',
+  settings: '<path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/>',
+  folder: '<path d="M3 7a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/>',
+  activity: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
+  shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+  server: '<rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/>',
+  ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+  camera: '<path d="M3 8a2 2 0 0 1 2-2h2l2-2h6l2 2h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/>',
+  link: '<path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1"/>',
+};
+const ic = name => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${P[name]}</svg>`;
+document.querySelectorAll("button, h2").forEach(el => {
+  el.innerHTML = el.innerHTML.replace(/__IC_(\w+)__/g, (_, n) => ic(n));
+});
+
+const DIAG = { ok: "ok-b", network_down: "warn-b", battery_low: "warn-b", faulty: "bad-b", linux_hung: "bad-b",
+               tampered: "bad-b", destroyed: "bad-b", unknown: "neutral" };
+const DOT = { "ok-b": "#16a34a", "warn-b": "#d97706", "bad-b": "#dc2626", neutral: "#9ca3af", ok: "#16a34a" };
+const STATE_IT = { IDLE: "Nessuno in zona", PRESENCE: "Presenza", WARN_DRIVER: "Avviso ai conducenti",
+                   WARN_PEDESTRIAN: "Avviso ai pedoni", ANIMAL_WARN: "Animale vicino", ANIMAL_ALERT: "Animale in strada",
+                   DEGRADED: "Visione degradata" };
+const MODE_IT = { normal: "normale", degraded: "degradato", failsafe: "fail-safe" };
+let S = null, picked = null, vmap = null, markers = {}, mapMode = "loading";
+
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const ago = s => s == null ? "mai" : s < 10 ? "adesso" : s < 60 ? `${Math.round(s)} s fa` : s < 3600 ? `${Math.round(s / 60)} min fa` : `${Math.round(s / 3600)} h fa`;
+const dur = s => s < 60 ? `${Math.round(s)} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${(s / 3600).toFixed(1)} h`;
+const hhmm = t => new Date(t * 1000).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+const num = n => n == null ? "n.d." : Number(n).toLocaleString("it-IT");
+const cls = n => DIAG[n.diagnosis.code] || "neutral";
+const label = n => n.diagnosis.code === "unknown" ? "in attesa del nodo" : n.diagnosis.text;
+const shortName = n => n.name || n.node;
+
+function select(id) { picked = id; if (S) render(S); }
+
+/* ---------- mappa: vettoriale MapLibre + OpenFreeMap (gratis, senza chiave); Google Maps solo con GOOGLE_MAPS_API_KEY;
+   senza Internet mappa schematica. https://openfreemap.org  https://maplibre.org
+   Google: https://developers.google.com/maps/documentation/javascript/advanced-markers/start ---------- */
+const MAPLIBRE = "https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl";
+const STYLES = { light: "https://tiles.openfreemap.org/styles/positron", dark: "https://tiles.openfreemap.org/styles/dark",
+                 detailed: "https://tiles.openfreemap.org/styles/liberty" };
+const PULSE = new Set(["network_down", "faulty", "linux_hung", "tampered", "destroyed", "battery_low"]);
+const darkMq = window.matchMedia("(prefers-color-scheme: dark)");
+let gmap = null, gmarkers = {}, styleChoice = "auto";
+try { styleChoice = localStorage.getItem("mdgb-map-style") || "auto"; } catch (e) {}
+
+function styleUrl() {
+  if (styleChoice === "detailed") return STYLES.detailed;
+  if (styleChoice === "light" || styleChoice === "dark") return STYLES[styleChoice];
+  return darkMq.matches ? STYLES.dark : STYLES.light;
+}
+
+async function loadMap() {
+  let key = "";
+  try { key = (await (await fetch("/api/info", { cache: "no-store" })).json()).maps_key || ""; } catch (e) {}
+  if (key) loadGoogle(key); else loadVector();
+}
+
+/* marcatore: un contenitore (lo posiziona la mappa) con dentro il pallino e l'etichetta */
+function markerEl(n) {
+  const root = document.createElement("div");
+  root.className = "mk-root";
+  root.dataset.node = n.node;
+  root.innerHTML = `<div class="mk"></div><div class="mk-label"></div>`;
+  root.addEventListener("click", e => { e.stopPropagation(); select(n.node); });
+  return root;
+}
+
+function updateMarkerEl(root, n) {
+  const dot = root.firstChild, lab = root.lastChild, color = DOT[cls(n)];
+  dot.className = "mk" + (n.node === picked ? " sel" : "") + (n.diagnosis.code === "unknown" ? " faint" : "")
+    + (PULSE.has(n.diagnosis.code) ? " pulse" : "");
+  dot.style.background = color;
+  dot.style.color = color;
+  lab.textContent = n.name ? `${n.node} · ${n.name}` : n.node;
+  root.title = `${n.node} · ${n.name} · ${label(n)}`;
+  root.classList.toggle("sel-root", n.node === picked);
+  root.style.zIndex = PULSE.has(n.diagnosis.code) ? 3 : n.node === picked ? 2 : 1;   // gli allarmi restano sopra le etichette
+}
+
+function loadVector(why) {
+  const css = document.createElement("link");
+  css.rel = "stylesheet"; css.href = MAPLIBRE + ".css";
+  document.head.appendChild(css);
+  const js = document.createElement("script");
+  js.src = MAPLIBRE + ".js";
+  const fallback = setTimeout(() => useSvg("senza Internet: mappa schematica"), 5000);
+  js.onload = () => { clearTimeout(fallback); useVector(why); };
+  js.onerror = () => { clearTimeout(fallback); useSvg("senza Internet: mappa schematica"); };
+  document.head.appendChild(js);
+}
+
+function useVector(why) {
+  if (mapMode !== "loading") return;
+  mapMode = "vector";
+  document.getElementById("maptype").textContent = why || "";
+  document.getElementById("mapstyle").hidden = false;
+  vmap = new maplibregl.Map({ container: "map", style: styleUrl(), center: [7.68, 45.07], zoom: 12.5,
+                              attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false });
+  vmap.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+  // si ripiega sulla schematica solo se lo stile non arriva proprio (niente Internet), non se le tile sono lente
+  let styleOk = false;
+  vmap.on("styledata", () => { styleOk = true; });
+  vmap.on("error", () => { if (!styleOk) useSvg("mappa non raggiungibile: mappa schematica"); });
+  setTimeout(() => { if (!styleOk) useSvg("mappa non raggiungibile: mappa schematica"); }, 15000);
+  if (S) { drawMap(S); fit(); }
+}
+
+function setMapStyle(choice) {
+  styleChoice = choice;
+  try { localStorage.setItem("mdgb-map-style", choice); } catch (e) {}
+  if (vmap) vmap.setStyle(styleUrl());
+}
+darkMq.addEventListener("change", () => { if (vmap && styleChoice === "auto") vmap.setStyle(styleUrl()); });
+
+function loadGoogle(key) {
+  const fallback = setTimeout(() => { if (mapMode === "loading") loadVector(); }, 6000);
+  window.gm_authFailure = () => { clearTimeout(fallback); dropGoogle(); loadVector("chiave Google non valida: mappa senza chiave"); };
+  window.mdgbGoogleReady = () => { clearTimeout(fallback); useGoogle(); };
+  const js = document.createElement("script");
+  js.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&libraries=marker&loading=async&callback=mdgbGoogleReady`;
+  js.async = true;
+  js.onerror = () => { clearTimeout(fallback); loadVector(); };
+  document.head.appendChild(js);
+}
+
+function useGoogle() {
+  if (mapMode !== "loading") return;
+  mapMode = "google";
+  document.getElementById("maptype").textContent = "Google Maps";
+  gmap = new google.maps.Map(document.getElementById("map"), {
+    center: { lat: 45.07, lng: 7.68 }, zoom: 13, mapId: "DEMO_MAP_ID",
+    streetViewControl: false, mapTypeControl: false, fullscreenControl: false,
+  });
+  if (S) { drawMap(S); fit(); }
+}
+
+function dropGoogle() {
+  Object.values(gmarkers).forEach(m => { m.map = null; });
+  gmarkers = {}; gmap = null; mapMode = "loading";
+  document.getElementById("map").innerHTML = "";
+}
+
+function useSvg(why) {
+  if (mapMode === "svg") return;
+  if (vmap) { vmap.remove(); vmap = null; markers = {}; }
+  mapMode = "svg";
+  document.getElementById("maptype").textContent = why;
+  document.getElementById("mapstyle").hidden = true;
+  if (S) drawMap(S);
+}
+
+function fit() {
+  const pts = (S?.nodes || []).filter(n => n.lat != null).map(n => [n.lon, n.lat]);
+  if (!pts.length) return;
+  if (vmap) {
+    const b = pts.reduce((bb, p) => bb.extend(p), new maplibregl.LngLatBounds(pts[0], pts[0]));
+    vmap.fitBounds(b, { padding: 70, maxZoom: 15, duration: 0 });
+  }
+  if (gmap) {
+    const b = new google.maps.LatLngBounds();
+    pts.forEach(([lng, lat]) => b.extend({ lat, lng }));
+    gmap.fitBounds(b, 60);
+  }
+}
+
+function drawMap(s) {
+  const placed = s.nodes.filter(n => n.lat != null && n.lon != null);
+  if (mapMode === "vector" || mapMode === "google") {
+    const store = mapMode === "vector" ? markers : gmarkers;
+    const fresh = !Object.keys(store).length;
+    for (const n of placed) {
+      let m = store[n.node];
+      if (!m) {
+        const el = markerEl(n);
+        m = mapMode === "vector"
+          ? new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat([n.lon, n.lat]).addTo(vmap)
+          : new google.maps.marker.AdvancedMarkerElement({ map: gmap, position: { lat: n.lat, lng: n.lon }, content: el });
+        store[n.node] = m;
+      }
+      updateMarkerEl(mapMode === "vector" ? m.getElement() : m.content, n);
+    }
+    if (fresh) fit();
+    return;
+  }
+  if (mapMode !== "svg") return;
+  const el = document.getElementById("map"), W = el.clientWidth || 600, H = el.clientHeight || 420, pad = 50;
+  if (!placed.length) { el.innerHTML = `<div class="muted" style="padding:16px">Nessuna camera con coordinate in app/nodes.json.</div>`; return; }
+  const lat0 = placed.reduce((a, n) => a + n.lat, 0) / placed.length, k = Math.cos(lat0 * Math.PI / 180);
+  const xs = placed.map(n => n.lon * k), ys = placed.map(n => n.lat);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  const sc = Math.min((W - 2 * pad) / Math.max(x1 - x0, 1e-4), (H - 2 * pad) / Math.max(y1 - y0, 1e-4));
+  const px = n => pad + (n.lon * k - x0) * sc + ((W - 2 * pad) - (x1 - x0) * sc) / 2;
+  const py = n => H - pad - (n.lat - y0) * sc - ((H - 2 * pad) - (y1 - y0) * sc) / 2;
+  let g = "";
+  for (let i = 1; i < 8; i++) g += `<line x1="${i * W / 8}" y1="0" x2="${i * W / 8}" y2="${H}" stroke="var(--grid)"/><line x1="0" y1="${i * H / 8}" x2="${W}" y2="${i * H / 8}" stroke="var(--grid)"/>`;
+  const dots = placed.map(n => {
+    const c = DOT[cls(n)], sel = n.node === picked, faint = n.diagnosis.code === "unknown";
+    return `<g style="cursor:pointer" data-node="${esc(n.node)}"><title>${esc(n.node)} · ${esc(n.name)} · ${esc(label(n))}</title>
+      <circle cx="${px(n)}" cy="${py(n)}" r="${sel ? 12 : 9}" fill="${c}" fill-opacity="${faint ? 0.3 : 0.9}" stroke="${sel ? "var(--text)" : c}" stroke-width="${sel ? 3 : 2}"/>
+      <text x="${px(n) + 14}" y="${py(n) + 4}" font-size="12" fill="var(--text)">${esc(n.node)}</text></g>`;
+  }).join("");
+  el.innerHTML = `<svg class="schematic" viewBox="0 0 ${W} ${H}" role="img" aria-label="Mappa schematica delle camere">${g}${dots}</svg>`;
+}
+
+/* ---------- pannello di dettaglio ---------- */
+function trafficView(t) {
+  if (!t || !t.windows.length) return `<div class="empty">${ic("activity")} Ancora nessun conteggio da questa camera.</div>`;
+  const h = t.last_hour, max = Math.max(1, ...Object.values(h));
+  const rows = [["Pedoni in", h.ped_in], ["Pedoni out", h.ped_out], ["Ciclisti", h.cyclist], ["Veicoli", h.vehicles], ["Animali", h.animals]]
+    .map(([k, v]) => `<span>${k}</span><div class="track"><div class="fill" style="width:${(100 * v / max).toFixed(1)}%"></div></div><span>${num(v)}</span>`).join("");
+  const tot = w => w.ped_in + w.ped_out + w.cyclist + w.vehicles + w.animals;
+  const cmax = Math.max(1, ...t.windows.map(tot));
+  const cols = t.windows.map(w => `<div class="col ${w.provisional ? "prov" : ""}" style="height:${(100 * tot(w) / cmax).toFixed(1)}%"
+    title="${hhmm(w.t0)}–${hhmm(w.t1)}: ${tot(w)} passaggi${w.provisional ? " (provvisorio, arrivato via Bluetooth)" : ""}"></div>`).join("");
+  const e = t.env || {};
+  const env = [e.t_c != null ? `${e.t_c} °C` : null, e.rh != null ? `${e.rh}% umidità` : null, e.lux != null ? `${e.lux} lux` : null].filter(Boolean);
+  return `<div class="bars">${rows}</div><div class="cols">${cols}</div>
+    <div class="muted" style="margin-top:6px">Passaggi per intervallo${t.last_hour_provisional ? " · le barre tratteggiate sono provvisorie (arrivate via Bluetooth)" : ""}</div>
+    ${env.length ? `<div class="envs">${env.map(x => `<span>${x}</span>`).join("")}</div>` : ""}`;
+}
+
+function alarmRow(a, withNode, now) {
+  const icon = a.severity === "info" ? "check" : "alert";
+  return `<div class="alarm"><div class="aic ${a.severity}">${ic(icon)}</div><div>
+    <div class="at">${esc(a.text.charAt(0).toUpperCase() + a.text.slice(1))}</div>
+    <div class="am">${withNode ? `<b>${esc(a.name || a.node)}</b> · ` : ""}${ago(now - a.ts)} (${hhmm(a.ts)})
+      ${a.via.map(v => `<span class="via">${esc(v === "MQTT" ? "Wi-Fi" : v === "BLE" ? "Bluetooth" : v)}</span>`).join("")}</div></div></div>`;
+}
+
+function detailView(n, s) {
+  const c = cls(n), t = s.traffic[n.node] || {}, today = t.today || {};
+  const links = n.lat != null ? `<div class="links">
+      <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${n.lat},${n.lon}">${ic("ext")} Google Maps</a>
+      <a class="btn" target="_blank" rel="noopener" href="https://maps.apple.com/?ll=${n.lat},${n.lon}&q=${encodeURIComponent(n.name || n.node)}">${ic("ext")} Mappe</a></div>` : "";
+  const head = `<div class="dh"><div><div class="dname">${esc(shortName(n))}</div>
+      <div class="muted">${esc(n.node)}${n.site ? " · profilo " + esc(n.site) : ""}</div></div>
+    <span class="badge ${c}">${esc(label(n))}</span></div>${links}`;
+  if (n.diagnosis.code === "unknown") {
+    return head + `<h3>Stato</h3><div class="empty">${ic("camera")}<div>Nessun dato ricevuto da questa camera.<br>`
+      + `<span class="muted">Si accende quando il nodo con <code>NODE_ID=${esc(n.node)}</code> si collega (Wi-Fi o Bluetooth).</span></div></div>`;
+  }
+  const kv = (icon, k, v, tip = "", wide = false) =>
+    `<div class="${wide ? "wide" : ""}" ${tip ? `title="${esc(tip)}"` : ""}><div class="k">${ic(icon)} ${k}</div><div class="v">${v}</div></div>`;
+  const items = [
+    kv(n.channel === "BLE" ? "bt" : "wifi", "Canale", esc(n.channel === "Wi-Fi/MQTT" ? "Wi-Fi" : n.channel === "BLE" ? "Bluetooth (riserva)" : n.channel || "nessuno"),
+       "Wi-Fi è il canale normale; il Bluetooth si accende da solo se il Wi-Fi del nodo è giù da 30 s"),
+    kv("clock", "Ultimo contatto", ago(n.last_contact_s)),
+  ];
+  if (n.diagnosis.code === "network_down" && n.mqtt_silent_s != null) items.push(kv("wifi", "Senza Wi-Fi da", dur(n.mqtt_silent_s)));
+  items.push(kv("light", "Semaforo", esc(STATE_IT[n.state] || n.state || "n.d."), `Modalità ${MODE_IT[n.mode] || n.mode || "n.d."}${n.fps ? ` · ${n.fps} fotogrammi/s` : ""}`));
+  items.push(kv("queue", "Eventi in attesa", num(n.queue), "Eventi salvati sul nodo e non ancora confermati dalla centrale: si svuota da solo quando torna la rete"));
+  items.push(kv("battery", "Batteria", n.batt == null ? "n.d." : n.batt + "%"));
+  if (n.rssi != null) items.push(kv("bt", "Segnale Bluetooth", `${n.rssi} dBm`, `Ultimo beacon ${ago(n.ble_last_s)}`));
+  const alarms = s.alarms.filter(a => a.node === n.node);
+  const mini = (k, v, tip) => `<div class="mini" title="${esc(tip)}"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  return head + `<h3>Stato</h3><div class="kv">${items.join("")}</div>
+    <h3>Traffico · ultima ora</h3>${trafficView(t)}
+    <h3>Sicurezza · oggi</h3><div class="minis">
+      ${mini("Precedenza data", today.yield_rate == null ? "n.d." : Math.round(100 * today.yield_rate) + "%", "Veicoli che hanno rallentato con un pedone in attesa")}
+      ${mini("Quasi incidenti", num(today.near_miss ?? 0), "Veicolo e pedone a meno di 1 secondo l'uno dall'altro")}
+      ${mini("Pedoni fragili", num(today.vulnerable ?? 0), "Bambini, persone lente o con ausili (carrozzina, passeggino)")}</div>
+    <h3>Allarmi</h3>${alarms.length ? alarms.map(a => alarmRow(a, false, s.now)).join("") : `<div class="empty">${ic("check")} Nessun allarme per questa camera.</div>`}`;
+}
+
+/* video dal vivo della visione: si apre solo con un clic, si chiude cambiando camera. Mai registrato (specifica §5.3). */
+let videoNode = undefined;
+function updateVideo(n) {
+  if (!n || n.node === videoNode) return;          // non ricaricare lo stream a ogni aggiornamento dei dati
+  videoNode = n.node;
+  const box = document.getElementById("videobox");
+  if (!n.video) {
+    box.innerHTML = n.diagnosis.code === "unknown" ? "" : `<h3>Video dal vivo</h3><div class="empty">${ic("camera")}
+      <span>Non configurato. Serve lo stream della visione sulla scheda e il campo <code>video</code> di questa camera in
+      <code>nodes.json</code> (pulsante Cartella).</span></div>`;
+    return;
+  }
+  box.innerHTML = `<h3>Video dal vivo</h3><button class="btn" id="live-open">${ic("camera")} Guarda dal vivo</button>
+    <span class="muted">solo dal vivo, nessuna registrazione</span>`;
+  document.getElementById("live-open").addEventListener("click", () => {
+    box.innerHTML = `<h3>Video dal vivo</h3><div class="live"><span class="tag">LIVE</span>
+      <img alt="Video dal vivo con i riconoscimenti" src="${esc(n.video)}"></div>
+      <div class="links"><button class="btn" id="live-close">Chiudi il video</button></div>`;
+    box.querySelector("img").addEventListener("error", () => {
+      box.querySelector(".live").outerHTML = `<div class="empty">${ic("alert")} Video non raggiungibile: la visione è accesa e la scheda è in rete?</div>`;
+    });
+    document.getElementById("live-close").addEventListener("click", () => { videoNode = undefined; updateVideo(n); });
+  });
+}
+
+function render(s) {
+  S = s;
+  document.getElementById("err").style.display = "none";
+  document.getElementById("updated").textContent = `Aggiornato alle ${new Date(s.now * 1000).toLocaleTimeString("it-IT")} · si aggiorna da solo ogni 2 secondi`;
+  if (!s.nodes.some(n => n.node === picked)) picked = (s.nodes.find(n => PULSE.has(n.diagnosis.code)) || s.nodes.find(n => n.diagnosis.code !== "unknown") || s.nodes[0] || {}).node || null;
+
+  // riepilogo
+  const online = s.nodes.filter(n => n.diagnosis.code === "ok").length;
+  const trouble = s.nodes.filter(n => PULSE.has(n.diagnosis.code));
+  const lastHour = Object.values(s.traffic).reduce((a, t) => a + Object.values(t.last_hour || {}).reduce((x, y) => x + y, 0), 0);
+  const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+  const alarmsToday = s.alarms.filter(a => a.ts * 1000 >= midnight.getTime()).length;
+  const kpi = (icon, k, v, sub, c = "", tip = "") => `<div class="kpi" ${tip ? `title="${esc(tip)}"` : ""}><div class="k">${ic(icon)} ${k}</div><div class="v ${c}">${v}</div><div class="s">${sub}</div></div>`;
+  document.getElementById("kpis").innerHTML =
+    kpi("camera", "Camere operative", `${online}/${s.nodes.length}`, online === s.nodes.length ? "tutte collegate" : "le altre: vedi la mappa",
+        s.nodes.length && online === s.nodes.length ? "ok" : "warn") +
+    kpi("alert", "Da controllare", trouble.length || "Nessuna", trouble.length ? "vedi l'avviso in alto" : "tutto regolare", trouble.length ? "bad" : "ok") +
+    kpi("activity", "Passaggi ultima ora", num(lastHour), "pedoni, bici, veicoli, animali") +
+    kpi("shield", "Allarmi oggi", num(alarmsToday), alarmsToday ? "nel registro qui sotto" : "nessun allarme", alarmsToday ? "warn" : "") +
+    kpi("check", "Eventi persi", num(s.reliability.gaps), "dall'avvio della centrale", s.reliability.gaps ? "bad" : "ok",
+        "Ogni evento ha un numero progressivo: se ne mancasse uno, comparirebbe qui");
+
+  // avviso
+  const att = document.getElementById("attention");
+  att.hidden = !trouble.length;
+  att.classList.toggle("bad", trouble.some(n => cls(n) === "bad-b"));
+  att.innerHTML = trouble.length ? `${ic("alert")} ${trouble.length === 1 ? "Una camera richiede" : trouble.length + " camere richiedono"} attenzione:
+    ${trouble.map(n => `<button data-node="${esc(n.node)}">${esc(shortName(n))} · ${esc(n.diagnosis.text)}</button>`).join("")}` : "";
+
+  // lista camere
+  document.getElementById("nodelist").innerHTML = s.nodes.map(n =>
+    `<button class="node ${n.node === picked ? "sel" : ""}" data-node="${esc(n.node)}">
+      <span class="dot" style="background:${DOT[cls(n)]}"></span>
+      <span><span class="n1">${esc(shortName(n))}</span><br><span class="n2">${esc(label(n))}${n.diagnosis.code !== "unknown" ? " · " + ago(n.last_contact_s) : ""}</span></span></button>`).join("");
+
+  const n = s.nodes.find(x => x.node === picked);
+  document.getElementById("detail").innerHTML = n ? detailView(n, s) : `<div class="empty">Nessuna camera configurata.</div>`;
+  updateVideo(n);
+  document.getElementById("alarm-count").textContent = s.alarms.length ? `${s.alarms.length} recenti` : "";
+  document.getElementById("alarms").innerHTML = s.alarms.length ? s.alarms.map(a => alarmRow(a, true, s.now)).join("")
+    : `<div class="empty">${ic("check")} Nessun allarme. Tutto tranquillo.</div>`;
+  const r = s.reliability;
+  const metric = (k, v, c = "", tip = "") => `<div class="metric" title="${esc(tip)}"><div class="k">${k}</div><div class="v ${c}">${v}</div></div>`;
+  document.getElementById("metrics").innerHTML =
+    metric("Eventi ricevuti", num(r.events), "", "Eventi arrivati dalle camere, senza doppioni") +
+    metric("Eventi persi", num(r.gaps), r.gaps ? "badv" : "good", "Numeri di evento mancanti: deve restare 0") +
+    metric("Doppioni scartati", num(r.duplicates_dropped), "", "Eventi arrivati due volte (normale dopo un blackout) e ignorati") +
+    metric("Messaggi via Bluetooth", num(r.backup_messages), "", "Stato, conteggi e allarmi arrivati sul canale di riserva");
+  drawMap(s);
+}
+
+async function refreshInfo() {
+  try {
+    const i = await (await fetch("/api/info", { cache: "no-store" })).json();
+    if (!i.mqtt) return;
+    document.getElementById("sys-mqtt").innerHTML =
+      `<span class="dot" style="background:${i.mqtt.connected ? DOT.ok : DOT["bad-b"]}"></span>${i.mqtt.connected ? "Rete dati attiva" : "Rete dati non collegata"}`;
+    const bleColor = i.ble === "in ascolto" ? DOT.ok : i.ble === "spento" || i.ble === "in avvio" ? DOT.neutral : DOT["bad-b"];
+    const bleText = i.ble === "in ascolto" ? "Bluetooth in ascolto" : i.ble === "spento" ? "Bluetooth spento" : i.ble === "in avvio" ? "Bluetooth in avvio" : "Bluetooth non disponibile";
+    document.getElementById("sys-ble").innerHTML = `<span class="dot" style="background:${bleColor}"></span>${bleText}`;
+    document.getElementById("sys-ble").title = `Ricezione Bluetooth: ${i.ble}`;
+    document.getElementById("sys-nodes").innerHTML = i.mqtt.nodes_connect_to ? `${ic("link")} Arduino → <b>${esc(i.mqtt.nodes_connect_to)}</b>` : "";
+    document.getElementById("btn-config").hidden = document.getElementById("btn-folder").hidden = !i.config_dir;
+  } catch (e) { /* il banner di errore lo gestisce refresh() */ }
+}
+for (const [id, what] of [["btn-config", "config"], ["btn-folder", "folder"]]) {
+  document.getElementById(id).addEventListener("click", () => fetch(`/api/open/${what}`, { method: "POST" }));
+}
+
+async function refresh() {
+  try {
+    const res = await fetch("/api/state", { cache: "no-store" });
+    if (!res.ok) throw new Error(res.status);
+    render(await res.json());
+  } catch (e) {
+    document.getElementById("err").style.display = "block";
+  }
+}
+document.getElementById("mapstyle").value = styleChoice;
+document.getElementById("mapstyle").addEventListener("change", e => setMapStyle(e.target.value));
+for (const id of ["nodelist", "map", "attention"]) {
+  document.getElementById(id).addEventListener("click", e => {
+    const el = e.target.closest("[data-node]");
+    if (el) select(el.dataset.node);
+  });
+}
+window.addEventListener("resize", () => { if (mapMode === "svg" && S) drawMap(S); });
+loadMap();
+refresh();
+refreshInfo();
+setInterval(refresh, 2000);
+setInterval(refreshInfo, 5000);
+</script>
+</body>
+</html>
