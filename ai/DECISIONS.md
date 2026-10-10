@@ -405,4 +405,8 @@ con v_ped 0,3 → 25 s.
       fail-safe. In quella prova 7,4 FPS: sulla scheda girava anche un `apt`.
     Non ancora provati sull'hardware: una richiesta nata da una scena vera (serve la calibrazione), badge → pagina
     del tecnico → login dal telefono, antifurto mostrato sulla pagina.
+34. **Rosso dei veicoli a 20 s** (era 10): chiesto da Paolo perché tutti i pedoni abbiano il tempo di attraversare.
+    È una costante dello sketch dell'app `mdgb` (`VEH_RED_MS`); i limiti diventano 20 + 15 s di estensione e
+    20 + 20 s di rosso trattenuto. Misurato sulla scheda: 20,0 s. `deploy/run_vision.sh` accende e spegne la
+    visione sulla scheda senza `sudo`.
 

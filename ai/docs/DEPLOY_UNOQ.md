@@ -121,7 +121,17 @@ Cosa guardare:
 Se `--actuator bridge` scrive "no sketch provides mdgb_line", sulla scheda c'è ancora lo sketch senza `mdgb_line`:
 la visione gira lo stesso, il semaforo fa il suo ciclo normale e badge e antifurto non arrivano alla visione.
 
-## 7. Avvio automatico
+## 7. Accendere e spegnere la visione
+
+A mano, senza `sudo`, in background (resta accesa anche chiudendo ssh):
+
+```bash
+ssh arduino@<scheda> '~/HackTurin-mdgb/ai/deploy/run_vision.sh start'    # stop | status | log
+```
+
+Il log è in `~/HackTurin-mdgb/logs/vision.log`. Dopo aver cambiato credenziali, calibrazione o codice: `stop`, poi `start`.
+
+### Avvio automatico all'accensione
 
 ```bash
 ./ai/deploy/push_to_arduino.sh arduino@<scheda> --bridge --service    # chiede la password di sudo

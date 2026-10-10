@@ -23,7 +23,8 @@ COMMS_FILES=(comms/__init__.py comms/actuators.py comms/jsonl.py)   # vision <->
 BRIDGE_PACKAGE="arduino-router-bridge==0.5.1"                       # same pin as comms/requirements.txt
 case " $* " in *" --bridge "*) BRIDGE=1 ;; *) BRIDGE=0 ;; esac
 FILES=(ai/smartcrossing ai/config.yaml ai/calib.example.json ai/calib_thermal.example.json ai/requirements.txt
-       ai/scripts/bench.py ai/scripts/operator_login.py ai/deploy/mdgb-ai.service ai/models/yolox_nano_dynamic.onnx)
+       ai/scripts/bench.py ai/scripts/operator_login.py ai/deploy/mdgb-ai.service ai/deploy/run_vision.sh
+       ai/models/yolox_nano_dynamic.onnx)
 [ -f "$ROOT/ai/calib.json" ] && FILES+=(ai/calib.json)            # the calibration of the mounted camera, if made
 [ -f "$ROOT/ai/calib_thermal.json" ] && FILES+=(ai/calib_thermal.json)
 [ -f "$ROOT/ai/models/yolox_nano_dynamic.onnx" ] || { echo "Manca il modello: lancia prima ai/scripts/get_model.sh"; exit 1; }
@@ -124,7 +125,8 @@ if [ "$SERVICE" = 1 ]; then
 else
   echo "3/3 (avvio automatico non richiesto: aggiungi --service quando la prova a mano funziona)"
   echo
-  echo "Fatto. Prova a mano sulla scheda (ssh $TARGET), con la camera libera (libcamerify: camera CSI):"
+  echo "Fatto. Per accendere e spegnere la visione sulla scheda:  ssh $TARGET '~/HackTurin-mdgb/ai/deploy/run_vision.sh start'   (stop, status, log)"
+  echo "Oppure a mano (ssh $TARGET), con la camera libera (libcamerify: camera CSI):"
   echo '  cd ~/HackTurin-mdgb/ai && libcamerify ~/venv/bin/python scripts/bench.py 0 --profile unoq'
   echo '  MDGB_C3_DIR=$(cat .c3_dir) libcamerify ~/venv/bin/python -m smartcrossing.app --source 0 --profile unoq \'
   echo '      --headless --actuator bridge --operator-port 8090'
