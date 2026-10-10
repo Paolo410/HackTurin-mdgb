@@ -468,4 +468,14 @@ con v_ped 0,3 → 25 s.
         chi lo riceve;
     - **non ancora provati:** badge, login e cicalino muto dal telefono (serve qualcuno con il badge);
       calibrazione e richieste nate da una scena vera.
+41. **Correzioni in centrale concordate con Lorenzo (11/10, 01:50)**, in PR #13 (area sua):
+    - **"Nodo distrutto" per 5 s:** per 20 s da quando MQTT è perso la centrale mostra "Wi-Fi perso, attendo il
+      Bluetooth" (giallo), poi decide. Lorenzo trovava troppi 40 s. Vale dopo la ricostruzione dell'app sul
+      suo PC;
+    - **fail-safe in centrale anche a visione spenta:** lo scrive `mdgb_link.py` dal messaggio `led_status`
+      "FAIL-SAFE" dello sketch. Lo sketch dell'app `mdgb` non manda più nessun `mcu_event`: urto, badge e
+      fail-safe passano tutti da `mdgb_link.py`, una volta sola. App aggiornata sulla scheda (backup in
+      `~/HackTurin-mdgb/backups/`) e zip per Salvatore aggiornato;
+    - **provato:** visione interrotta → riga di fail-safe dopo circa 0,7 s → la centrale mostra "nodo guasto
+      (semaforo in fail-safe)" → con la visione ripartita da sola torna "nodo OK" dopo 12 s.
 
