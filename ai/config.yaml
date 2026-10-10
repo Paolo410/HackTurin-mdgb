@@ -184,6 +184,17 @@ actuator:
   c1_repeat_s: 1.0                # the last C1 is repeated at least this often (CONTRACTS draft)
   failsafe_timeout_s: 0.5         # (spec) the firmware falls back after 500 ms without heartbeat
 
+mcu:                              # what the microcontroller tells the vision (C5 lines of CONTRACTS.md)
+  applab_series: applab           # files <series>-*.jsonl written in the C3 folder by the App Lab app of the
+                                  # sketch (comms/applab/mdgb_link.py): sensors, shock alarm, technician's badge
+  poll_s: 0.5                     # how often those files are read
+  tamper_hold_s: 30               # after a shock the camera may have moved: DEGRADED for this long.
+                                  # null = until the technician's badge. The badge always clears it at once
+  lamp_fault_hold_s: 5            # DEGRADED while the firmware keeps reporting a lamp fault this often
+
+operator:                         # status page for the technician (--operator-port): numbers only, no images
+  unlock_s: 600                   # the page answers for this long after the badge (tamper code 3)
+
 derive:
   rider_iou: 0.3                  # (spec) person/two-wheeler IoU above which the person is the rider
   animal_classes: [dog, cat, horse, sheep, cow, bear]   # (spec) COCO classes reported as "animal"

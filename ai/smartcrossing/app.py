@@ -18,10 +18,12 @@ import cv2
 from .actuator import make_actuator
 from .config import load_config
 from .geometry import load_calib
-from .logger import C3Logger, flat_counts
+from .logger import C3Logger, c3_dir, flat_counts
+from .mcu import C5FileTail, McuState
 from .overlay import draw_hud, draw_lines, draw_state, draw_thermal, draw_tracks, draw_zones
 from .pipeline import PHASES, LatencyStats, Pipeline
 from .sources import FrameSource, default_source
+from .status_page import OperatorPage
 from .thermal import ThermalFusion, make_thermal_source
 
 _KEY_ESC = 27
@@ -47,6 +49,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--calib", help="path to a calib.json (default: ai/calib.json, else ai/calib.example.json)")
     p.add_argument("--c3-dir", help="folder of the C3 event files (default: $MDGB_C3_DIR, else logs/c3 in the repo)")
     p.add_argument("--no-c3", action="store_true", help="do not write the C3 event files")
+    p.add_argument("--operator-port", type=int, help="status page for the technician on this port (numbers only, "
+                                                     "open for a few minutes after the badge)")
     return p.parse_args(argv)
 
 
@@ -66,9 +70,17 @@ def main(argv: list[str] | None = None) -> int:
         actuator = make_actuator(args.actuator, cfg, **({"port": args.port} if args.port else {}))
         thermal_source = make_thermal_source(args.thermal, cfg, actuator)
         thermal = ThermalFusion(cfg, thermal_source, force_night=args.night) if thermal_source else None
+        # Lines of the microcontroller (C5): from the Bridge through the actuator, and from the files of the
+        # App Lab app of the sketch. The thermal camera, when there is one, reads the same lines.
+        mcu = McuState(cfg)
+        handlers = [mcu.on_line] + ([thermal_source.on_mcu_line] if hasattr(thermal_source, "on_mcu_line") else [])
+        actuator.set_listener(lambda line: [handle(line) for handle in handlers])
+        events_dir = args.c3_dir or c3_dir(cfg)
+        mcu_files = C5FileTail(events_dir, cfg["mcu"]["applab_series"], mcu.on_line, cfg["mcu"]["poll_s"])
+        operator = OperatorPage(args.operator_port, mcu) if args.operator_port is not None else None
         source = FrameSource(args.source or default_source(cfg), cfg)
         pipeline = Pipeline(cfg, source.fps, calib, actuator, site=args.site, thermal=thermal)
-    except (FileNotFoundError, RuntimeError, TypeError) as exc:
+    except (FileNotFoundError, RuntimeError, TypeError, OSError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
     stats = LatencyStats()
@@ -80,7 +92,8 @@ def main(argv: list[str] | None = None) -> int:
              f"max_fps={cfg['source']['max_fps'] or 'unlimited'} actuator={args.actuator} "
              f"site={pipeline.animals.site_name}")
     print(setup)
-    print(f"c3={log.dir if log else 'off'}")
+    print(f"c3={log.dir if log else 'off'}  mcu_files={events_dir}/{cfg['mcu']['applab_series']}-*.jsonl"
+          + (f"  operator_page=:{operator.port}" if operator else ""))
     metric = pipeline.geometry is not None and pipeline.geometry.metric
     print(f"calib={calib_path}" + ("" if metric else
                                   "  (no metric calibration: no speeds and no rule; run scripts/calibrate.py)"))
@@ -94,11 +107,15 @@ def main(argv: list[str] | None = None) -> int:
     frames = 0
     last_state = None
     last_frame = None
+    n_tracks = n_valid = 0
+    page_lat = dict.fromkeys(PHASES, "-")
     # The clock starts at the first frame: opening the camera is not part of the frame rate.
     first = last = last_status = perf_counter()
     pipeline.commander.start()   # heartbeat every 100 ms, only while this loop is alive
+    mcu_files.start()
     try:
         while True:
+            pipeline.external_fault = mcu.fault()   # shock or lamp fault reported by the microcontroller
             item = source.read()
             if item is None:
                 if not source.is_live or frames == 0:
@@ -146,6 +163,17 @@ def main(argv: list[str] | None = None) -> int:
             if result is not None:
                 n_tracks, n_valid = len(result.tracked), int(result.valid.sum())
                 lat = " ".join(f"{phase}={_fmt_ms(result.lat_ms[phase])}" for phase in PHASES)
+            if operator is not None:   # also without frames: the page must say DEGRADED, not the last good state
+                if result is not None:
+                    page_lat = {phase: _fmt_ms(result.lat_ms[phase]) for phase in PHASES}
+                operator.update({
+                    "state": command["state"], "led": command["led"], "reason": command["reason"],
+                    "green_s": command["green_s"], "fps": round(fps, 1), "tracks": n_valid, "counts": counts,
+                    "lat_ms": page_lat,
+                    "events": pipeline.events.summary(), "source": source.name, "calib": calib_path.name,
+                    "link_failsafe": getattr(actuator, "connected", None) is False
+                                     or bool(getattr(actuator, "failsafe", False)),
+                })
             if args.headless:
                 if result is not None and now - last_status >= float(o["status_every_s"]):
                     print(f"t={now - first:6.1f}s frame={frames} fps={fps:.1f} ms[{lat}] "
@@ -172,6 +200,9 @@ def main(argv: list[str] | None = None) -> int:
         pass
     finally:
         pipeline.commander.close()
+        mcu_files.close()
+        if operator is not None:
+            operator.close()
         source.release()
         if log:
             log.close()

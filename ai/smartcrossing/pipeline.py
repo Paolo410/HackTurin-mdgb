@@ -99,6 +99,7 @@ class Pipeline:
         self.selfcheck_every = max(1, int(cfg["selfcheck"]["every_n_frames"]))
         self.selfcheck_confirm = max(1, int(cfg["selfcheck"]["confirm_checks"]))
         self.fault: str | None = None             # confirmed result of the camera self-check
+        self.external_fault: str | None = None    # set by the caller: tamper or lamp fault from the MCU
         self._last_fault: str | None = None
         self._fault_streak = 0
         self.scene = Scene(W=float(cfg["rules"]["default_W_m"]))
@@ -163,7 +164,7 @@ class Pipeline:
         valid = self.tracker.valid_mask(self._last)
         t2 = perf_counter()
         self.scene = build_scene(self.tracker, self._last, self._last_roles, valid, self.geometry, t, self.cfg)
-        self.scene.fault = self.fault
+        self.scene.fault = self.fault or self.external_fault
         if detections is not None:
             # "rules" also covers what the rule needs from the trajectories: animals and events.
             self.scene.animals = self.animals.update(self.tracker, self._last, self._last_roles, valid, self.geometry, t)
@@ -185,7 +186,7 @@ class Pipeline:
     def no_frame(self, t: float) -> dict:
         """The camera gave no frame: the rule runs on the age of the last one (DEGRADED after the timeout)."""
         age = t - self._last_frame_t if self._last_frame_t is not None else float("inf")
-        self.scene = Scene(W=self.scene.W, video_age_s=age)
+        self.scene = Scene(W=self.scene.W, video_age_s=age, fault=self.external_fault)
         self._command = self.rules.step(self.scene, t)
         if self.commander is not None:
             self.commander.update(self._command)
