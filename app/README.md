@@ -62,8 +62,10 @@ Pulsanti **Configurazione** e **Cartella** in alto nella finestra. La cartella �
 | `certs/` | solo per il cloud: certificati del broker (vedi `comms/aws/`) |
 | `central.db`, `centrale.log` | database e log della centrale |
 
-**Mappa.** Con una chiave di Google Maps (`GOOGLE_MAPS_API_KEY`, API "Maps JavaScript") la mappa è Google Maps; senza
-chiave è una mappa web senza chiave; senza Internet una mappa schematica con le stesse camere.
+**Mappa.** Mappa vettoriale moderna (MapLibre + OpenFreeMap, gratis e senza chiave): stile automatico chiaro/scuro
+come il Mac, oppure "Dettagliata" dal menu sopra la mappa (la scelta resta memorizzata). Le camere con un problema
+pulsano. Senza Internet si passa da soli a una mappa schematica con le stesse camere. Facoltativo: con una chiave di
+Google Maps (`GOOGLE_MAPS_API_KEY`, API "Maps JavaScript", serve un account con fatturazione) si usa Google Maps.
 
 **Dashboard da telefono/tablet.** In `config.env` metti `WEB_HOST=0.0.0.0` e apri `http://<IP del PC>:8080` dal telefono
 sulla stessa rete.
@@ -76,6 +78,18 @@ python app/desktop/centrale_app.py        # come l'app, con la finestra
 python app/central.py --no-ble            # senza finestra: dashboard su http://localhost:8080 (broker già avviato a parte)
 python app/central.py --report            # riepilogo del database ed esce
 ```
+
+## Nodi simulati (prove e demo, sul PC dello sviluppatore)
+
+Con l'app aperta (il broker è dentro l'app, porta 1883), dalla cartella del repo:
+
+```bash
+MQTT_HOST=127.0.0.1 MQTT_PORT=1883 MQTT_TLS=0 NODE_ID=nodo01 EVENT_SOURCE=sim BACKUP_LINK=none DB_PATH=/tmp/nodo01.db python comms/node/main.py
+```
+
+Cambiando `NODE_ID` (e `DB_PATH`) si accendono anche le camere del mockup (`nodo02`…`nodo05`). Gli eventi sono finti,
+ma passano dalla rete vera. Quando la scheda gira con la visione di Paolo, `nodo01` arriva dall'Arduino: vedi
+[`docs/INSTRUCTIONS_FOR_OTHERS.md`](../docs/INSTRUCTIONS_FOR_OTHERS.md#8-dal-nodo-simulato-a-quello-vero).
 
 ## File
 
