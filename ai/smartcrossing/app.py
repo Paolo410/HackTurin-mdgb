@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from collections import deque
 from time import perf_counter
 
 import cv2
@@ -18,10 +19,12 @@ import cv2
 from .actuator import make_actuator
 from .config import load_config
 from .geometry import load_calib
-from .logger import C3Logger, flat_counts
+from .logger import C3Logger, c3_dir, flat_counts
+from .mcu import C5FileTail, McuState
 from .overlay import draw_hud, draw_lines, draw_state, draw_thermal, draw_tracks, draw_zones
 from .pipeline import PHASES, LatencyStats, Pipeline
 from .sources import FrameSource, default_source
+from .status_page import OperatorPage
 from .thermal import ThermalFusion, make_thermal_source
 
 _KEY_ESC = 27
@@ -47,6 +50,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--calib", help="path to a calib.json (default: ai/calib.json, else ai/calib.example.json)")
     p.add_argument("--c3-dir", help="folder of the C3 event files (default: $MDGB_C3_DIR, else logs/c3 in the repo)")
     p.add_argument("--no-c3", action="store_true", help="do not write the C3 event files")
+    p.add_argument("--operator-port", type=int, help="page for the technician on this port: after the badge and "
+                                                     "a login it shows the numbers and, if enabled, a live view")
     return p.parse_args(argv)
 
 
@@ -66,9 +71,17 @@ def main(argv: list[str] | None = None) -> int:
         actuator = make_actuator(args.actuator, cfg, **({"port": args.port} if args.port else {}))
         thermal_source = make_thermal_source(args.thermal, cfg, actuator)
         thermal = ThermalFusion(cfg, thermal_source, force_night=args.night) if thermal_source else None
+        # Lines of the microcontroller (C5): from the Bridge through the actuator, and from the files of the
+        # App Lab app of the sketch. The thermal camera, when there is one, reads the same lines.
+        mcu = McuState(cfg)
+        handlers = [mcu.on_line] + ([thermal_source.on_mcu_line] if hasattr(thermal_source, "on_mcu_line") else [])
+        actuator.set_listener(lambda line: [handle(line) for handle in handlers])
+        events_dir = args.c3_dir or c3_dir(cfg)
+        mcu_files = C5FileTail(events_dir, cfg["mcu"]["applab_series"], mcu.on_line, cfg["mcu"]["poll_s"])
+        operator = OperatorPage(args.operator_port, mcu, cfg) if args.operator_port is not None else None
         source = FrameSource(args.source or default_source(cfg), cfg)
         pipeline = Pipeline(cfg, source.fps, calib, actuator, site=args.site, thermal=thermal)
-    except (FileNotFoundError, RuntimeError, TypeError) as exc:
+    except (FileNotFoundError, RuntimeError, TypeError, OSError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
     stats = LatencyStats()
@@ -80,7 +93,10 @@ def main(argv: list[str] | None = None) -> int:
              f"max_fps={cfg['source']['max_fps'] or 'unlimited'} actuator={args.actuator} "
              f"site={pipeline.animals.site_name}")
     print(setup)
-    print(f"c3={log.dir if log else 'off'}")
+    print(f"c3={log.dir if log else 'off'}  mcu_files={events_dir}/{cfg['mcu']['applab_series']}-*.jsonl")
+    if operator is not None:
+        print(f"operator_page=:{operator.port} images={'on' if operator.share_images else 'off'} "
+              f"login={'set' if operator.credentials else 'NOT SET (run scripts/operator_login.py): nobody can log in'}")
     metric = pipeline.geometry is not None and pipeline.geometry.metric
     print(f"calib={calib_path}" + ("" if metric else
                                   "  (no metric calibration: no speeds and no rule; run scripts/calibrate.py)"))
@@ -89,16 +105,34 @@ def main(argv: list[str] | None = None) -> int:
               + (" night forced" if args.night else ""))
 
     quit_keys = {ord(k) for k in o["quit_keys"]} | {_KEY_ESC}
-    alpha = float(o["fps_ema_alpha"])
+    # Rate over the last frames, not between two frames: with the detector on one frame out of two the frames
+    # arrive in pairs, and the time between the two of a pair says nothing.
+    stamps: deque = deque(maxlen=int(o["fps_window_frames"]))
     fps = 0.0
     frames = 0
     last_state = None
     last_frame = None
+    n_tracks = n_valid = 0
+    page_lat = dict.fromkeys(PHASES, "-")
     # The clock starts at the first frame: opening the camera is not part of the frame rate.
     first = last = last_status = perf_counter()
+
+    def annotate(view) -> None:
+        """What the vision sees, drawn on the frame: for the window and for the technician's live view."""
+        draw_zones(view, pipeline.geometry, cfg)
+        draw_lines(view, pipeline.counter, cfg)
+        draw_tracks(view, result, pipeline.tracker, cfg)
+        draw_hud(view, [f"FPS {fps:.1f}   tracks {n_valid}/{n_tracks}", f"ms  {lat}", counts,
+                        pipeline.events.summary(), setup], cfg)
+        draw_thermal(view, pipeline.thermal, cfg)
+
     pipeline.commander.start()   # heartbeat every 100 ms, only while this loop is alive
+    mcu_files.start()
     try:
         while True:
+            pipeline.external_fault = mcu.fault()   # shock or lamp fault reported by the microcontroller
+            # Technician at the node, from the badge to the logout: the sketch keeps the buzzer quiet.
+            pipeline.technician = operator.technician_present() if operator is not None else mcu.unlocked()
             item = source.read()
             if item is None:
                 if not source.is_live or frames == 0:
@@ -119,9 +153,9 @@ def main(argv: list[str] | None = None) -> int:
             if result is not None:
                 if frames == 1:
                     first = last_status = now
-                else:
-                    instant = 1.0 / max(now - last, _MIN_DT)
-                    fps = instant if frames == 2 else (1 - alpha) * fps + alpha * instant
+                stamps.append(now)
+                if len(stamps) > 1:
+                    fps = (len(stamps) - 1) / max(stamps[-1] - stamps[0], _MIN_DT)
                 last = now
                 for event in result.events:
                     if event["type"] == "crossing":
@@ -146,21 +180,35 @@ def main(argv: list[str] | None = None) -> int:
             if result is not None:
                 n_tracks, n_valid = len(result.tracked), int(result.valid.sum())
                 lat = " ".join(f"{phase}={_fmt_ms(result.lat_ms[phase])}" for phase in PHASES)
+            if operator is not None:   # also without frames: the page must say DEGRADED, not the last good state
+                if result is not None:
+                    page_lat = {phase: _fmt_ms(result.lat_ms[phase]) for phase in PHASES}
+                operator.update({
+                    "state": command["state"], "led": command["led"], "reason": command["reason"],
+                    "green_s": command["green_s"], "fps": round(fps, 1), "tracks": n_valid, "counts": counts,
+                    "lat_ms": page_lat,
+                    "events": pipeline.events.summary(), "source": source.name, "calib": calib_path.name,
+                    "link_failsafe": getattr(actuator, "connected", None) is False
+                                     or bool(getattr(actuator, "failsafe", False)),
+                })
+            # Live view for the technician: drawn only when a logged-in technician is watching and images are on.
+            share = operator is not None and result is not None and operator.wants_frame()
             if args.headless:
                 if result is not None and now - last_status >= float(o["status_every_s"]):
                     print(f"t={now - first:6.1f}s frame={frames} fps={fps:.1f} ms[{lat}] "
                           f"tracks={n_tracks} valid={n_valid} state={command['state']} | {counts}")
                     last_status = now
+                if share:
+                    annotate(last_frame)
+                    draw_state(last_frame, command, cfg, failsafe=bool(getattr(actuator, "failsafe", False)))
+                    operator.push_frame(last_frame)
             else:
                 view = last_frame if result is not None else last_frame.copy()
                 if result is not None:
-                    draw_zones(view, pipeline.geometry, cfg)
-                    draw_lines(view, pipeline.counter, cfg)
-                    draw_tracks(view, result, pipeline.tracker, cfg)
-                    draw_hud(view, [f"FPS {fps:.1f}   tracks {n_valid}/{n_tracks}", f"ms  {lat}", counts,
-                                    pipeline.events.summary(), setup], cfg)
-                    draw_thermal(view, pipeline.thermal, cfg)
+                    annotate(view)
                 draw_state(view, command, cfg, failsafe=bool(getattr(actuator, "failsafe", False)))
+                if share:
+                    operator.push_frame(view)
                 cv2.imshow(o["window_name"], view)
                 if cv2.waitKey(1) & 0xFF in quit_keys:
                     break
@@ -172,6 +220,9 @@ def main(argv: list[str] | None = None) -> int:
         pass
     finally:
         pipeline.commander.close()
+        mcu_files.close()
+        if operator is not None:
+            operator.close()
         source.release()
         if log:
             log.close()

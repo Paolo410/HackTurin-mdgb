@@ -342,11 +342,13 @@ def test_scenario_elderly_and_fast_car_warns_driver_then_pedestrian():
     # Every command went through the actuator as a full C1 line, in order.
     assert [c["seq"] for c in sim.sent] == sorted(c["seq"] for c in sim.sent)
     assert {c["state"] for c in sim.sent} >= {"PRESENCE", "WARN_DRIVER", "WARN_PEDESTRIAN"}
-    assert all({"v", "seq", "t_ms", "state", "led", "green_s", "req", "lcd", "oled", "reason"} == set(c) for c in sim.sent)
+    assert all({"v", "seq", "t_ms", "state", "led", "green_s", "req", "lcd", "oled", "reason", "tech"} == set(c)
+               for c in sim.sent)
+    assert not any(c["tech"] for c in sim.sent)        # no technician at the node in the scenario
     assert pipeline.counter.totals("veh") in ({"in": 1, "out": 0}, {"in": 0, "out": 1})
 
 
-def test_scenario_pedestrian_crossing_counts_one_and_holds_the_red():
+def test_scenario_pedestrian_crossing_counts_one_and_asks_nothing_of_the_signal():
     sim = SimActuator()
     timeline = []
     pipeline = run_scenario(CFG, "pedestrian_crossing", fps=10, actuator=sim,
@@ -354,5 +356,8 @@ def test_scenario_pedestrian_crossing_counts_one_and_holds_the_red():
     ped = pipeline.counter.totals("ped")
     assert ped["in"] + ped["out"] == 1
     on_stripes = [cmd for t, cmd in timeline if 3.5 <= t <= 6.5]
-    assert all(cmd["state"] == "PRESENCE" and cmd["req"]["veh_red_hold"] for cmd in on_stripes)
+    # An adult who walks at a normal pace: seen and counted, but the signal keeps its normal cycle.
+    assert all(cmd["state"] == "PRESENCE" for cmd in on_stripes)
+    assert not any(cmd["req"]["veh_red_hold"] or cmd["req"]["veh_red_now"] or cmd["req"]["ped_green_extend_s"]
+                   for cmd in on_stripes)
     assert timeline[-1][1]["state"] == "IDLE"

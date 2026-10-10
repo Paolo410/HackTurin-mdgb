@@ -47,7 +47,7 @@ def main() -> int:
             last["state"] = command["state"]
             req = command["req"]
             print(f"t={t:5.1f}s {command['state']:<16} LED {command['led']:<17} green {command['green_s']}s "
-                  f"+{req['ped_green_extend_s']}s red_hold={int(req['veh_red_hold'])} flash={int(req['flash'])}")
+                  f"+{req['ped_green_extend_s']}s red_hold={int(req['veh_red_hold'])} red_now={int(req['veh_red_now'])} flash={int(req['flash'])}")
             print(f"         LCD [{command['lcd']}]  OLED [{command['oled']}]")
             print(f"         {command['reason']}")
 

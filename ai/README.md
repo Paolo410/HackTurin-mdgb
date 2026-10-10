@@ -26,7 +26,7 @@ Specifica completa: [`PROMPT_SMART_CROSSING.md`](../PROMPT_SMART_CROSSING.md), �
 | AI-M3 | calibrazione, velocità, attributi, regole, `SimActuator` | fatto |
 | AI-M4 | eventi, animali, logger, output C3 | fatto |
 | AI-M5 | termocamera | fatto in simulazione, da provare con il sensore |
-| AI-M6 | profilo `unoq`, prova sulla scheda, benchmark | da fare sulla scheda; guida in [docs/DEPLOY_UNOQ.md](docs/DEPLOY_UNOQ.md) |
+| AI-M6 | profilo `unoq`, prova sulla scheda, benchmark | la visione gira sulla scheda con la camera vera a 9 FPS e comanda il semaforo dell'app `mdgb`; manca la calibrazione sull'incrocio. Guida in [docs/DEPLOY_UNOQ.md](docs/DEPLOY_UNOQ.md) |
 
 ## Come si avvia
 
@@ -45,8 +45,10 @@ Poi, con il virtualenv attivo e dentro `ai/`:
 ```bash
 python -m smartcrossing.app --source 0                     # webcam, finestra con l'overlay (q o Esc per uscire)
 python -m smartcrossing.app --source samples/video.mp4     # file video
-python -m smartcrossing.app --source 0 --emulate-unoq      # limiti della UNO Q: 10 FPS, 4 thread
+python -m smartcrossing.app --source 0 --emulate-unoq      # limiti nominali della specifica: 10 FPS, 4 thread
 python -m smartcrossing.app --source 0 --headless          # senza finestra, una riga di stato al secondo
+python -m smartcrossing.app --source 0 --operator-port 8090  # in più la pagina del tecnico (badge + login)
+python scripts/operator_login.py                           # imposta utente e password del tecnico
 python scripts/calibrate.py --source samples/video.mp4     # calibra l'inquadratura e salva calib.json (vedi sotto)
 python scripts/scenario.py                                 # elenco delle scene simulate (senza camera)
 python scripts/scenario.py elderly_fast_car                # pedone lento + auto a 50 km/h: regole e attuatore
@@ -103,6 +105,29 @@ persona appare più corta di quanto è larga la strada accanto, e senza questa c
 `child` si decide solo quando l'altezza è misurabile: calibrazione che torna con una camera reale e riquadro alto
 almeno 30 pixel (`attributes.height_min_box_px`). Altrimenti resta non deciso, e vale la velocità di camminata misurata.
 
+## Sulla scheda: microcontrollore e tecnico
+
+Sulla UNO Q la visione gira come programma a parte accanto all'app di App Lab dello sketch. Come si copia e si
+prova: [`docs/DEPLOY_UNOQ.md`](docs/DEPLOY_UNOQ.md) e `deploy/push_to_arduino.sh`.
+
+- **Cosa arriva dal microcontrollore** (`smartcrossing/mcu.py`, righe C5 del contratto):
+  - badge del tecnico: dà 2 minuti per entrare nella pagina del tecnico (`operator.login_s`);
+  - urto: è l'antifurto del nodo. La visione continua a lavorare e lo mostra al tecnico; l'avviso alla centrale
+    è compito della rete (`comms/`), da collegare quando le due parti si uniscono;
+  - guasto lampada: `DEGRADED` finché il firmware lo segnala.
+- **Pagina del tecnico** (`--operator-port`, `smartcrossing/status_page.py`), dal telefono via Wi-Fi:
+  - accesso in due passi: badge sul lettore, poi utente e password entro 2 minuti. La sessione resta aperta
+    finché il tecnico non preme "Esci" (`operator.session_s: 0`; con un limite, un badge lo fa ripartire).
+    Cinque password sbagliate chiudono la pagina fino al badge successivo;
+  - **cicalino muto mentre c'è il tecnico:** dal badge al logout (o ai 2 minuti senza login) il comando C1 porta
+    `"tech": true` e lo sketch non suona (resta solo il bip di conferma del badge). Fermandosi la visione, lo sketch
+    torna a suonare: senza heartbeat il campo non vale più. Campo nuovo del contratto C1, da confermare con Lorenzo;
+  - mostra stato, motivo, FPS, tempi, conteggi, sensori e la vista dal vivo con i riquadri della visione;
+  - `operator.share_images: false` spegne le immagini e lascia solo le statistiche (per la produzione);
+  - le immagini non vengono mai salvate: esistono in memoria solo mentre un tecnico connesso guarda;
+  - credenziali: `python scripts/operator_login.py` salva in `ai/.env` (ignorato da git) il nome utente e la sola
+    impronta della password. Limite: HTTP in chiaro, per la strada serve HTTPS.
+
 ## Regola
 
 `rules.py` è una macchina a stati in puro Python. Ogni decisione riporta in `reason` i numeri che l'hanno prodotta.
@@ -129,6 +154,18 @@ almeno 30 pixel (`attributes.height_min_box_px`). Altrimenti resta non deciso, e
   firmware va in fail-safe da solo.
 - Sul display dei pedoni l'AI non scrive mai di attraversare: non conosce la fase del semaforo.
 
+Cosa chiede al semaforo (campo `req` del comando), in due soli casi:
+
+| Chi c'è | Richiesta | Campo |
+|---|---|---|
+| chi ha bisogno di più tempo: cammina sotto 0,9 m/s (`slow`) o ha un ausilio (`aid`: carrozzina, deambulatore, passeggino) | verde pedonale più lungo, fino a 15 s; rosso dei veicoli trattenuto finché è sulle strisce | `ped_green_extend_s`, `veh_red_hold` |
+| un bambino non accompagnato alle strisce o in strada, oppure un animale libero in carreggiata (non i piccoli, non il cane al guinzaglio) | rosso ai veicoli subito, trattenuto finché sono lì | `veh_red_now`, `veh_red_hold` |
+
+- Un pedone qualunque, o un bambino con un adulto entro 2 m (`rules.supervision_distance_m`), non cambia il ciclo.
+- `veh_red_now` è un campo nuovo rispetto alla bozza del contratto C1: va confermato da Lorenzo.
+- Servono la calibrazione in metri (altezza, velocità di camminata, distanze) e, per gli ausili, il classificatore
+  opzionale, che oggi non c'è: carrozzine e deambulatori si riconoscono solo se chi li usa cammina piano.
+
 Attributi del pedone, decisi una volta per traccia: `child` (altezza mediana su 5 frame sotto 1,30 m), `slow`
 (velocità di camminata sotto 0,9 m/s, misurata per almeno 2 s mentre cammina), `aid` (classificatore opzionale
 `models/aid_cls.onnx`: se manca resta sconosciuto).
@@ -139,7 +176,7 @@ Scene simulate (`scripts/scenario.py`): fanno girare tracker, geometria, regole 
 | Scena | Cosa mostra |
 |---|---|
 | `elderly_fast_car` | pedone lento in attesa, auto a 50 km/h: WARN_DRIVER, poi WARN_PEDESTRIAN |
-| `pedestrian_crossing` | un pedone attraversa: un conteggio, rosso veicolare trattenuto finché è sulle strisce |
+| `pedestrian_crossing` | un pedone attraversa: un conteggio, nessuna richiesta al semaforo |
 | `loose_dog_and_leashed_dog` | cane al guinzaglio (nessun allarme), poi cane grande libero (ANIMAL_ALERT) |
 | `car_yields` | un'auto rallenta per il pedone in attesa: yield rate 100% |
 | `night_pedestrian_seen_by_heat` | di notte la camera non vede il pedone, la termocamera sì: scatta l'avviso |
@@ -199,7 +236,7 @@ A schermo e a fine corsa: yield rate, near-miss e incidenti.
   - `veh`, trasversale alla corsia: conta `car`, `bus`, `truck`, `motorcyclist`, `cyclist`.
 - **Niente doppioni:** conta il punto in basso al centro del box, servono 3 frame oltre la linea, e ogni traccia
   conta al massimo una volta per verso su ciascuna linea.
-- **Tracce valide:** una traccia conta dopo 5 frame (specifica). Nei profili a 10 FPS (`unoq`, `--emulate-unoq`)
+- **Tracce valide:** una traccia conta dopo 5 frame (specifica). Nei profili della scheda (`unoq`, `--emulate-unoq`)
   ne bastano 2: cinque frame sarebbero mezzo secondo, e un'auto passerebbe la linea prima di contare.
 - **Una linea conta solo tra i suoi due estremi:** chi passa oltre la fine del segmento non viene contato.
   Conviene disegnarla più lunga del necessario. Le coordinate possono uscire dall'immagine (meno di 0, più di 1).
@@ -210,8 +247,32 @@ A schermo e a fine corsa: yield rate, near-miss e incidenti.
 
 ## Prestazioni misurate
 
+### Sulla Arduino UNO Q (10/10/2026)
+
+Debian 13, Python 3.13, onnxruntime 1.30 solo CPU, input 416x256 (budget 320 px). Scheda senza altri programmi.
+
+Catena completa su un video di prova 720p con molta gente (`scripts/bench.py`):
+
+| Impostazione | detect | track | totale per frame | FPS |
+|---|---|---|---|---|
+| 320 px, 4 thread, detector a ogni frame | 148 ms | 24 ms | 172 ms | 5,8 |
+| 320 px, 3 thread | 143 ms | 24 ms | 166 ms | 6,0 |
+| 256 px, 3 thread | 95 ms | 19 ms | 114 ms | 8,8 |
+| **320 px, 3 thread, detector un frame su due (profilo `unoq`)** | 139 ms | 24 ms | 82 ms in media | **12,3** |
+
+Con la camera vera della scheda (IMX219 su CSI, scena vuota), profilo `unoq`: **9,2 FPS end-to-end**, detect 129 ms,
+track 1 ms. Obiettivo della specifica: almeno 8.
+
+- **Perché un frame su due e non 256 px:** sul video di Torino, a parità di carico, 256 px conta 8 veicoli,
+  320 px con il detector un frame su due ne conta 16 (riferimento a 30 FPS e 512 px: 35).
+- **Tre thread e non quattro:** il quarto core serve a camera, tracker e al resto; con quattro va uguale o peggio.
+- **La camera costa** circa il 20% di un core a 10 letture al secondo.
+- **Con l'app di App Lab che tiene aperta la camera** (140% di CPU) il detector a ogni frame scendeva a 3,1 FPS.
+
+### Su PC
+
 Su PC (Apple M1, onnxruntime solo CPU). `--emulate-unoq` limita FPS e thread ma non rallenta i core: questi numeri
-**non** prevedono la velocità sulla UNO Q. I numeri veri arrivano con AI-M6, sulla scheda.
+**non** prevedono la velocità sulla UNO Q.
 
 Detector, 4 thread, stessi 300 frame alternati tra le due dimensioni:
 

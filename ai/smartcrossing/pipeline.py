@@ -59,7 +59,8 @@ def build_scene(tracker: Tracker, tracked: sv.Detections, roles: list[str], vali
             scene.pedestrians.append(PedestrianInfo(
                 track_id=state.track_id, zone=state.zone,
                 waiting_s=t - state.zone_since if waiting else 0.0, toward_road_ms=toward,
-                walk_speed_ms=a.get("walk_speed"), child=a.get("child"), slow=a.get("slow"), aid=a.get("aid")))
+                walk_speed_ms=a.get("walk_speed"), child=a.get("child"), slow=a.get("slow"), aid=a.get("aid"),
+                x=x, y=y))
         elif role in veh_roles and state.zone in ROAD_ZONES:
             # Distance to the nearest edge of the stripes, only while driving towards them (else negative).
             d = approach_distance(state, along)
@@ -99,6 +100,8 @@ class Pipeline:
         self.selfcheck_every = max(1, int(cfg["selfcheck"]["every_n_frames"]))
         self.selfcheck_confirm = max(1, int(cfg["selfcheck"]["confirm_checks"]))
         self.fault: str | None = None             # confirmed result of the camera self-check
+        self.external_fault: str | None = None    # set by the caller: tamper or lamp fault from the MCU
+        self.technician = False                   # set by the caller: technician at the node (badge to logout)
         self._last_fault: str | None = None
         self._fault_streak = 0
         self.scene = Scene(W=float(cfg["rules"]["default_W_m"]))
@@ -163,7 +166,7 @@ class Pipeline:
         valid = self.tracker.valid_mask(self._last)
         t2 = perf_counter()
         self.scene = build_scene(self.tracker, self._last, self._last_roles, valid, self.geometry, t, self.cfg)
-        self.scene.fault = self.fault
+        self.scene.fault = self.fault or self.external_fault
         if detections is not None:
             # "rules" also covers what the rule needs from the trajectories: animals and events.
             self.scene.animals = self.animals.update(self.tracker, self._last, self._last_roles, valid, self.geometry, t)
@@ -174,7 +177,7 @@ class Pipeline:
             self.scene.animals, self.scene.animal_margin_m = self._animals, self.animals.margin_m
         if self.thermal is not None:
             self.thermal.update(self.scene, t, self.luminance)   # adds who only the thermal camera sees
-        self._command = self.rules.step(self.scene, t)
+        self._command = self._decide(t)
         t3 = perf_counter()
         sent = self.commander.update(self._command) if self.commander is not None else False
         lat_ms["rules"] = (t3 - t2) * 1000.0
@@ -185,11 +188,15 @@ class Pipeline:
     def no_frame(self, t: float) -> dict:
         """The camera gave no frame: the rule runs on the age of the last one (DEGRADED after the timeout)."""
         age = t - self._last_frame_t if self._last_frame_t is not None else float("inf")
-        self.scene = Scene(W=self.scene.W, video_age_s=age)
-        self._command = self.rules.step(self.scene, t)
+        self.scene = Scene(W=self.scene.W, video_age_s=age, fault=self.external_fault)
+        self._command = self._decide(t)
         if self.commander is not None:
             self.commander.update(self._command)
         return self._command
+
+    def _decide(self, t: float) -> dict:
+        """C1 fields: the rule, plus "tech" (technician at the node: the sketch keeps the buzzer quiet)."""
+        return {**self.rules.step(self.scene, t), "tech": self.technician}
 
     def _describe(self, event: dict) -> dict:
         """Adds to a crossing what C3 wants to know about who crossed."""

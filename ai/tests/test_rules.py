@@ -3,7 +3,7 @@ import pytest
 
 from smartcrossing.config import load_config
 from smartcrossing.rules import (
-    PRIORITY, PedestrianInfo, RuleEngine, Scene, VehicleInfo, evaluate, green_time, lcd_text,
+    PRIORITY, AnimalInfo, PedestrianInfo, RuleEngine, Scene, VehicleInfo, evaluate, green_time, lcd_text,
     pedestrian_speed, stopping_distance, time_needed, time_to_collision,
 )
 
@@ -34,7 +34,8 @@ def test_elderly_and_fast_car_far_away_warns_the_driver():
     out = run(Scene(W=W, pedestrians=[elderly()], vehicles=[car(60)]))
     assert out["state"] == "WARN_DRIVER" and out["led"] == "AMBER_BLINK_2HZ"
     assert out["reason"] == "pedone lento 0.8 m/s; car 50 km/h a 60 m; TTC 4.3 s < T_need 9.8 s"
-    assert out["req"]["veh_red_hold"] is True and out["req"]["flash"] is False
+    # The warning is for the driver's display; the signal is asked nothing more than the extra green.
+    assert out["req"] == {"ped_green_extend_s": 3, "veh_red_hold": False, "veh_red_now": False, "flash": False}
     assert out["lcd"] == "PEDONE  50 km/h RALLENTA" and out["oled"] == "ATTENDI auto 50km/h"
 
 
@@ -53,13 +54,14 @@ def test_no_vehicle_is_presence():
     out = run(Scene(W=W, pedestrians=[elderly()]))
     assert out["state"] == "PRESENCE" and out["led"] == "WHITE_ON"
     assert out["reason"] == "pedone lento in attesa"
-    assert out["req"] == {"ped_green_extend_s": 3, "veh_red_hold": False, "flash": False}   # 10.75 - 7.83
+    assert out["req"] == {"ped_green_extend_s": 3, "veh_red_hold": False, "veh_red_now": False,
+                          "flash": False}   # 10.75 - 7.83
 
 
 def test_no_video_for_one_and_a_half_seconds_is_degraded():
     out = run(Scene(W=W, pedestrians=[elderly()], vehicles=[car(25)], video_age_s=1.5))
     assert out["state"] == "DEGRADED" and out["led"] == "YELLOW_FAILSAFE"
-    assert out["req"] == {"ped_green_extend_s": 0, "veh_red_hold": False, "flash": False}
+    assert out["req"] == {"ped_green_extend_s": 0, "veh_red_hold": False, "veh_red_now": False, "flash": False}
     assert out["lcd"] == "" and out["oled"] == "" and out["green_s"] == 0
 
 
@@ -151,7 +153,68 @@ def test_green_request_only_grows_while_somebody_is_there():
     hold = CFG["rules"]["hold_s"]
     assert engine.step(Scene(W=12), t=1.0 + hold + 0.1)["green_s"] == 0          # everybody left
     brisk = PedestrianInfo(2, "crosswalk", walk_speed_ms=1.1)
-    assert engine.step(Scene(W=12, pedestrians=[brisk]), t=5.0)["green_s"] == 13   # a new pedestrian starts afresh
+    # A new pedestrian starts afresh, and one who does not need more time gets the standard green: 12 / 1.2 + 2.
+    assert engine.step(Scene(W=12, pedestrians=[brisk]), t=5.0)["green_s"] == 12
+
+
+def test_more_green_only_for_who_needs_more_time_to_cross():
+    def req(*people):
+        return run(Scene(W=12, pedestrians=list(people)))["req"]
+
+    # An adult, an adult who is not fast, a child with its parent: the standard green, the red is not held.
+    parent = PedestrianInfo(2, "crosswalk", x=0.5, y=3.0)
+    for people in ([PedestrianInfo(1, "crosswalk")], [PedestrianInfo(1, "crosswalk", walk_speed_ms=1.0)],
+                   [PedestrianInfo(1, "crosswalk", child=True, x=0.0, y=3.0), parent]):
+        assert req(*people) == {"ped_green_extend_s": 0, "veh_red_hold": False, "veh_red_now": False, "flash": False}
+    # Wheelchair, walking aid, stroller, measured slow walker: more green, and the red held while they cross.
+    for ped in (PedestrianInfo(1, "crosswalk", aid="wheelchair"), PedestrianInfo(1, "crosswalk", aid="walking_aid"),
+                PedestrianInfo(1, "crosswalk", aid="stroller"), PedestrianInfo(1, "crosswalk", slow=True, walk_speed_ms=0.6)):
+        assert req(ped)["ped_green_extend_s"] > 0 and req(ped)["veh_red_hold"] is True
+    waiting = PedestrianInfo(1, "waiting_zone_left", aid="wheelchair")
+    assert req(waiting)["ped_green_extend_s"] == 5 and req(waiting)["veh_red_hold"] is False   # 12 / 0.8 - 12 / 1.2
+    # With an adult and a slow walker together, the slow walker sets the time.
+    both = Scene(W=12, pedestrians=[PedestrianInfo(1, "crosswalk"), PedestrianInfo(2, "crosswalk", slow=True, walk_speed_ms=0.6)])
+    assert run(both)["req"]["ped_green_extend_s"] == 10
+
+
+def test_a_child_on_its_own_calls_the_red_for_the_vehicles_at_once():
+    child = PedestrianInfo(1, "waiting_zone_left", child=True, x=1.0, y=-0.5)
+    out = run(Scene(W=W, pedestrians=[child]))
+    assert out["req"]["veh_red_now"] is True and out["req"]["veh_red_hold"] is True
+    assert out["req"]["ped_green_extend_s"] == 0
+    assert out["state"] == "PRESENCE" and out["reason"] == "bambino in attesa; rosso ai veicoli: bambino non accompagnato"
+
+    def red_now(*people):
+        return run(Scene(W=W, pedestrians=list(people)))["req"]["veh_red_now"]
+
+    near, far = CFG["rules"]["supervision_distance_m"] - 0.5, CFG["rules"]["supervision_distance_m"] + 3
+    assert red_now(child, PedestrianInfo(2, "waiting_zone_left", x=1.0 + near, y=-0.5)) is False   # an adult beside
+    assert red_now(child, PedestrianInfo(2, "waiting_zone_left", x=1.0 + far, y=-0.5)) is True     # an adult far away
+    assert red_now(child, PedestrianInfo(2, "waiting_zone_left", child=True, x=1.5, y=-0.5)) is True   # two children
+    assert red_now(PedestrianInfo(1, "carriageway", child=True, x=9.0, y=3.0)) is True              # on the road
+    assert red_now(PedestrianInfo(1, None, child=True, x=1.0, y=-9.0)) is False                     # far from the crossing
+    assert red_now(PedestrianInfo(1, "crosswalk")) is False                                         # an adult
+    assert red_now(PedestrianInfo(1, "crosswalk", child=None, x=1.0, y=3.0)) is False               # height not known
+
+
+def test_a_free_animal_on_the_road_calls_the_red_but_not_a_small_or_leashed_one():
+    def req(animal):
+        return run(Scene(W=W, animals=[animal]))["req"]
+
+    out = run(Scene(W=W, animals=[AnimalInfo(1, "dog", "medium", on_road=True)]))
+    assert out["req"]["veh_red_now"] is True and out["req"]["veh_red_hold"] is True
+    assert out["state"] == "IDLE" and out["reason"].endswith("rosso ai veicoli: animale libero in carreggiata (dog)")
+    assert req(AnimalInfo(1, "cow", "large", on_road=True))["veh_red_now"] is True
+    assert req(AnimalInfo(1, "dog", "medium", on_road=True, free=False))["veh_red_now"] is False   # on a leash
+    assert req(AnimalInfo(1, "cat", "small", on_road=True))["veh_red_now"] is False
+    assert req(AnimalInfo(1, "dog", "medium", on_road=False))["veh_red_now"] is False              # on the pavement
+
+
+def test_degraded_asks_nothing_of_the_signal():
+    child = PedestrianInfo(1, "crosswalk", child=True, x=1.0, y=3.0)
+    out = run(Scene(W=W, pedestrians=[child], animals=[AnimalInfo(2, "dog", "medium", on_road=True)], fault="glare"))
+    assert out["state"] == "DEGRADED"
+    assert out["req"] == {"ped_green_extend_s": 0, "veh_red_hold": False, "veh_red_now": False, "flash": False}
 
 
 def test_lcd_text_is_two_rows_of_16():
@@ -166,7 +229,7 @@ def test_every_output_is_a_complete_c1_command():
     for scene in scenes:
         out = run(scene)
         assert set(out) == {"state", "led", "green_s", "req", "lcd", "oled", "reason"}
-        assert set(out["req"]) == {"ped_green_extend_s", "veh_red_hold", "flash"}
+        assert set(out["req"]) == {"ped_green_extend_s", "veh_red_hold", "veh_red_now", "flash"}
         assert out["lcd"].isascii() and out["oled"].isascii() and len(out["lcd"]) <= 32
         assert 0 <= out["req"]["ped_green_extend_s"] <= 15      # firmware limit
         assert evaluate(scene, CFG).state == out["state"]

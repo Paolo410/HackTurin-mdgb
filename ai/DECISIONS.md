@@ -135,7 +135,7 @@ con v_ped 0,3 → 25 s.
 | Parametro | Valore | Fonte |
 |---|---|---|
 | C1 | una riga JSON per messaggio: `v`, `seq`, `t_ms`, `state`, `led`, `green_s`, `req`, `lcd`, `oled`, `reason` | §4 |
-| `req` | `ped_green_extend_s`, `veh_red_hold`, `flash` | §4 |
+| `req` | `ped_green_extend_s`, `veh_red_hold`, `flash`; in più `veh_red_now`, aggiunto l'11/10 (punto 31), da confermare con Lorenzo | §4 |
 | `lcd` | massimo 2x16 caratteri | §4 |
 | Seriale | 115200 baud | §4 |
 | C2 heartbeat | ogni 100 ms; il firmware va in fail-safe dopo più di 500 ms senza | §4 |
@@ -178,6 +178,7 @@ con v_ped 0,3 → 25 s.
 1. **Camera sulla UNO Q.** La specifica prevede webcam USB, file o RTSP (§5.1.1). `hardware/BOM.md` indica come
    camera principale la Sony IMX219 su Media Carrier (CSI), con la webcam USB come piano B. Va capito come si legge
    la IMX219 da Python sulla scheda. Per Kuzey e Salvatore. Non blocca AI-M1…M5 su PC.
+   **Chiusa il 10/10 (punto 32):** la scheda monta la IMX219; si apre con `libcamerify`.
 2. **Valore di `--thermal`.** L'opzione prevede `none|uvc|mlx90640` (§5.1.13) e AI-M5 parla di "MLX90640 simulata",
    ma il sensore disponibile è la MLX90621 16x4 (§6). Serve il valore `mlx90621` e un simulatore 16x4. Anche il test
    di §8 parla di "blob caldo", che con 4 righe diventa "colonne calde".
@@ -185,6 +186,7 @@ con v_ped 0,3 → 25 s.
    (§5.2 dice "estendere C3"). Servono a `thermal.py` e allo stato DEGRADED. Per Lorenzo e Salvatore.
 4. **Come si calcola `req`.** La specifica dà `green_s` ma non dice come ricavare `ped_green_extend_s` (manca la
    durata base del verde pedonale della centralina) né quando valgono `veh_red_hold` e `flash`. Per Salvatore e Lorenzo.
+   **Deciso da Paolo il 10/10 (punto 31).**
 5. **Testi di `lcd` e `oled`.** Ci sono solo due esempi (§1, §4). Manca il testo per ogni stato, e quale velocità
    compare in "PEDONE 47 km/h".
 6. **Trasporto di C3.** "JSONL su file + endpoint HTTP locale" (§4): non è scritto chi espone l'endpoint. Flask è
@@ -222,7 +224,8 @@ con v_ped 0,3 → 25 s.
       `RED_GROUND_BLINK`, ANIMAL_WARN `AMBER_BLINK_2HZ`, ANIMAL_ALERT `AMBER_BLINK_4HZ`, DEGRADED `YELLOW_FAILSAFE`;
     - `ped_green_extend_s` = `green_s` meno il verde standard `W/1,2 + 2`, arrotondato, al massimo 15 s
       (con W = 12 m e 0,7 m/s dà 19 s e +7 s, come l'esempio di §4);
-    - `veh_red_hold` vero in WARN_DRIVER, in WARN_PEDESTRIAN e finché c'è qualcuno sulle strisce;
+    - `veh_red_hold` vero in WARN_DRIVER, in WARN_PEDESTRIAN e finché c'è qualcuno sulle strisce
+      (**superato dal punto 31**: ora solo per chi ha bisogno di tempo, bambino solo o animale);
     - `flash` vero solo in ANIMAL_ALERT;
     - `lcd` su due righe da 16 caratteri ASCII: `PEDONE / IN ATTESA`, `PEDONE / SULLE STRISCE`,
       `PEDONE  47 km/h / RALLENTA`, `FRENA!  47 km/h / PEDONE`; la velocità è quella del veicolo in arrivo;
@@ -342,4 +345,92 @@ con v_ped 0,3 → 25 s.
       le altezze di quel video non valgono;
     - un incrocio con veicoli in svolta (Torino_3) non si conta con una sola linea diritta;
     - pedoni lontani letti come `bird`, un'auto scura letta come `motorcycle`.
-
+29. **Integrazione sulla UNO Q** (branch `paolo/ai-unoq`, decisa con Paolo e il team il 10/10 sera):
+    - **ordine:** prima sketch (Salvatore) + visione, provati sulla scheda; la rete verso la centrale e il backup
+      (Lorenzo) dopo;
+    - **la visione gira su Linux fuori da App Lab**. Scartata l'alternativa "dentro `main.py` dell'app":
+      onnxruntime e supervision andrebbero installati nel container di App Lab, mai provato, con il rischio di
+      conflitti con le sue librerie;
+    - **la camera la apre solo la visione**: il `main.py` dell'app di App Lab oggi la apre per mostrarla su una
+      pagina web, e va tolta da lì (proposta consegnata a Salvatore);
+    - **per parlare con lo sketch si usa `comms/actuators.py` di Lorenzo così com'è** (`BridgeActuator`): è il
+      collegamento visione–sketch, non la rete. Finché non è su main, `push_to_arduino.sh --bridge` lo prende dal
+      suo ramo. Dipendenza sulla scheda: `arduino-router-bridge==0.5.1`, come in `comms/requirements.txt`;
+    - **l'urto è l'antifurto del nodo e non cambia lo stato della visione.** (La prima versione metteva la visione
+      in `DEGRADED`, come dice §5.2 della specifica: Paolo ha chiarito che non è quello lo scopo.) La visione lo
+      mostra al tecnico e basta;
+    - **pagina del tecnico:** badge, poi login con utente e password, via Wi-Fi. Mostra numeri e vista dal vivo.
+      `operator.share_images: false` lascia solo le statistiche: è l'interruttore per la produzione. Le immagini non
+      si salvano mai (specifica: "mai salvare frame su disco") e si producono solo mentre un tecnico connesso guarda.
+      Via Bluetooth un video non passerebbe: il BLE non ha la banda;
+    - **credenziali:** nome utente e impronta PBKDF2 della password in `ai/.env`, mai nel repo. Limite noto: HTTP in
+      chiaro;
+    - **proposta di sketch per Salvatore** (fuori dal repo): `mdgb_line` per C1/C2, centralina simulata sui tre
+      LED, fail-safe a 500 ms, blocco RFID e bip senza `delay()`, badge e antifurto anche verso la visione
+      (`mcu_event`). Logica provata su PC con un finto Arduino, non compilata per la scheda. Aperto: lo stato della
+      visione usato come chiamata pedonale (verde dei veicoli da 20 a 8 s) non è scritto nel contratto.
+30. **Da fare quando si unisce la rete di Lorenzo:**
+    - **antifurto verso la centrale:** l'allarme dell'accelerometro deve arrivare alla sua applicazione. Le righe
+      `mcu_event` dello sketch passano già da `comms/actuators.py`, che le scrive in `mcu-*.jsonl` per il nodo; va
+      verificato sulla scheda e va evitato che l'allarme arrivi due volte (anche `mdgb_link.py` lo inoltra);
+    - cartella unica degli eventi (`--applab`, `MDGB_C3_DIR`) e permessi di scrittura in `~/ArduinoApps/<app>/data`;
+    - stato del nodo "manomesso" in centrale: come si presenta e chi lo azzera (il badge del tecnico?).
+31. **Cosa si chiede al semaforo, deciso da Paolo il 10/10 sera** (cambia quanto scritto al punto 17):
+    - **rosso subito** per un bambino non accompagnato o un animale libero in strada, con un giallo breve prima;
+    - **verde pedonale più lungo solo per chi ne ha bisogno**: `slow` (cammina sotto 0,9 m/s) o `aid`. Non più per
+      ogni pedone più lento di 1,2 m/s, né per i bambini in quanto tali;
+    - **il rosso non si trattiene più** per chiunque sia sulle strisce né negli stati di avviso: solo per chi ha
+      bisogno di tempo e per bambino solo o animale;
+    - "non accompagnato" = nessuno che non sia un bambino entro 2 m a terra (`rules.supervision_distance_m`, lo
+      stesso criterio del cane al guinzaglio). Un pedone di cui non si conosce l'altezza conta come adulto;
+    - animali: liberi, in carreggiata, di taglia media o grande (`rules.red_now_animal_sizes`);
+    - **campo nuovo `req.veh_red_now` nel comando C1**: è una modifica al contratto, da far confermare a Lorenzo.
+      È solo un'aggiunta: chi non lo conosce lo ignora;
+    - `T_need` e gli avvisi a conducenti e pedoni non cambiano: per quelli il bambino resta a 0,8 m/s.
+32. **Prima prova sulla scheda (10/10 sera)**, numeri in `README.md`:
+    - a 320 px con il detector a ogni frame la scheda fa 5,8 FPS, sotto l'obiettivo di 8. Profilo `unoq`: detector
+      un frame su due, 3 thread, tetto a 12 FPS. Con la camera vera: 9,2 FPS;
+    - la camera è un IMX219 su CSI: si apre con `libcamerify` (chiude la questione aperta 1);
+    - sulla scheda manca `python3-venv`: l'ambiente si crea senza pip e si installa con il pip di sistema;
+    - gli FPS mostrati erano una media di tempi tra frame consecutivi: con il detector un frame su due dava numeri
+      assurdi (220). Ora è la frequenza sugli ultimi 30 frame.
+33. **App `mdgb` sulla scheda e prima prova del semaforo comandato (10/10, 23:30)**. Su richiesta di Paolo lo sketch
+    proposto non sostituisce quello di Salvatore: è in una app nuova, `~/ArduinoApps/mdgb`, copia della sua `test`
+    (versione sulla scheda, con buzzer su A5 e luce su A0) più `mdgb_line`. `test` è intatta. Misure dai log dell'app:
+    - lo sketch compila per la scheda (129 kB, 16%) e parte;
+    - ciclo normale: verde 20,0 s, giallo 3,0 s, rosso 10,0 s; badge, allarme e sensori come prima;
+    - rosso d'urgenza chiesto attraverso il Bridge con `comms/actuators.py` quando il verde era acceso da 5 s: lo
+      sketch ha aspettato il verde minimo (giallo a 8,0 s), giallo breve di 1,5 s, rosso tenuto 24,5 s finché la
+      richiesta è rimasta, poi verde;
+    - heartbeat fermati: fail-safe e ciclo normale dopo circa mezzo secondo (i log hanno la precisione del
+      secondo sul lato visione, non permettono di dire di più);
+    - visione vera con la camera collegata allo sketch: "visione collegata", nessuna riga rifiutata; fermandola,
+      fail-safe. In quella prova 7,4 FPS: sulla scheda girava anche un `apt`.
+    Non ancora provati sull'hardware: una richiesta nata da una scena vera (serve la calibrazione), badge → pagina
+    del tecnico → login dal telefono, antifurto mostrato sulla pagina.
+34. **Rosso dei veicoli a 20 s** (era 10): chiesto da Paolo perché tutti i pedoni abbiano il tempo di attraversare.
+    È una costante dello sketch dell'app `mdgb` (`VEH_RED_MS`); i limiti diventano 20 + 15 s di estensione e
+    20 + 20 s di rosso trattenuto. Misurato sulla scheda: 20,0 s. `deploy/run_vision.sh` accende e spegne la
+    visione sulla scheda senza `sudo`.
+35. **Stato a fine serata dell'11/10 (per chi riprende il lavoro):**
+    - sulla scheda gira l'app `mdgb` (cicalino spento per ora: `BUZZER_ENABLED 0` nello sketch) e la visione,
+      accesa con `deploy/run_vision.sh`. La sorgente dello sketch non è nel repo: è in `~/ArduinoApps/mdgb` sulla
+      scheda e in `mdgb-app-proposta.zip` consegnato a Salvatore, che deciderà se e come metterlo in `firmware/`;
+    - manca la calibrazione sull'incrocio vero: senza, la visione conta ma non chiede niente al semaforo;
+    - non ancora provati: badge → pagina del tecnico → login dal telefono; una richiesta nata da una scena vera;
+    - PR #9 e #11 aperte (la #11 sopra la #9); la PR #10 di Lorenzo non è su main;
+    - da fare con Lorenzo: punto 30 e il campo `req.veh_red_now` nel contratto.
+36. **Tecnico: 2 minuti per il login e cicalino muto mentre lavora** (chiesto da Paolo l'11/10, notte):
+    - dal badge ci sono 2 minuti per entrare (`operator.login_s`); la sessione resta aperta fino a "Esci"
+      (`operator.session_s: 0`, scelta di Paolo; con un limite, un badge con la pagina aperta lo fa ripartire).
+      Login e logout consumano il badge: un secondo login, o rientrare dopo l'uscita, chiede un altro badge;
+    - dal badge al logout (o ai 2 minuti senza login) il comando C1 porta il campo nuovo `"tech": true`. Lo sketch
+      tiene muto il cicalino; resta il bip di conferma del badge (scelta di Paolo). Il campo parte al cambio, non
+      aspetta la ripetizione di 1 s;
+    - nello sketch: 2 minuti di silenzio dal badge anche senza visione, poi silenzio finché arriva `tech: true`.
+      Quando `tech` passa da true a false (logout) il cicalino torna subito. Senza heartbeat il campo non vale:
+      se la visione si ferma, l'antifurto torna a suonare. L'urto viene comunque segnalato (`mcu_event`, centrale);
+    - Salvatore ha riacceso il cicalino l'11/10 (`BUZZER_ENABLED 1`) e tolto solo il bip del sensore di luce coperto,
+      che di sera suonava di continuo;
+    - `tech` è un campo nuovo del contratto C1, come `req.veh_red_now` (punto 31): da far scrivere a Lorenzo in
+      `docs/CONTRACTS.md`. Chi non lo conosce lo ignora.

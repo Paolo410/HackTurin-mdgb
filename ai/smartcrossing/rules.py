@@ -18,6 +18,7 @@ _RANK = {state: rank for rank, state in enumerate(PRIORITY)}   # 0 = most import
 
 WAITING_ZONES = ("waiting_zone_left", "waiting_zone_right")
 CROSSWALK = "crosswalk"
+CARRIAGEWAY = "carriageway"
 KMH = 3.6
 LCD_ROW = 16
 # Reasons of DEGRADED that come from the self-check or from the MCU.
@@ -40,6 +41,8 @@ class PedestrianInfo:
     slow: bool | None = None
     aid: str | None = None                # None | normal | wheelchair | walking_aid | stroller
     thermal_only: bool = False            # seen by the thermal camera only
+    x: float | None = None                # position on the ground, metres (None = not known)
+    y: float | None = None
 
 
 @dataclass
@@ -123,6 +126,38 @@ def pedestrian_speed(ped: PedestrianInfo, cfg: dict) -> float:
 
 def is_present(ped: PedestrianInfo) -> bool:
     return ped.zone == CROSSWALK or ped.zone in WAITING_ZONES
+
+
+def needs_more_time(ped: PedestrianInfo) -> bool:
+    """Who the pedestrian green is extended for: measured slow walkers and people with an aid
+    (wheelchair, walking aid, stroller). Not children as such, not pedestrians in general."""
+    return bool(ped.slow or ped.aid not in (None, "normal"))
+
+
+def is_supervised(child: PedestrianInfo, scene: Scene, cfg: dict) -> bool:
+    """A child with somebody who is not a child close by. Without positions nobody counts as close."""
+    reach = float(cfg["rules"]["supervision_distance_m"])
+    if child.x is None or child.y is None:
+        return False
+    for other in scene.pedestrians:
+        if other is child or other.child or other.x is None or other.y is None:
+            continue
+        if ((other.x - child.x) ** 2 + (other.y - child.y) ** 2) ** 0.5 <= reach:
+            return True
+    return False
+
+
+def urgent_subject(scene: Scene, cfg: dict) -> str | None:
+    """Who the vehicles must get the red for at once: a child on its own at the crossing or on the road, or
+    a free animal on the road (not the small ones, not a dog on a leash). None when there is nobody."""
+    r = cfg["rules"]
+    for ped in scene.pedestrians:
+        if ped.child and (is_present(ped) or ped.zone == CARRIAGEWAY) and not is_supervised(ped, scene, cfg):
+            return "bambino non accompagnato"
+    for animal in scene.animals:
+        if animal.on_road and animal.free and animal.size in r["red_now_animal_sizes"]:
+            return f"animale libero in carreggiata ({animal.coco})"
+    return None
 
 
 def has_intention(ped: PedestrianInfo, cfg: dict) -> bool:
@@ -232,11 +267,13 @@ def lcd_text(row1: str, row2: str = "") -> str:
 
 
 def green_needed(scene: Scene, cfg: dict) -> float:
-    """Pedestrian green needed by the slowest pedestrian present, 0 with nobody."""
+    """Pedestrian green needed by who is present, 0 with nobody: the standard time, or more for the slowest
+    of those who need more time (see needs_more_time)."""
     present = [p for p in scene.pedestrians if is_present(p)]
     if not present:
         return 0.0
-    return green_time(scene.W, min(pedestrian_speed(p, cfg) for p in present), cfg)
+    in_need = [pedestrian_speed(p, cfg) for p in present if needs_more_time(p)]
+    return green_time(scene.W, min(in_need) if in_need else float(cfg["rules"]["v_ped_default_ms"]), cfg)
 
 
 def command(decision: Decision, scene: Scene, cfg: dict, green_floor: float = 0.0) -> dict:
@@ -248,6 +285,11 @@ def command(decision: Decision, scene: Scene, cfg: dict, green_floor: float = 0.
     state = decision.state
     present = [p for p in scene.pedestrians if is_present(p)] if state != "DEGRADED" else []
     on_stripes = any(p.zone == CROSSWALK for p in present)
+    # Requests to the signal controller, only two cases:
+    # - more pedestrian green (extension, red held) only for who needs more time to cross;
+    # - red for the vehicles at once for a child on its own or a free animal, held while they are there.
+    in_need_on_stripes = any(p.zone == CROSSWALK and needs_more_time(p) for p in present)
+    urgent = urgent_subject(scene, cfg) if state != "DEGRADED" else None
 
     green_s = extend_s = 0
     if present:
@@ -279,12 +321,13 @@ def command(decision: Decision, scene: Scene, cfg: dict, green_floor: float = 0.
         "green_s": green_s,
         "req": {
             "ped_green_extend_s": extend_s,
-            "veh_red_hold": state in ("WARN_DRIVER", "WARN_PEDESTRIAN") or on_stripes,
+            "veh_red_hold": in_need_on_stripes or urgent is not None,
+            "veh_red_now": urgent is not None,
             "flash": state == "ANIMAL_ALERT",
         },
         "lcd": lcd,
         "oled": oled,
-        "reason": decision.reason,
+        "reason": decision.reason + (f"; rosso ai veicoli: {urgent}" if urgent else ""),
     }
 
 

@@ -93,6 +93,8 @@ rules:
   green_max_s: 25                 # (spec) green_s = min(25, max(W / 1.2, W / v_ped) + 2)
   green_margin_s: 2               # (spec)
   ped_green_extend_max_s: 15      # (spec) limit of the signal controller on the green extension
+  supervision_distance_m: 2.0     # a child with somebody who is not a child within this distance is not alone
+  red_now_animal_sizes: [medium, large]   # free animals on the road that call the red for the vehicles at once
   video_timeout_s: 1.0            # (spec) no frames for longer than this = DEGRADED
   hold_s: 1.0                     # a state is kept this long before stepping down (no flicker)
   default_W_m: 7.0                # road width used when calib.json has no metric calibration
@@ -184,6 +186,26 @@ actuator:
   c1_repeat_s: 1.0                # the last C1 is repeated at least this often (CONTRACTS draft)
   failsafe_timeout_s: 0.5         # (spec) the firmware falls back after 500 ms without heartbeat
 
+mcu:                              # what the microcontroller tells the vision (C5 lines of CONTRACTS.md)
+  applab_series: applab           # files <series>-*.jsonl written in the C3 folder by the App Lab app of the
+                                  # sketch (comms/applab/mdgb_link.py), when that part is on the board
+  poll_s: 0.5                     # how often those files are read
+  lamp_fault_hold_s: 5            # DEGRADED while the firmware keeps reporting a lamp fault this often
+
+operator:                         # page for the technician (--operator-port): badge first, then login
+  login_s: 120                    # after the badge: time to log in. Logging in or out uses the badge up
+  session_s: 0                    # how long a session lasts after the login; 0 = until the technician logs out.
+                                  # With a limit, a badge while logged in starts it again
+                                  # From the badge to the logout the C1 command says "tech": true and the
+                                  # sketch keeps the buzzer quiet (the badge beep still sounds)
+  max_failed_logins: 5            # wrong passwords before the page closes until the next badge
+  credentials_file: .env          # relative to ai/, ignored by git; written by scripts/operator_login.py
+  share_images: true              # live view of what the vision sees, for the logged-in technician.
+                                  # false = statistics only: no image leaves the vision process (privacy)
+  stream_fps: 5                   # live view: frames per second,
+  stream_width: 480               # width in pixels
+  jpeg_quality: 70                # and JPEG quality
+
 derive:
   rider_iou: 0.3                  # (spec) person/two-wheeler IoU above which the person is the rider
   animal_classes: [dog, cat, horse, sheep, cow, bear]   # (spec) COCO classes reported as "animal"
@@ -200,7 +222,7 @@ overlay:
   window_name: MDGB smartcrossing
   font_scale: 0.5
   thickness: 2
-  fps_ema_alpha: 0.1              # smoothing of the FPS shown on screen
+  fps_window_frames: 30           # the FPS shown is the rate over this many frames
   status_every_s: 1.0             # period of the status line in --headless mode
   quit_keys: [q, Q]
   line_arrow_px: 40               # length of the arrow that shows the IN direction
@@ -237,11 +259,14 @@ bench:
 # At 10 FPS a track is valid after 2 frames instead of 5: five frames are half a second, and a car at
 # 30 km/h has crossed the counting line before its track counts (Turin video: 16 vehicles counted of the
 # 35 counted at 30 FPS; with 2 frames, 28).
+# Measured on the board (10/10/2026, 720p crowd video, board otherwise idle): at 320 px the detector takes
+# 148 ms and the whole chain runs at 5.8 FPS with 4 threads, 6.0 with 3; 256 px reaches 8.8 FPS but loses half
+# of the vehicles of the Turin video. The detector on one frame out of two keeps 320 px and runs at 12.8 FPS.
 profiles:
   pc: {}
   unoq:
-    model: {input_size: 320, intra_op_num_threads: 4}
-    source: {max_fps: 10, resize_width: 640}
+    model: {input_size: 320, intra_op_num_threads: 3, detect_every_n: 2}
+    source: {max_fps: 12, resize_width: 640}
     tracking: {min_track_age: 2}
 
 # Applied on top of the profile by --emulate-unoq. (spec) 10 FPS, input 320, 4 onnxruntime threads.
