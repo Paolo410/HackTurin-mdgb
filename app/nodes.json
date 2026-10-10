@@ -1,5 +1,5 @@
 {
-  "_comment": "Camere/nodi mostrati sulla mappa della centrale. id = NODE_ID del nodo (= nome del Thing AWS). mock = true: camera di esempio per la demo, senza nodo reale. site = profilo della specifica (urbano | lungofiume | collina). Coordinate indicative.",
+  "_comment": "Camere/nodi mostrati sulla mappa della centrale. id = NODE_ID del nodo (comms/.env sull'Arduino). mock = true: camera di esempio per la demo, senza nodo reale. site = profilo della specifica (urbano | lungofiume | collina). Coordinate indicative.",
   "nodes": [
     {"id": "nodo01", "name": "Via Roma, piazza San Carlo", "lat": 45.0679, "lon": 7.6829, "site": "urbano", "mock": false},
     {"id": "nodo02", "name": "Corso Francia, piazza Bernini", "lat": 45.0758, "lon": 7.6561, "site": "urbano", "mock": true},

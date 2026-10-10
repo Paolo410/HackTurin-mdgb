@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Porta sull'Arduino UNO Q SOLO il codice della rete (comms): niente app del PC, test, AWS o documentazione.
+# Porta sull'Arduino UNO Q SOLO il codice della rete (comms): niente app del PC, test o documentazione.
 #
 #   ./comms/deploy/push_to_arduino.sh arduino@192.168.1.50     copia via ssh in ~/HackTurin-mdgb e prepara Python (~/venv)
 #   ./comms/deploy/push_to_arduino.sh --pack                    crea mdgb-nodo.tar.gz da copiare a mano (chiavetta)

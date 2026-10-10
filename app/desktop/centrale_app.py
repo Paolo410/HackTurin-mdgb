@@ -5,8 +5,8 @@ Chiudendo la finestra si ferma tutto. Impostazioni, certificati e database stann
   macOS   ~/Library/Application Support/MDGB Centrale/      Windows  %APPDATA%\\MDGB Centrale\\
   Linux   ~/.config/mdgb-centrale/                           (oppure la cartella in MDGB_HOME)
 con dentro:
-  config.env    broker (locale o AWS IoT Core), Bluetooth, porta della dashboard   <- creato al primo avvio
-  certs/        certificati AWS del Thing della centrale (mdgb-ingest)
+  config.env    broker (locale o in cloud), Bluetooth, porta della dashboard   <- creato al primo avvio
+  certs/        solo con un broker in cloud: certificati TLS della centrale
   nodes.json    camere sulla mappa (copiato al primo avvio; si modifica anche ad app aperta)
   central.db    database della centrale             centrale.log   log dell'app
 Se il broker è "localhost" e non risponde, l'app avvia il Mosquitto che ha dentro (o quello installato nel sistema).
@@ -36,15 +36,14 @@ MQTT_HOST=localhost
 MQTT_PORT=1883
 MQTT_TLS=0
 
-# --- Modalità AWS IoT Core: metti un # davanti alle 3 righe sopra e toglilo da queste.
-#     I tre file del certificato vanno nella cartella certs/ accanto a questo file (comms/aws/setup_thing.sh).
-# MQTT_HOST=xxxxxxxxxxxx-ats.iot.eu-central-1.amazonaws.com
+# --- Broker in cloud (produzione, in futuro): metti un # davanti alle 3 righe sopra e toglilo da queste.
+#     I file del certificato vanno nella cartella certs/ accanto a questo file.
+# MQTT_HOST=broker.esempio.it
 # MQTT_PORT=8883
 # MQTT_TLS=1
-# MQTT_CA=certs/AmazonRootCA1.pem
-# MQTT_CERT=certs/mdgb-ingest.cert.pem
-# MQTT_KEY=certs/mdgb-ingest.private.key
-# INGEST_CLIENT_ID=mdgb-ingest
+# MQTT_CA=certs/ca.pem
+# MQTT_CERT=certs/centrale.cert.pem
+# MQTT_KEY=certs/centrale.key
 
 # --- Bluetooth: canale di backup dei nodi. BLE=0 per spegnerlo. BLE_NODE = nodo a cui appartengono i beacon ---
 BLE=1

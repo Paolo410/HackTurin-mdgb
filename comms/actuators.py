@@ -1,7 +1,7 @@
 """Actuator transports: C1 (command) and C2 (heartbeat) from the AI to the MCU — docs/CONTRACTS.md v1.
 
     from comms.actuators import make_actuator
-    act = make_actuator("serial", port="/dev/cu.usbmodem1101")   # or "sim"; "bridge" arrives in CM-M4
+    act = make_actuator("serial", port="/dev/cu.usbmodem1101")   # or "sim"; "bridge" still to do (with the firmware)
     act.send(c1)            # never blocks, never raises on link errors
     act.heartbeat(seq)      # every 100 ms: without it the firmware fails safe after 500 ms
     act.close()
@@ -236,11 +236,12 @@ class SerialActuator(Actuator):
 
 
 def make_actuator(kind: str = "sim", **kwargs) -> Actuator:
-    """kind: "sim" | "serial" (port=...) | "bridge" (CM-M4)."""
+    """kind: "sim" | "serial" (port=...) | "bridge" (not yet: needs the firmware's Bridge functions)."""
     if kind == "sim":
         return SimActuator(**kwargs)
     if kind == "serial":
         return SerialActuator(**kwargs)
     if kind == "bridge":
-        raise NotImplementedError("BridgeActuator arrives in CM-M4: use 'sim' or 'serial'")
+        raise NotImplementedError("BridgeActuator not implemented yet (needs the firmware's Bridge functions): "
+                                  "use 'sim' or 'serial'")
     raise ValueError(f"unknown actuator kind: {kind!r}")

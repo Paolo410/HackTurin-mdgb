@@ -8,7 +8,7 @@ Non decodifica: decodifica la centrale (un solo decoder, docs/CONTRACTS.md v1).
 Uso:   python ble_receiver.py --node nodo01
        python ble_receiver.py --node nodo01 --dry-run         # prima prova: stampa e basta, niente broker
        python ble_receiver.py --node nodo01 --addr <indirizzo>   # filtra un solo nodo
-Richiede: pip install bleak paho-mqtt     (+ le variabili MQTT_* se il broker è AWS IoT Core)
+Richiede: pip install bleak paho-mqtt     (+ le variabili MQTT_* se il broker non è sul PC locale)
 """
 import argparse
 import asyncio

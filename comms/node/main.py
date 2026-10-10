@@ -2,7 +2,7 @@
 
   file C3/C5 (o simulatore) ──► Outbox (eMMC)        ← SEMPRE per primo
   loop ogni 0,2 s:
-      uplink.pump()        outbox ──MQTT/TLS──► AWS IoT Core   (backfill automatico quando torna la rete)
+      uplink.pump()        outbox ──MQTT──► broker (sul PC nella demo)   (backfill automatico quando torna la rete)
       aggregator.tick()    MQTT `agg` (finestre esatte, anche quelle maturate durante un blackout)
       failover.tick()      30 s senza conferme MQTT -> backup ACCESO (BLE nella demo, LoRa in produzione):
                            HB + AGG subito, poi HB periodico, AGG a ogni finestra, allarmi subito;

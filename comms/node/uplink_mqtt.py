@@ -1,7 +1,7 @@
 """Canale primario: MQTT 5 su TCP (porta 1883) o TCP+TLS (porta 8883 / 443).
 
-Compatibile con AWS IoT Core: autenticazione mutual TLS con certificato X.509, QoS 1 (AWS non
-supporta QoS 2), Last Will, messaggi retained e sessione persistente (Session Expiry).
+Demo: broker Mosquitto dentro l'app della centrale sul PC (rete locale, senza TLS). Produzione: un broker MQTT 5 in
+cloud con TLS e un certificato per nodo (mutual TLS); QoS 1, Last Will, messaggi retained, sessione persistente.
 
 - Svuota l'outbox a batch (un batch "in volo" alla volta), formato C4 `events` di docs/CONTRACTS.md v1.
 - QoS 1: solo un PUBACK POSITIVO (reason code < 0x80) marca gli eventi come inviati. Con un PUBACK negativo
@@ -25,14 +25,11 @@ from payload import C4_VERSION, event_id
 log = logging.getLogger("uplink")
 
 
-def make_tls_context(ca="", cert="", key="", alpn_443=False):
-    """TLS per AWS IoT Core (o qualsiasi broker con mutual TLS).
-    Sulla porta 443 AWS richiede l'ALPN 'x-amzn-mqtt-ca' (utile se la rete blocca la 8883)."""
+def make_tls_context(ca="", cert="", key=""):
+    """TLS verso un broker in cloud; con cert e key anche autenticazione del nodo (mutual TLS)."""
     ctx = ssl.create_default_context(cafile=ca or None)
     if cert and key:
         ctx.load_cert_chain(certfile=cert, keyfile=key)
-    if alpn_443:
-        ctx.set_alpn_protocols(["x-amzn-mqtt-ca"])
     return ctx
 
 
@@ -63,7 +60,7 @@ class MqttUplink:
         if user:
             self.c.username_pw_set(user, password)
         if tls:
-            self.c.tls_set_context(make_tls_context(ca, cert, key, alpn_443=(port == 443)))
+            self.c.tls_set_context(make_tls_context(ca, cert, key))
         self.c.will_set(f"{self.base}/hb", json.dumps({"v": C4_VERSION, "node_id": node_id, "type": "hb",
                                                        "online": False}), qos=1, retain=True)
         self.c.on_connect = self._on_connect

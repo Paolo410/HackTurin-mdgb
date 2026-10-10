@@ -38,22 +38,22 @@ def _env(name, default, cast=str):
     return cast(v)
 
 
-NODE_ID = _env("NODE_ID", "nodo01")                # = AWS IoT Thing name (docs/CONTRACTS.md C4)
+NODE_ID = _env("NODE_ID", "nodo01")                # nome del nodo = client ID MQTT (docs/CONTRACTS.md C4)
 TOPIC_PREFIX = _env("TOPIC_PREFIX", "mdgb")
 
 # --- MQTT (canale primario: Wi-Fi) ---
 # Sviluppo locale: Mosquitto sul laptop, TCP 1883 senza TLS.
-# AWS IoT Core:    MQTT_HOST=<xxxx-ats.iot.<region>.amazonaws.com>, MQTT_PORT=8883 (o 443 con ALPN),
-#                  MQTT_TLS=1 e i tre file del certificato X.509 del "Thing" (NODE_ID = nome del Thing).
+# Demo:            MQTT_HOST = IP del PC della centrale (broker dentro l'app), MQTT_PORT=1883, MQTT_TLS=0.
+# Cloud (futuro):  MQTT_HOST = broker in cloud, MQTT_PORT=8883, MQTT_TLS=1 e i file del certificato del nodo.
 MQTT_HOST = _env("MQTT_HOST", "localhost")
 MQTT_PORT = _env("MQTT_PORT", 1883, int)          # 1883 = TCP in chiaro, 8883 = TCP+TLS, 443 = TLS+ALPN
 MQTT_TLS = _env("MQTT_TLS", False, bool)
-MQTT_CA = _path(_env("MQTT_CA", ""))                     # es. certs/AmazonRootCA1.pem
+MQTT_CA = _path(_env("MQTT_CA", ""))                     # es. certs/ca.pem
 MQTT_CERT = _path(_env("MQTT_CERT", ""))                 # es. certs/nodo01.cert.pem
 MQTT_KEY = _path(_env("MQTT_KEY", ""))                   # es. certs/nodo01.private.key
-MQTT_USER = _env("MQTT_USER", "")                 # non usato con AWS IoT (autenticazione via certificato)
+MQTT_USER = _env("MQTT_USER", "")                 # facoltativo, se il broker usa utente e password
 MQTT_PASS = _env("MQTT_PASS", "")
-MQTT_SESSION_EXPIRY_S = _env("MQTT_SESSION_EXPIRY_S", 3600, int)   # AWS IoT: default 1 h, max configurabile 7 gg
+MQTT_SESSION_EXPIRY_S = _env("MQTT_SESSION_EXPIRY_S", 3600, int)   # il broker tiene la sessione per 1 h
 MQTT_BATCH = _env("MQTT_BATCH", 50, int)          # eventi per messaggio di backfill
 MQTT_ACK_TIMEOUT_S = _env("MQTT_ACK_TIMEOUT_S", 30, int)
 MQTT_ACK_WINDOW_S = _env("MQTT_ACK_WINDOW_S", 30, int)   # "online" = PUBACK positivo negli ultimi 30 s

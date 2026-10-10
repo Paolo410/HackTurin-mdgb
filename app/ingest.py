@@ -1,7 +1,7 @@
 """Subscriber della centrale: riceve tutto, deduplica, salva, rileva perdite (docs/CONTRACTS.md v1, C4 e C4-B).
 
 Fonti:
-  1. Broker principale (AWS IoT Core / Mosquitto):  {prefix}/+/events | agg | hb | backup
+  1. Broker principale (Mosquitto dentro l'app nella demo):  {prefix}/+/events | agg | hb | backup
   2. (opzionale) broker MQTT di The Things Network: v3/{app}@ttn/devices/+/up   (backup via LoRaWAN)
 
 Garanzie:
@@ -14,7 +14,7 @@ Uso:
   python ingest.py                 # ascolta e stampa statistiche ogni 10 s
   python ingest.py --report        # stampa il riepilogo dal DB ed esce
 Variabili: MQTT_HOST, MQTT_PORT, TOPIC_PREFIX, INGEST_DB, TTN_APP_ID, TTN_API_KEY, TTN_HOST
-           AWS IoT Core: MQTT_TLS=1, MQTT_CA, MQTT_CERT, MQTT_KEY, INGEST_CLIENT_ID (= nome del Thing "ingest")
+           broker in cloud: MQTT_TLS=1, MQTT_CA, MQTT_CERT, MQTT_KEY, INGEST_CLIENT_ID
 """
 import argparse
 import base64
@@ -73,8 +73,6 @@ def tls_context():
     ctx = ssl.create_default_context(cafile=MQTT_CA or None)
     if MQTT_CERT and MQTT_KEY:
         ctx.load_cert_chain(MQTT_CERT, MQTT_KEY)
-    if MQTT_PORT == 443:
-        ctx.set_alpn_protocols(["x-amzn-mqtt-ca"])
     return ctx
 
 
@@ -213,7 +211,7 @@ def main_loop(store):
     c.on_connect, c.on_message = on_connect, on_message
     # sessione persistente: se l'ingest si disconnette, il broker gli conserva i messaggi QoS 1
     props = mqtt.Properties(mqtt.PacketTypes.CONNECT)
-    props.SessionExpiryInterval = int(os.environ.get("MQTT_SESSION_EXPIRY_S", 3600))  # AWS: default max 1 h
+    props.SessionExpiryInterval = int(os.environ.get("MQTT_SESSION_EXPIRY_S", 3600))  # il broker la tiene 1 h
     c.reconnect_delay_set(1, 30)
     c.connect_async(MQTT_HOST, MQTT_PORT, keepalive=15, clean_start=False, properties=props)
     c.loop_start()

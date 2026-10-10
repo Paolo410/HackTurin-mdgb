@@ -1,7 +1,7 @@
 """Programma della centrale (docs/CONTRACTS.md v1). Sul PC si usa l'app "MDGB Centrale" (app/desktop/), che avvia
 questa stessa classe Central; da terminale: python app/central.py.
 
-    canale principale:  nodo ──Wi-Fi/MQTT──► AWS IoT Core (o Mosquitto) ──► qui   (ingest.py)
+    canale principale:  nodo ──Wi-Fi/MQTT──► broker (Mosquitto nell'app; in futuro in cloud) ──► qui   (ingest.py)
     canale di backup:   nodo ──BLE──────────────────────────────────────► qui   (Bluetooth del PC, SENZA Internet)
 Tutto finisce nello stesso database (app/central.db): eventi deduplicati, aggregati, heartbeat, messaggi di
 backup, e ogni 10 s la diagnosi di ogni nodo (OK / rete giù / guasto / Linux bloccato / manomissione / ...).
