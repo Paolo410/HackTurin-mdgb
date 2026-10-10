@@ -19,10 +19,10 @@ for p in (ROOT, os.path.join(ROOT, "comms", "node"), os.path.join(ROOT, "app")):
         sys.path.insert(0, p)
 
 from aggregator import Aggregator  # noqa: E402
-from backup_link import SimulatedBle  # noqa: E402
 from decoder import decode  # noqa: E402
 from diagnosis import diagnose  # noqa: E402
 from failover import Failover  # noqa: E402
+from fakes import SimulatedBle  # noqa: E402
 from outbox import Outbox  # noqa: E402
 from payload import TYPE_AGG, TYPE_HB, TYPE_INCIDENT  # noqa: E402
 
@@ -138,18 +138,19 @@ def test_backup_turns_on_if_mqtt_never_comes_up(tmp_path):
     assert fo.active, "30 s dall'avvio senza MQTT -> backup acceso"
 
 
-def test_real_ble_is_chosen_where_btmgmt_exists(monkeypatch):
-    """Sulla UNO Q il nodo gira come Python normale (non in App Lab): il BLE vero dipende da btmgmt, non dal Bridge."""
+def test_ble_is_real_or_the_node_refuses_to_start(monkeypatch):
+    """Sulla UNO Q il nodo gira come Python normale (non in App Lab): BLE vero se c'è btmgmt; altrimenti errore
+    chiaro, mai un BLE finto che non trasmette."""
     import backup_link
     monkeypatch.setattr(backup_link.shutil, "which", lambda name: "/usr/bin/btmgmt" if name == "btmgmt" else None)
     monkeypatch.setattr(backup_link.BleBackup, "_run", lambda self, args: True)
-    real = backup_link.make_backup("ble", mcu=None)
-    assert type(real) is backup_link.BleBackup
-    monkeypatch.setenv("BLE_SIMULATE", "1")
-    assert isinstance(backup_link.make_backup("ble", mcu=None), SimulatedBle)
+    assert type(backup_link.make_backup("ble")) is backup_link.BleBackup
     monkeypatch.setattr(backup_link.shutil, "which", lambda name: None)
-    monkeypatch.delenv("BLE_SIMULATE")
-    assert isinstance(backup_link.make_backup("ble", mcu=None), SimulatedBle), "senza btmgmt (Mac): simulato"
+    with pytest.raises(RuntimeError, match="btmgmt"):
+        backup_link.make_backup("ble")
+    assert type(backup_link.make_backup("none")) is backup_link.NoBackup
+    with pytest.raises(ValueError):
+        backup_link.make_backup("4g")
 
 
 # ------------------------------------------------------------------ ricevitore BLE
@@ -266,7 +267,7 @@ class WifiProxy:
 def test_wifi_off_then_on_ble_backup_end_to_end():
     from central import ble_to_store
     from dashboard import state
-    from event_source import SimulatedSource
+    from comms.tools.c3_sim import SimulatedSource
     from test_offline import Broker, _start_central, free_port, need_mosquitto, wait_until
     from uplink_mqtt import MqttUplink
     need_mosquitto()

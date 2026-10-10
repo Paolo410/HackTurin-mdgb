@@ -1,19 +1,48 @@
-"""Write simulated C3 lines to $MDGB_C3_DIR as ai/ will do (docs/CONTRACTS.md v1), plus a `status` line every 5 s.
-Lets you run the whole network (node with EVENT_SOURCE=c3) before the vision pipeline is ready.
+"""TEST TOOL, launched by hand: writes made-up C3 lines to $MDGB_C3_DIR exactly as ai/ does (docs/CONTRACTS.md v1),
+plus a `status` line every 5 s. Lets you try the whole network on the board (the node reads these files like the
+real ones) before the vision pipeline runs. The node itself never makes events up.
 
     python -m comms.tools.c3_sim --rate 2 --duration 600
 """
 from __future__ import annotations
 
 import argparse
-import os
+import random
 import sys
 import time
 
 from comms.jsonl import JsonlWriter, default_c3_dir
 
-sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "node"))
-from event_source import SimulatedSource  # noqa: E402  (flat module of comms/node)
+# rough mix of the users of an urban crossing
+SIM_MIX = [("pedestrian", 0.55), ("car", 0.25), ("cyclist", 0.10), ("motorcyclist", 0.04), ("bus", 0.02),
+           ("truck", 0.02), ("animal", 0.02)]
+
+
+class SimulatedSource:
+    """Plausible C3 lines (crossing, sometimes near_miss or yield); also used by the tests."""
+
+    def __init__(self, rate_hz=0.5, seed=None):
+        self.rate = rate_hz
+        self.rng = random.Random(seed)
+        self._track = 0
+
+    def make_event(self, ts=None):
+        r, ts = self.rng, time.time() if ts is None else ts
+        self._track += 1
+        if r.random() < 0.01:
+            return {"v": 1, "ts": ts, "type": "near_miss", "a": self._track, "b": self._track + 1,
+                    "ttc_s": round(r.uniform(0.3, 1.0), 2), "pet_s": None}
+        cls = r.choices(*zip(*SIM_MIX))[0]
+        if cls == "car" and r.random() < 0.3:
+            return {"v": 1, "ts": ts, "type": "yield", "track_id": self._track, "yielded": r.random() < 0.5}
+        ev = {"v": 1, "ts": ts, "type": "crossing", "track_id": self._track, "cls": cls,
+              "dir": r.choice(["in", "out"]), "line": "ped" if cls in ("pedestrian", "cyclist") else "veh"}
+        if cls == "pedestrian":
+            ev["attrs"] = {"child": r.random() < 0.05, "slow": r.random() < 0.10,
+                           "aid": r.choice(["wheelchair", "stroller"]) if r.random() < 0.04 else None}
+        if cls == "animal":
+            ev["coco"] = "dog"
+        return ev
 
 
 def main(argv=None) -> int:
@@ -37,7 +66,7 @@ def main(argv=None) -> int:
         pass
     finally:
         w.close()
-    print(f"{n} eventi C3 scritti in {a.dir}")
+    print(f"{n} eventi C3 di prova scritti in {a.dir}")
     return 0
 
 

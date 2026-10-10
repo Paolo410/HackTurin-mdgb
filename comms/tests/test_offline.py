@@ -123,7 +123,8 @@ def test_c4b_node_and_central_agree():
 def test_ble_frame_roundtrip():
     """Nodo (C4-B -> frame BLE 27 B -> comando btmgmt) e ricevitore (frame -> type, corpo) devono coincidere."""
     import payload as p
-    from backup_link import BLE_COMPANY_ID, SimulatedBle
+    from backup_link import BLE_COMPANY_ID
+    from fakes import SimulatedBle
     from ble_receiver import frame_to_message
     from decoder import decode
     agg = p.summarize([{"type": "crossing", "cls": "pedestrian", "dir": "in"}] * 5, 1739011500, 1739012400, "n")
@@ -225,8 +226,9 @@ def _start_central(port, work):
 def test_offline_end_to_end():
     need_mosquitto()
     from aggregator import Aggregator
-    from backup_link import McuLoraBackup, SimulatedMcu
-    from event_source import SimulatedSource
+    from backup_link import McuLoraBackup
+    from comms.tools.c3_sim import SimulatedSource
+    from fakes import SimulatedMcu
     from failover import Failover
     from outbox import Outbox
     from payload import TYPE_AGG
@@ -314,7 +316,7 @@ def test_offline_end_to_end():
 
 def test_negative_puback_end_to_end():
     need_mosquitto()
-    from event_source import SimulatedSource
+    from comms.tools.c3_sim import SimulatedSource
     from outbox import Outbox
     from uplink_mqtt import MqttUplink
 

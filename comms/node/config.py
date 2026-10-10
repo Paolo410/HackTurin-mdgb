@@ -28,7 +28,6 @@ def _path(v):
     return v if not v or os.path.isabs(v) else os.path.join(REPO_ROOT, v)
 
 
-
 def _env(name, default, cast=str):
     v = os.environ.get(name)
     if v is None:
@@ -42,8 +41,7 @@ NODE_ID = _env("NODE_ID", "nodo01")                # nome del nodo = client ID M
 TOPIC_PREFIX = _env("TOPIC_PREFIX", "mdgb")
 
 # --- MQTT (canale primario: Wi-Fi) ---
-# Sviluppo locale: Mosquitto sul laptop, TCP 1883 senza TLS.
-# Demo:            MQTT_HOST = IP del PC della centrale (broker dentro l'app), MQTT_PORT=1883, MQTT_TLS=0.
+# Demo:            MQTT_HOST = IP del PC della centrale (broker Mosquitto dentro l'app), MQTT_PORT=1883, MQTT_TLS=0.
 # Cloud (futuro):  MQTT_HOST = broker in cloud, MQTT_PORT=8883, MQTT_TLS=1 e i file del certificato del nodo.
 MQTT_HOST = _env("MQTT_HOST", "localhost")
 MQTT_PORT = _env("MQTT_PORT", 1883, int)          # 1883 = TCP in chiaro, 8883 = TCP+TLS, 443 = TLS+ALPN
@@ -74,7 +72,5 @@ BACKUP_ON_AFTER_S = _env("BACKUP_ON_AFTER_S", 30, float)    # acceso dopo 30 s s
 BACKUP_OFF_AFTER_S = _env("BACKUP_OFF_AFTER_S", 60, float)  # spento dopo 60 s di MQTT stabile
 BACKUP_HB_S = _env("BACKUP_HB_S", 300, float)               # HB sul backup: 5 min (nella demo anche 30 s)
 
-# --- Sorgente eventi ---
-EVENT_SOURCE = _env("EVENT_SOURCE", "sim")        # "sim" (simulatore interno) | "c3" (file JSONL scritti da ai/ e da Actuator)
+# --- Eventi: i file JSONL scritti sulla scheda da ai/ (C3) e da comms/actuators.py (C5) ---
 C3_DIR = _path(_env("MDGB_C3_DIR", os.path.join(REPO_ROOT, "logs", "c3")))
-SIM_RATE_HZ = _env("SIM_RATE_HZ", 0.5, float)     # eventi/secondo medi del simulatore

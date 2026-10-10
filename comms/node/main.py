@@ -1,6 +1,6 @@
 """Nodo MDGB, parte comunicazione: orchestrazione (docs/CONTRACTS.md v1).
 
-  file C3/C5 (o simulatore) ──► Outbox (eMMC)        ← SEMPRE per primo
+  file C3 (ai/) e C5 (MCU) in logs/c3 ──► Outbox (eMMC)   ← SEMPRE per primo
   loop ogni 0,2 s:
       uplink.pump()        outbox ──MQTT──► broker (sul PC nella demo)   (backfill automatico quando torna la rete)
       aggregator.tick()    MQTT `agg` (finestre esatte, anche quelle maturate durante un blackout)
@@ -13,12 +13,14 @@ La sicurezza non passa da qui: il semaforo lo comanda ai/ tramite comms/actuator
 import logging
 import os
 import shutil
+import signal
+import sys
 import time
 
 import config as cfg
 from aggregator import Aggregator
-from backup_link import ON_UNO_Q, make_backup, make_mcu
-from event_source import make_source
+from backup_link import make_backup
+from event_source import C3FileSource
 from failover import Failover
 from outbox import Outbox
 from payload import C4_VERSION
@@ -69,9 +71,8 @@ class NodeState:
 class Node:
     def __init__(self):
         self.ob = Outbox(cfg.DB_PATH)
-        self.mcu = make_mcu()
         self.state = NodeState()
-        self.backup = make_backup(cfg.BACKUP_LINK, self.mcu, cfg.BLE_SUDO)
+        self.backup = make_backup(cfg.BACKUP_LINK, cfg.BLE_SUDO)
         self.up = MqttUplink(self.ob, cfg.NODE_ID, cfg.TOPIC_PREFIX, cfg.MQTT_HOST, cfg.MQTT_PORT,
                              cfg.MQTT_TLS, cfg.MQTT_USER, cfg.MQTT_PASS,
                              cfg.MQTT_BATCH, cfg.MQTT_ACK_TIMEOUT_S,
@@ -81,17 +82,10 @@ class Node:
         self.failover = Failover(self.ob, self.up, self.backup, self.agg, self.state,
                                  cfg.BACKUP_ON_AFTER_S, cfg.BACKUP_OFF_AFTER_S, cfg.BACKUP_HB_S,
                                  disk_free=lambda: disk_free_pct(cfg.DB_PATH))
-        self.source = make_source(cfg.EVENT_SOURCE, cfg.SIM_RATE_HZ, cfg.C3_DIR, self.ob)
+        self.source = C3FileSource(cfg.C3_DIR, self.ob)
         self._t_hb = self._t_prune = 0.0
-        log.info("nodo %s | App Lab=%s | broker %s:%d | backup=%s | sorgente=%s | backlog iniziale %d",
-                 cfg.NODE_ID, ON_UNO_Q, cfg.MQTT_HOST, cfg.MQTT_PORT, cfg.BACKUP_LINK, cfg.EVENT_SOURCE,
-                 self.ob.backlog())
-
-    # chiamata dal simulatore (C3FileSource scrive direttamente nell'outbox, insieme al cursore)
-    def on_event(self, ev):
-        seq = self.ob.put(ev)                                                # persistenza, sempre per prima
-        self.state.on_event(ev)
-        log.debug("evento #%d %s", seq, ev.get("type"))
+        log.info("nodo %s | broker %s:%d | backup=%s | eventi da %s | backlog iniziale %d",
+                 cfg.NODE_ID, cfg.MQTT_HOST, cfg.MQTT_PORT, cfg.BACKUP_LINK, cfg.C3_DIR, self.ob.backlog())
 
     def hb(self, now=None):
         """Heartbeat C4 `hb`."""
@@ -103,7 +97,7 @@ class Node:
                 "queue": self.ob.backlog(), "disk_free_pct": round(disk_free_pct(cfg.DB_PATH)), "fps": st.get("fps")}
 
     def start(self):
-        self.source.start(self.on_event, self.state.on_info)
+        self.source.start(self.state.on_event, self.state.on_info)
 
     def loop_once(self):
         now = time.time()
@@ -128,22 +122,23 @@ class Node:
 
 
 def run():
-    node = Node()
+    try:
+        node = Node()
+    except (RuntimeError, ValueError) as e:      # configurazione impossibile (es. BLE senza btmgmt): niente finte
+        log.error("%s", e)
+        sys.exit(2)
     node.start()
 
-    def loop():
-        node.loop_once()
-        time.sleep(0.2)
+    def on_sigterm(*_):                          # systemctl stop: stessa uscita pulita di Ctrl+C
+        raise KeyboardInterrupt
 
-    if ON_UNO_Q:
-        from arduino.app_utils import App
-        App.run(user_loop=loop)
-    else:
-        try:
-            while True:
-                loop()
-        except KeyboardInterrupt:
-            node.stop()
+    signal.signal(signal.SIGTERM, on_sigterm)
+    try:
+        while True:
+            node.loop_once()
+            time.sleep(0.2)
+    except KeyboardInterrupt:
+        node.stop()
 
 
 if __name__ == "__main__":

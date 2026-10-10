@@ -1,28 +1,38 @@
-"""Ponte verso l'MCU STM32U585 (Arduino Bridge / RPC MessagePack su UART interna).
+"""Canale di backup del nodo: BLE (radio della UNO Q, demo) oppure LoRa (modulo sull'MCU, produzione).
 
-Sull'UNO Q:   Python (Linux)  --Bridge.call-->  sketch MCU  --UART D0/D1-->  modulo LoRa
-Sul laptop:   nessun Bridge disponibile -> SimulatedMcu registra le chiamate a log,
-              così puoi sviluppare e testare tutto il resto senza la scheda.
+BLE:  Python (Linux) --btmgmt (BlueZ)--> radio Bluetooth della UNO Q --> beacon ricevuti dal PC della centrale
+LoRa: Python (Linux) --Bridge.call("lora_send")--> sketch MCU --UART--> modulo LoRa (Wio-E5)
+Niente simulazioni qui: se la radio scelta non c'è il nodo si ferma con un errore chiaro (le prove senza scheda
+usano i finti di comms/tests/fakes.py).
 """
 import logging
+import shlex
+import shutil
+import struct
+import subprocess
 
 log = logging.getLogger("mcu")
-
-try:
-    from arduino.app_utils import Bridge      # disponibile solo dentro App Lab sull'UNO Q
-    ON_UNO_Q = True
-except ImportError:
-    Bridge = None
-    ON_UNO_Q = False
 
 
 class McuLink:
     """Funzioni esposte dallo sketch con Bridge.provide(...) (docs/CONTRACTS.md v1, sezione Bridge).
-    C1/C2 verso l'MCU passano da comms/actuators.py: qui serve solo la radio LoRa (produzione)."""
+    C1/C2 verso l'MCU passano da comms/actuators.py: qui serve solo la radio LoRa (produzione).
+    Client ufficiale dell'arduino-router, lo stesso di App Lab, usabile da un venv normale:
+    https://github.com/arduino/arduino-router-bridge-py"""
+
+    CALL_TIMEOUT_S = 2.0
+
+    def __init__(self, address=None, bridge=None):
+        if bridge is None:
+            from arduino.router_bridge import DEFAULT_ADDRESS, Bridge   # pip: arduino-router-bridge
+            bridge = Bridge(address or DEFAULT_ADDRESS)
+            if not bridge.connect(timeout=5):
+                log.error("arduino-router non raggiungibile: riprovo in background (systemctl status arduino-router)")
+        self.bridge = bridge
 
     def _call(self, name, *args):
         try:
-            return Bridge.call(name, *args)
+            return self.bridge.call(name, *args, timeout=self.CALL_TIMEOUT_S)
         except Exception as e:                  # l'MCU non deve mai far cadere la pipeline
             log.error("Bridge.call(%s) fallita: %s", name, e)
             return False
@@ -35,35 +45,11 @@ class McuLink:
         return bool(self._call("lora_joined"))
 
 
-class SimulatedMcu:
-    """Stessa interfaccia di McuLink, per girare sul laptop."""
-
-    def __init__(self):
-        self.sent = []          # (fPort, payload) "trasmessi via LoRa" (utile nei test)
-
-    def lora_send(self, payload: bytes, port: int = 1) -> bool:
-        self.sent.append((port, payload))
-        log.info("[SIM LoRa] uplink fPort %d, %d byte: %s", port, len(payload), payload.hex().upper())
-        return True
-
-    def lora_joined(self) -> bool:
-        return True
-
-
-def make_mcu():
-    return McuLink() if ON_UNO_Q else SimulatedMcu()
-
-
 # ======================================================================================
 # Canale di backup intercambiabile: LoRa (via MCU) oppure BLE (radio integrata nella UNO Q)
 #   config.BACKUP_LINK = "lora" | "ble" | "none"
 #   Interfaccia comune:  send(payload, port=1) -> bool   |   idle()  (chiamata quando MQTT è sano)
 # ======================================================================================
-import os
-import shlex
-import shutil
-import struct
-import subprocess
 
 BLE_COMPANY_ID = 0xFFFF            # ID riservato ai test dal Bluetooth SIG (in produzione: ID registrato)
 BLE_FRAME_SIZE = 27                # 31 byte di advertising - 4 di header manufacturer data
@@ -112,7 +98,8 @@ class BleBackup:
         self.run = runner or self._run
         self.active = False
         self.frames = {}                   # istanza -> frame in onda adesso
-        self.run(["btmgmt", "power", "on"])
+        if not self.run(["btmgmt", "power", "on"]):
+            log.error("BLE: la radio non risponde a btmgmt: avvia il nodo con sudo (o BLE_SUDO=1)")
 
     def _run(self, args):
         try:
@@ -164,27 +151,23 @@ class NoBackup:
 
 
 def ble_available() -> bool:
-    """BLE vero dove c'è BlueZ (il Linux della UNO Q, anche fuori da App Lab); sul Mac/PC di sviluppo no.
-    BLE_SIMULATE=1 forza la simulazione."""
-    return shutil.which("btmgmt") is not None and os.environ.get("BLE_SIMULATE", "0") != "1"
+    """BLE vero dove c'è BlueZ: il Linux della UNO Q (anche fuori da App Lab)."""
+    return shutil.which("btmgmt") is not None
 
 
-def make_backup(kind: str, mcu, ble_sudo=False):
-    kind = (kind or "lora").lower()
+def make_backup(kind: str, ble_sudo=False, mcu=None):
+    """kind = BACKUP_LINK: "ble" | "lora" | "none". Se la radio scelta non c'è -> RuntimeError, mai una finta."""
+    kind = (kind or "ble").lower()
     if kind == "ble":
-        if ble_available():
-            log.info("backup BLE reale (btmgmt)")
-            return BleBackup(sudo=ble_sudo)
-        log.warning("backup BLE SIMULATO: btmgmt non trovato (normale sul Mac; sulla UNO Q: sudo apt install bluez)")
-        return SimulatedBle()
+        if not ble_available():
+            raise RuntimeError("BACKUP_LINK=ble ma btmgmt non c'è: sulla UNO Q `sudo apt install bluez`. "
+                               "Su un PC senza BlueZ usa BACKUP_LINK=none")
+        log.info("backup BLE reale (btmgmt)")
+        return BleBackup(sudo=ble_sudo)
     if kind == "none":
+        log.info("backup spento (BACKUP_LINK=none)")
         return NoBackup()
-    return McuLoraBackup(mcu)
-
-
-class SimulatedBle(BleBackup):
-    """BLE simulato sul laptop: costruisce gli stessi comandi btmgmt ma non li esegue."""
-
-    def __init__(self):
-        self.commands = []
-        super().__init__(runner=lambda args: self.commands.append(args) or True)
+    if kind == "lora":
+        log.info("backup LoRa via MCU (Bridge lora_send)")
+        return McuLoraBackup(mcu or McuLink())
+    raise ValueError(f"BACKUP_LINK sconosciuto: {kind!r} (ble | lora | none)")

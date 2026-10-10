@@ -3,8 +3,9 @@
     UNO Q:   python -m comms.tools.ble_beacon_test --seconds 60          (add --sudo if not root)
     laptop:  python app/ble_receiver.py --node nodo01 --dry-run
 
-Every 5 s it advertises a C4-B HB frame (and one TAMPER alarm on instance 3) with the real btmgmt commands
-used by the node, then switches the beacons off. The laptop must print the decoded HB with an increasing ts.
+Every 5 s it advertises a C4-B HB frame (plus, on instance 3, a "technician badge" notice: TAMPER code 3, shown as
+information, not as an alarm) with the real btmgmt commands used by the node, then switches the beacons off.
+The laptop (or the app, channel BLE of nodo01) must show the HB with an increasing ts.
 """
 from __future__ import annotations
 
@@ -28,12 +29,12 @@ def main(argv=None) -> int:
     ble = BleBackup(sudo=a.sudo)
     t_end, n = time.time() + a.seconds, 0
     try:
-        if not ble.send(pack_alarm(time.time(), 2), TYPE_TAMPER):
+        if not ble.send(pack_alarm(time.time(), 3), TYPE_TAMPER):
             print("btmgmt add-adv fallito: controlla `which btmgmt`, `sudo btmgmt info` e i permessi (--sudo)")
             return 1
         while time.time() < t_end:
             n += 1
-            ble.send(pack_hb(time.time(), "normal", "IDLE", backlog=10 * n), TYPE_HB)
+            ble.send(pack_hb(time.time(), "normal", "IDLE", backlog=0), TYPE_HB)
             time.sleep(5)
     except KeyboardInterrupt:
         pass
