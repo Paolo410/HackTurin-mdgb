@@ -18,6 +18,14 @@ if WIN:
     MOSQ_DIR = os.environ.get("MOSQUITTO_DIR", r"C:\Program Files\mosquitto")
     MOSQ = os.path.join(MOSQ_DIR, "mosquitto.exe")
     extra = [(dll, "mosquitto") for dll in glob.glob(os.path.join(MOSQ_DIR, "*.dll"))]   # OpenSSL e simili
+    # runtime Visual C++ accanto a mosquitto.exe: non è garantito che ci sia su ogni PC Windows
+    have = {os.path.basename(d).lower() for d, _ in extra}
+    for name in ("vcruntime140.dll", "vcruntime140_1.dll", "msvcp140.dll"):
+        for folder in (sys.base_prefix, os.path.join(os.environ.get("SystemRoot", r"C:\Windows"), "System32")):
+            path = os.path.join(folder, name)
+            if name not in have and os.path.exists(path):
+                extra.append((path, "mosquitto"))
+                have.add(name)
 else:
     MOSQ = shutil.which("mosquitto") or "/opt/homebrew/sbin/mosquitto"
     extra = []

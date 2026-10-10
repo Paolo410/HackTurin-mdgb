@@ -2,7 +2,7 @@
 # Da PowerShell, nella cartella del repo:
 #   powershell -ExecutionPolicy Bypass -File app\desktop\build_windows.ps1
 # Serve: Python 3.12 (python.org o "winget install Python.Python.3.12") e Mosquitto per Windows installato in
-# C:\Program Files\mosquitto (https://mosquitto.org/download/ oppure "choco install mosquitto"): l'exe lo include,
+# C:\Program Files\mosquitto (installer ufficiale: https://mosquitto.org/download/): l'exe lo include,
 # quindi il centralino non deve installare nulla. Senza un PC Windows: la build automatica su GitHub
 # (.github/workflows/centrale-windows.yml) fa la stessa cosa.
 $ErrorActionPreference = "Stop"
@@ -15,7 +15,7 @@ New-Item -ItemType Directory -Force $Build | Out-Null
 Write-Host "0/4 Mosquitto"
 $MosqDir = if ($env:MOSQUITTO_DIR) { $env:MOSQUITTO_DIR } else { "C:\Program Files\mosquitto" }
 if (-not (Test-Path (Join-Path $MosqDir "mosquitto.exe"))) {
-  throw "Mosquitto non trovato in ${MosqDir}: installalo da https://mosquitto.org/download/ (o 'choco install mosquitto')"
+  throw "Mosquitto non trovato in ${MosqDir}: installalo da https://mosquitto.org/download/ (installer per Windows x64)"
 }
 
 Write-Host "1/4 ambiente di build (app\desktop\build\venv)"
