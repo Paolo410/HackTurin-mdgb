@@ -25,11 +25,12 @@ ANIMALS = ("animal", "bird")
 
 
 def node_config(path=None):
-    """Camere della mappa: app/nodes.json (o NODES_FILE) -> {id: {name, lat, lon, site, mock}}."""
+    """Camere della mappa: app/nodes.json (o NODES_FILE) -> {id: {name, lat, lon, site, video}}.
+    Le camere di esempio ("mock": true) delle versioni precedenti, rimaste nelle impostazioni, si ignorano."""
     path = path or os.environ.get("NODES_FILE") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "nodes.json")
     try:
         with open(path, encoding="utf-8") as f:
-            return {n["id"]: n for n in json.load(f).get("nodes", [])}
+            return {n["id"]: n for n in json.load(f).get("nodes", []) if not n.get("mock")}
     except FileNotFoundError:
         return {}
 
@@ -101,7 +102,7 @@ def state(store, config=None, now=None, windows=12, **diag_windows):
         cfg = config.get(node, {})
         nodes.append({
             "node": node, "name": names.get(node, ""), "diagnosis": diag,
-            "lat": cfg.get("lat"), "lon": cfg.get("lon"), "site": cfg.get("site"), "mock": bool(cfg.get("mock")),
+            "lat": cfg.get("lat"), "lon": cfg.get("lon"), "site": cfg.get("site"),
             "video": cfg.get("video"),          # stream MJPEG dal vivo della visione (facoltativo, mai registrato)
             "channel": {"mqtt": "Wi-Fi/MQTT", "ble": "BLE", "lorawan": "LoRaWAN"}.get(diag["via"]) if diag["via"] else None,
             "last_contact_s": None if diag["last_contact"] is None else round(now - diag["last_contact"], 1),

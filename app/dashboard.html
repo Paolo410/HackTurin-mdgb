@@ -242,7 +242,7 @@ const dur = s => s < 60 ? `${Math.round(s)} s` : s < 3600 ? `${Math.round(s / 60
 const hhmm = t => new Date(t * 1000).toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
 const num = n => n == null ? "n.d." : Number(n).toLocaleString("it-IT");
 const cls = n => DIAG[n.diagnosis.code] || "neutral";
-const label = n => n.mock && n.diagnosis.code === "unknown" ? "camera di esempio" : n.diagnosis.text;
+const label = n => n.diagnosis.code === "unknown" ? "in attesa del nodo" : n.diagnosis.text;
 const shortName = n => n.name || n.node;
 
 function select(id) { picked = id; if (S) render(S); }
@@ -282,7 +282,7 @@ function markerEl(n) {
 
 function updateMarkerEl(root, n) {
   const dot = root.firstChild, lab = root.lastChild, color = DOT[cls(n)];
-  dot.className = "mk" + (n.node === picked ? " sel" : "") + (n.mock && n.diagnosis.code === "unknown" ? " faint" : "")
+  dot.className = "mk" + (n.node === picked ? " sel" : "") + (n.diagnosis.code === "unknown" ? " faint" : "")
     + (PULSE.has(n.diagnosis.code) ? " pulse" : "");
   dot.style.background = color;
   dot.style.color = color;
@@ -409,7 +409,7 @@ function drawMap(s) {
   let g = "";
   for (let i = 1; i < 8; i++) g += `<line x1="${i * W / 8}" y1="0" x2="${i * W / 8}" y2="${H}" stroke="var(--grid)"/><line x1="0" y1="${i * H / 8}" x2="${W}" y2="${i * H / 8}" stroke="var(--grid)"/>`;
   const dots = placed.map(n => {
-    const c = DOT[cls(n)], sel = n.node === picked, faint = n.mock && n.diagnosis.code === "unknown";
+    const c = DOT[cls(n)], sel = n.node === picked, faint = n.diagnosis.code === "unknown";
     return `<g style="cursor:pointer" data-node="${esc(n.node)}"><title>${esc(n.node)} · ${esc(n.name)} · ${esc(label(n))}</title>
       <circle cx="${px(n)}" cy="${py(n)}" r="${sel ? 12 : 9}" fill="${c}" fill-opacity="${faint ? 0.3 : 0.9}" stroke="${sel ? "var(--text)" : c}" stroke-width="${sel ? 3 : 2}"/>
       <text x="${px(n) + 14}" y="${py(n) + 4}" font-size="12" fill="var(--text)">${esc(n.node)}</text></g>`;
@@ -448,12 +448,11 @@ function detailView(n, s) {
       <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${n.lat},${n.lon}">${ic("ext")} Google Maps</a>
       <a class="btn" target="_blank" rel="noopener" href="https://maps.apple.com/?ll=${n.lat},${n.lon}&q=${encodeURIComponent(n.name || n.node)}">${ic("ext")} Mappe</a></div>` : "";
   const head = `<div class="dh"><div><div class="dname">${esc(shortName(n))}</div>
-      <div class="muted">${esc(n.node)}${n.site ? " · profilo " + esc(n.site) : ""}${n.mock ? " · camera di esempio" : ""}</div></div>
+      <div class="muted">${esc(n.node)}${n.site ? " · profilo " + esc(n.site) : ""}</div></div>
     <span class="badge ${c}">${esc(label(n))}</span></div>${links}`;
   if (n.diagnosis.code === "unknown") {
-    return head + `<h3>Stato</h3><div class="empty">${ic("camera")}<div>${n.mock
-      ? `Camera di esempio: non c'è ancora un nodo collegato.<br><span class="muted">Si accende quando arriva un nodo con <code>NODE_ID=${esc(n.node)}</code>.</span>`
-      : "Nessun dato ricevuto da questa camera."}</div></div>`;
+    return head + `<h3>Stato</h3><div class="empty">${ic("camera")}<div>Nessun dato ricevuto da questa camera.<br>`
+      + `<span class="muted">Si accende quando il nodo con <code>NODE_ID=${esc(n.node)}</code> si collega (Wi-Fi o Bluetooth).</span></div></div>`;
   }
   const kv = (icon, k, v, tip = "", wide = false) =>
     `<div class="${wide ? "wide" : ""}" ${tip ? `title="${esc(tip)}"` : ""}><div class="k">${ic(icon)} ${k}</div><div class="v">${v}</div></div>`;
@@ -510,17 +509,15 @@ function render(s) {
   if (!s.nodes.some(n => n.node === picked)) picked = (s.nodes.find(n => PULSE.has(n.diagnosis.code)) || s.nodes.find(n => n.diagnosis.code !== "unknown") || s.nodes[0] || {}).node || null;
 
   // riepilogo
-  const active = s.nodes.filter(n => !(n.mock && n.diagnosis.code === "unknown"));
-  const online = active.filter(n => n.diagnosis.code === "ok").length;
+  const online = s.nodes.filter(n => n.diagnosis.code === "ok").length;
   const trouble = s.nodes.filter(n => PULSE.has(n.diagnosis.code));
   const lastHour = Object.values(s.traffic).reduce((a, t) => a + Object.values(t.last_hour || {}).reduce((x, y) => x + y, 0), 0);
   const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
   const alarmsToday = s.alarms.filter(a => a.ts * 1000 >= midnight.getTime()).length;
-  const examples = s.nodes.length - active.length;
   const kpi = (icon, k, v, sub, c = "", tip = "") => `<div class="kpi" ${tip ? `title="${esc(tip)}"` : ""}><div class="k">${ic(icon)} ${k}</div><div class="v ${c}">${v}</div><div class="s">${sub}</div></div>`;
   document.getElementById("kpis").innerHTML =
-    kpi("camera", "Camere operative", `${online}/${active.length}`, examples ? `+ ${examples} di esempio` : "tutte collegate",
-        active.length && online === active.length ? "ok" : "warn") +
+    kpi("camera", "Camere operative", `${online}/${s.nodes.length}`, online === s.nodes.length ? "tutte collegate" : "le altre: vedi la mappa",
+        s.nodes.length && online === s.nodes.length ? "ok" : "warn") +
     kpi("alert", "Da controllare", trouble.length || "Nessuna", trouble.length ? "vedi l'avviso in alto" : "tutto regolare", trouble.length ? "bad" : "ok") +
     kpi("activity", "Passaggi ultima ora", num(lastHour), "pedoni, bici, veicoli, animali") +
     kpi("shield", "Allarmi oggi", num(alarmsToday), alarmsToday ? "nel registro qui sotto" : "nessun allarme", alarmsToday ? "warn" : "") +

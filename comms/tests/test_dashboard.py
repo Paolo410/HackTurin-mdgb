@@ -43,15 +43,15 @@ def store(tmp_path):
 
 
 CONFIG = {"nodo01": {"id": "nodo01", "name": "via Roma", "lat": 45.0679, "lon": 7.6829, "site": "urbano"},
-          "nodo09": {"id": "nodo09", "name": "camera di esempio", "lat": 45.05, "lon": 7.70, "mock": True}}
+          "nodo09": {"id": "nodo09", "name": "corso Francia", "lat": 45.05, "lon": 7.70}}
 
 
 def test_state_nodes_alarms_traffic(store):
     s = state(store, CONFIG)
     n1, n2, n9 = s["nodes"]
     assert (n1["node"], n1["name"], n1["diagnosis"]["code"], n1["channel"]) == ("nodo01", "via Roma", "ok", "Wi-Fi/MQTT")
-    assert (n1["lat"], n1["lon"], n1["site"], n1["mock"]) == (45.0679, 7.6829, "urbano", False)
-    assert (n9["diagnosis"]["code"], n9["mock"], n9["lat"]) == ("unknown", True, 45.05), "camera del mockup senza dati"
+    assert (n1["lat"], n1["lon"], n1["site"]) == (45.0679, 7.6829, "urbano")
+    assert (n9["diagnosis"]["code"], n9["lat"]) == ("unknown", 45.05), "camera configurata, nodo non ancora collegato"
     assert n2["lat"] is None, "nodo con dati ma senza coordinate: in lista, non sulla mappa"
     assert (n1["state"], n1["queue"], n1["batt"], n1["fps"]) == ("PRESENCE", 0, 87, 9.6)
     assert (n2["diagnosis"]["text"], n2["channel"], n2["rssi"]) == ("rete giù, nodo sano", "BLE", -67)
@@ -78,10 +78,20 @@ def test_http_endpoints(store):
     assert b"mappa schematica" in page.data, "senza Internet la mappa ripiega su quella schematica"
     api = client.get("/api/state")
     assert api.status_code == 200
-    assert {"nodo01", "nodo02"} <= {n["node"] for n in api.get_json()["nodes"]}, "più le camere di app/nodes.json"
+    assert {"nodo01", "nodo02"} == {n["node"] for n in api.get_json()["nodes"]}, "nodi con dati + app/nodes.json"
 
 
 def test_repo_nodes_json_is_valid():
     from dashboard import node_config
     cams = node_config()
-    assert cams and all(-90 <= c["lat"] <= 90 and -180 <= c["lon"] <= 180 for c in cams.values())
+    assert list(cams) == ["nodo01"], "solo il nodo vero: niente camere di esempio"
+    assert all(-90 <= c["lat"] <= 90 and -180 <= c["lon"] <= 180 for c in cams.values())
+
+
+def test_old_example_cameras_are_ignored(tmp_path):
+    """Chi ha già usato l'app ha nelle impostazioni il nodes.json vecchio, con le camere di esempio: non si mostrano."""
+    from dashboard import node_config
+    f = tmp_path / "nodes.json"
+    f.write_text('{"nodes": [{"id": "nodo01", "lat": 45, "lon": 7, "mock": false},'
+                 ' {"id": "nodo02", "lat": 45, "lon": 7, "mock": true}]}')
+    assert list(node_config(str(f))) == ["nodo01"]
