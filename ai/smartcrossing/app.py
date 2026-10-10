@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import sys
 import time
+from collections import deque
 from time import perf_counter
 
 import cv2
@@ -104,7 +105,9 @@ def main(argv: list[str] | None = None) -> int:
               + (" night forced" if args.night else ""))
 
     quit_keys = {ord(k) for k in o["quit_keys"]} | {_KEY_ESC}
-    alpha = float(o["fps_ema_alpha"])
+    # Rate over the last frames, not between two frames: with the detector on one frame out of two the frames
+    # arrive in pairs, and the time between the two of a pair says nothing.
+    stamps: deque = deque(maxlen=int(o["fps_window_frames"]))
     fps = 0.0
     frames = 0
     last_state = None
@@ -148,9 +151,9 @@ def main(argv: list[str] | None = None) -> int:
             if result is not None:
                 if frames == 1:
                     first = last_status = now
-                else:
-                    instant = 1.0 / max(now - last, _MIN_DT)
-                    fps = instant if frames == 2 else (1 - alpha) * fps + alpha * instant
+                stamps.append(now)
+                if len(stamps) > 1:
+                    fps = (len(stamps) - 1) / max(stamps[-1] - stamps[0], _MIN_DT)
                 last = now
                 for event in result.events:
                     if event["type"] == "crossing":

@@ -56,7 +56,9 @@ def test_alert_lamp_and_flash_request():
     engine = RuleEngine(CFG)
     out = engine.step(Scene(W=7, animals=[AnimalInfo(1, "bear", "large", on_road=True, length_m=1.2)]))
     assert out["state"] == "ANIMAL_ALERT" and out["led"] == "AMBER_BLINK_4HZ" and out["req"]["flash"] is True
-    assert out["reason"] == "animale grande libero in carreggiata (bear, 1.2 m)"
+    assert out["reason"] == ("animale grande libero in carreggiata (bear, 1.2 m); "
+                             "rosso ai veicoli: animale libero in carreggiata (bear)")
+    assert out["req"]["veh_red_now"] is True
     assert out["lcd"] == "ANIMALE         IN STRADA"
 
 

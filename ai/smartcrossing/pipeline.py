@@ -59,7 +59,8 @@ def build_scene(tracker: Tracker, tracked: sv.Detections, roles: list[str], vali
             scene.pedestrians.append(PedestrianInfo(
                 track_id=state.track_id, zone=state.zone,
                 waiting_s=t - state.zone_since if waiting else 0.0, toward_road_ms=toward,
-                walk_speed_ms=a.get("walk_speed"), child=a.get("child"), slow=a.get("slow"), aid=a.get("aid")))
+                walk_speed_ms=a.get("walk_speed"), child=a.get("child"), slow=a.get("slow"), aid=a.get("aid"),
+                x=x, y=y))
         elif role in veh_roles and state.zone in ROAD_ZONES:
             # Distance to the nearest edge of the stripes, only while driving towards them (else negative).
             d = approach_distance(state, along)

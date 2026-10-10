@@ -95,7 +95,7 @@ def draw_state(frame: np.ndarray, command: dict | None, cfg: dict, failsafe: boo
         f"{command['state']}   LED {command['led']}" + ("   [FAIL-SAFE: no heartbeat]" if failsafe else ""),
         command["reason"][:int(o["reason_max_chars"])],
         f"LCD [{command['lcd']}]  OLED [{command['oled']}]  green {command['green_s']}s "
-        f"+{req['ped_green_extend_s']}s  red_hold={int(req['veh_red_hold'])} flash={int(req['flash'])}",
+        f"+{req['ped_green_extend_s']}s  red_hold={int(req['veh_red_hold'])} red_now={int(req['veh_red_now'])} flash={int(req['flash'])}",
     ]
     (_, text_h), baseline = cv2.getTextSize("Ag", _FONT, scale, 1)
     line_h = text_h + baseline + int(o["thickness"])

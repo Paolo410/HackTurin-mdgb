@@ -31,7 +31,9 @@ def test_emulate_unoq_applies_spec_limits():
 def test_unoq_profile_overrides():
     cfg = load_config(profile="unoq")
     assert cfg["model"]["input_size"] == 320
-    assert cfg["source"]["max_fps"] == 10
+    # Measured on the board: the detector every frame gives 6 FPS; one frame out of two, 12.
+    assert cfg["model"]["detect_every_n"] == 2 and cfg["source"]["max_fps"] == 12
+    assert cfg["model"]["intra_op_num_threads"] == 3
     assert cfg["tracking"]["min_track_age"] == 2
 
 
