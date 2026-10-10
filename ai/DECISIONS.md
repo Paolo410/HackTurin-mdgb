@@ -342,4 +342,22 @@ con v_ped 0,3 → 25 s.
       le altezze di quel video non valgono;
     - un incrocio con veicoli in svolta (Torino_3) non si conta con una sola linea diritta;
     - pedoni lontani letti come `bird`, un'auto scura letta come `motorcycle`.
+29. **Integrazione sulla UNO Q** (branch `paolo/ai-unoq`, decisa con Paolo il 10/10 sera):
+    - **la visione gira come servizio su Linux, fuori da App Lab**, come già previsto da `comms/` e dalla guida.
+      Scartata l'alternativa "dentro `main.py` dell'app": onnxruntime e supervision andrebbero installati nel
+      container di App Lab, mai provato, con il rischio di conflitti con le sue librerie;
+    - **la camera la apre solo la visione**: il `main.py` dell'app di App Lab oggi la apre per mostrarla su una
+      pagina web, e va tolta da lì (proposta consegnata a Salvatore e Lorenzo);
+    - **urto, badge e sensori si leggono dai file `applab-*.jsonl`** scritti da `comms/applab/mdgb_link.py`, non da
+      nuove notifiche `mcu_event`: funziona con lo sketch com'è e in centrale non arriva niente due volte. Le righe
+      `mcu_event` (fail-safe, lampada, termocamera) arrivano comunque dal Bridge;
+    - **urto → `DEGRADED` per 30 s** (`mcu.tamper_hold_s`), non "fino al badge": lo sketch scatta a ogni scossa
+      sopra 1,35 g e in una demo su un tavolo capita. Il badge riarma subito. Da rivedere per la strada;
+    - **pagina del tecnico con soli numeri**, aperta per 10 minuti dal badge. Scartato il video dal vivo: mostrare
+      persone riconoscibili a un telefono è un trattamento di dati personali anche senza registrare, e la
+      specifica dice "mai salvare frame, solo metadati". Via Bluetooth un video non passerebbe comunque;
+    - **proposta di sketch per Salvatore** (fuori dal repo): `mdgb_line` per C1/C2, centralina simulata sui tre
+      LED, fail-safe a 500 ms, blocco RFID e bip senza `delay()`. Logica provata su PC con un finto Arduino, non
+      compilata per la scheda. Aperto: lo stato della visione usato come chiamata pedonale (accorcia il verde
+      dei veicoli fino a 8 s) non è scritto nel contratto.
 

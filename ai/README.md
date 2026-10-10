@@ -47,6 +47,7 @@ python -m smartcrossing.app --source 0                     # webcam, finestra co
 python -m smartcrossing.app --source samples/video.mp4     # file video
 python -m smartcrossing.app --source 0 --emulate-unoq      # limiti della UNO Q: 10 FPS, 4 thread
 python -m smartcrossing.app --source 0 --headless          # senza finestra, una riga di stato al secondo
+python -m smartcrossing.app --source 0 --operator-port 8090  # in più la pagina di stato per il tecnico
 python scripts/calibrate.py --source samples/video.mp4     # calibra l'inquadratura e salva calib.json (vedi sotto)
 python scripts/scenario.py                                 # elenco delle scene simulate (senza camera)
 python scripts/scenario.py elderly_fast_car                # pedone lento + auto a 50 km/h: regole e attuatore
@@ -102,6 +103,20 @@ L'altezza delle persone (attributo `child`) usa la posizione ricostruita della c
 persona appare più corta di quanto è larga la strada accanto, e senza questa correzione gli adulti risultano bambini.
 `child` si decide solo quando l'altezza è misurabile: calibrazione che torna con una camera reale e riquadro alto
 almeno 30 pixel (`attributes.height_min_box_px`). Altrimenti resta non deciso, e vale la velocità di camminata misurata.
+
+## Sulla scheda: microcontrollore e tecnico
+
+Sulla UNO Q la visione gira come servizio accanto all'app di App Lab dello sketch. Come si copia e si prova:
+[`docs/DEPLOY_UNOQ.md`](docs/DEPLOY_UNOQ.md) e `deploy/push_to_arduino.sh`.
+
+- **Cosa arriva dal microcontrollore** (`smartcrossing/mcu.py`): le righe C5 del contratto, dal Bridge e dai file
+  `applab-*.jsonl` che l'app di App Lab scrive nella cartella degli eventi.
+  - urto o sportello aperto: la camera può essersi mossa, quindi stato `DEGRADED` per `mcu.tamper_hold_s`
+    (30 s; `null` = fino al badge);
+  - badge del tecnico: riarma subito dopo un urto e apre la pagina di stato;
+  - guasto lampada: `DEGRADED` finché il firmware lo segnala.
+- **Pagina del tecnico** (`--operator-port`, `smartcrossing/status_page.py`): stato, motivo, FPS, tempi, conteggi,
+  sensori. **Solo numeri, mai immagini.** Risponde per `operator.unlock_s` (10 minuti) dopo il badge.
 
 ## Regola
 
