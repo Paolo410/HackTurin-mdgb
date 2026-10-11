@@ -331,7 +331,7 @@ function showTech(msg) {
   if (msg.lat_ms) {
     $("bars").innerHTML = Object.entries(msg.lat_ms).map(([k, v]) => {
       const pct = v == null ? 0 : Math.min(100, (v / PHASE_SCALE_MS) * 100);
-      return `<div class="bar"><span>${PHASE_NAMES[k] || k}</span><div class="track"><div class="fill${v > 80 ? " slow" : ""}" style="width:${pct}%"></div></div><span>${v == null ? "–" : num(v) + " ms"}</span></div>`;
+      return `<div class="phase"><span>${PHASE_NAMES[k] || k}</span><div class="track"><div class="fill${v > 80 ? " slow" : ""}" style="width:${pct}%"></div></div><span>${v == null ? "–" : num(v) + " ms"}</span></div>`;
     }).join("");
   }
   const link = msg.link || {};

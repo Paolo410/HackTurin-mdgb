@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t">
+  <title id="t">MDGB, proposta alternativa: occhio</title>
+  <!-- Alternative C, "occhio": the vision. The iris is the amber lamp, the stripes underneath are the crossing it
+       watches. Says "computer vision" at first sight. -->
+  <rect width="64" height="64" rx="15" fill="#1d2226"/>
+  <path d="M8 29Q32 7 56 29Q32 51 8 29Z" fill="none" stroke="#f3f4f1" stroke-width="3.4" stroke-linejoin="round"/>
+  <circle cx="32" cy="29" r="9" fill="#f2a900"/>
+  <circle cx="32" cy="29" r="3.8" fill="#1d2226"/>
+  <circle cx="34.6" cy="26.4" r="1.4" fill="#f3f4f1"/>
+  <g fill="#f3f4f1">
+    <rect x="14.8" y="48" width="6" height="7" rx="1.2"/>
+    <rect x="24.3" y="48" width="6" height="7" rx="1.2"/>
+    <rect x="33.8" y="48" width="6" height="7" rx="1.2"/>
+    <rect x="43.3" y="48" width="6" height="7" rx="1.2"/>
+  </g>
+</svg>

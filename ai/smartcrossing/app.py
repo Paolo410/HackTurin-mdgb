@@ -20,6 +20,7 @@ import cv2
 from .actuator import make_actuator
 from .config import load_config, resolve_path
 from .geometry import load_calib
+from .health import Health
 from .logger import C3Logger, c3_dir, flat_counts
 from .mcu import C5FileTail, McuState
 from .overlay import draw_hud, draw_lines, draw_state, draw_thermal, draw_tracks, draw_zones
@@ -32,6 +33,7 @@ from .thermal import ThermalFusion, make_thermal_source
 _KEY_ESC = 27
 _MIN_DT = 1e-6  # avoids a division by zero in the instantaneous FPS
 _NO_FRAME_SLEEP_S = 0.05  # pause between two attempts when a live camera gives no frame
+_HEALTH_PERIOD_S = 1.0    # check of the parts of the node, for the technician's page and the log
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -78,10 +80,20 @@ def main(argv: list[str] | None = None) -> int:
         # Lines of the microcontroller (C5): from the Bridge through the actuator, and from the files of the
         # App Lab app of the sketch. The thermal camera, when there is one, reads the same lines.
         mcu = McuState(cfg)
-        handlers = [mcu.on_line] + ([thermal_source.on_mcu_line] if hasattr(thermal_source, "on_mcu_line") else [])
+        operator = None
+        health = Health(on_change=lambda level, text: _health_changed(level, text, operator))
+
+        def on_mcu_line(line: dict) -> None:
+            """One C5 line: the state of the MCU, the check of the parts and the Registro of the page."""
+            mcu.on_line(line)
+            health.on_mcu_line(line)
+            if operator is not None:
+                _note_mcu_line(operator, line)
+
+        handlers = [on_mcu_line] + ([thermal_source.on_mcu_line] if hasattr(thermal_source, "on_mcu_line") else [])
         actuator.set_listener(lambda line: [handle(line) for handle in handlers])
         events_dir = args.c3_dir or c3_dir(cfg)
-        mcu_files = C5FileTail(events_dir, cfg["mcu"]["applab_series"], mcu.on_line, cfg["mcu"]["poll_s"])
+        mcu_files = C5FileTail(events_dir, cfg["mcu"]["applab_series"], on_mcu_line, cfg["mcu"]["poll_s"])
         operator = OperatorPage(args.operator_port, mcu, cfg) if args.operator_port is not None else None
         source = FrameSource(args.source or default_source(cfg), cfg, loop=args.loop)
         pipeline = Pipeline(cfg, source.fps, calib, actuator, site=args.site, thermal=thermal)
@@ -125,6 +137,8 @@ def main(argv: list[str] | None = None) -> int:
     page_lat = dict.fromkeys(PHASES, "-")
     # The clock starts at the first frame: opening the camera is not part of the frame rate.
     first = last = last_status = perf_counter()
+    last_health = -float("inf")
+    storage_error = None   # a C3 file that cannot be written must not stop the traffic light: only reported
 
     def annotate(view) -> None:
         """What the vision sees, drawn on the frame: for the window and for the technician's live view."""
@@ -219,17 +233,35 @@ def main(argv: list[str] | None = None) -> int:
                         print(f"t={now - first:6.1f}s {event['type']} {details}")
                     # With the example calibration the counting lines are not on the stripes of this scene: the
                     # crossings would reach the central as real ones. They stay on the screen only.
-                    if log and not (event["type"] == "crossing" and example_lines()):
-                        log.write(event)
+                    sent = not (event["type"] == "crossing" and example_lines())
+                    if log and sent:
+                        storage_error = _write_c3(log.write, event) or storage_error
+                    if operator is not None:
+                        operator.note(event["type"], _event_text(event, sent))
                 for animal in pipeline.animals.new_sightings(pipeline.scene.animals):
                     print(f"t={now - first:6.1f}s animal track=#{animal.track_id} coco={animal.coco} size={animal.size} "
                           f"free={animal.free} on_road={animal.on_road}")
                 if log and log.status_due():
-                    log.write_status(command["state"], fps, result.lat_ms,
-                                     flat_counts(pipeline.counter.counts) if pipeline.counter else {})
+                    storage_error = _write_c3(log.write_status, command["state"], fps, result.lat_ms,
+                                              flat_counts(pipeline.counter.counts) if pipeline.counter else {})
+                h, w = last_frame.shape[:2]
+                health.seen("camera", {"w": w, "h": h, "fault": pipeline.fault, "lum": pipeline.luminance})
+                if result.detected:
+                    health.seen("vision", {"fps": fps, "detect_ms": result.lat_ms["detect"]})
             if command["state"] != last_state:
                 last_state = command["state"]
                 print(f"t={now - first:6.1f}s state={command['state']} led={command['led']} | {command['reason']}")
+                if operator is not None:
+                    operator.note("state", f"{command['state']}: {command['reason']}")
+            link_failsafe = getattr(actuator, "connected", None) is False or bool(getattr(actuator, "failsafe", False))
+            health.seen("link", {"failsafe": link_failsafe, "sim": args.actuator == "sim"})
+            health.seen("storage", {"enabled": log is not None, "written": log.written if log else 0,
+                                    "error": storage_error})
+            if now - last_health >= _HEALTH_PERIOD_S:   # also without the page: the changes go in the log
+                last_health = now
+                report = health.evaluate()
+                if operator is not None:
+                    operator.health = report
 
             counts = pipeline.counter.summary() if pipeline.counter else "no counting lines"
             if result is not None:
@@ -248,8 +280,10 @@ def main(argv: list[str] | None = None) -> int:
                         "name": playlist.current.name, "index": playlist.index + 1, "total": len(playlist.videos),
                         "pos_s": round(source.position_s, 1), "dur_s": round(source.duration_s, 1),
                         "calib": calib_path.name if calib_path.parent.name == "calib" else None, "seek_s": seek_s},
-                    "link_failsafe": getattr(actuator, "connected", None) is False
-                                     or bool(getattr(actuator, "failsafe", False)),
+                    "link_failsafe": link_failsafe,
+                    "lines": _lines(pipeline.counter),
+                    "stats": {"yield_rate": pipeline.events.yield_rate, "near_miss": pipeline.events.near_misses,
+                              "incidents": pipeline.events.incidents},
                 })
             # Live view for the technician: drawn only when a logged-in technician is watching and images are on.
             share = operator is not None and result is not None and operator.wants_frame()
@@ -307,6 +341,50 @@ def main(argv: list[str] | None = None) -> int:
     if sent:
         print(f"actuator  C1 sent={sent} heartbeats={actuator.heartbeats}")
     return 0
+
+
+def _health_changed(level: str, text: str, operator) -> None:
+    """A part of the node changed status: on the terminal (journalctl) and in the Registro of the page."""
+    print(f"diagnosi: {text}")
+    if operator is not None:
+        operator.note("diag", text)
+
+
+def _note_mcu_line(operator, line: dict) -> None:
+    """The lines of the MCU worth a line in the Registro: shock, badge, fail-safe of the sketch."""
+    kind, code = line.get("type"), line.get("code")
+    if kind == "tamper" and code == 3:
+        operator.note("rfid", "badge del tecnico letto")
+    elif kind == "tamper":
+        operator.note("alarm", "urto o apertura: antifurto")
+    elif kind == "failsafe":
+        operator.note("link", f"lo sketch è passato in fail-safe ({line.get('reason', '?')})")
+    elif kind == "lamp_fault":
+        operator.note("alarm", "guasto della lampada")
+
+
+def _event_text(event: dict, sent: bool) -> str:
+    """An event of the vision for the Registro (the page turns it into Italian)."""
+    if event["type"] == "crossing":
+        return (f"{event['cls']} #{event['track_id']} {str(event['dir']).upper()} linea {event['line']}"
+                + ("" if sent else ", non inviato alla centrale"))
+    return " ".join(f"{k}={v}" for k, v in event.items() if k != "type")
+
+
+def _lines(counter) -> dict:
+    """IN/OUT of each counting line, in total and per role, for the page."""
+    if counter is None:
+        return {}
+    return {name: {**counter.totals(name), "roles": counter.counts[name]} for name in counter.lines}
+
+
+def _write_c3(write, *args) -> str | None:
+    """Writes a C3 line. A full disk or a missing folder is reported to the technician, the vision goes on."""
+    try:
+        write(*args)
+    except OSError as exc:
+        return exc.strerror or str(exc)
+    return None
 
 
 if __name__ == "__main__":

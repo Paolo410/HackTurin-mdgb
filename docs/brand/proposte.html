@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Logo MDGB: proposte</title>
+<link rel="icon" href="mdgb-simbolo.svg">
+<style>
+/* Board to choose the placeholder logo of MDGB: the main proposal in every place it will be used, then the
+   alternatives. Opens from the file system, no network needed. */
+:root { --paper: #f3f4f1; --surface: #fff; --ink: #1d2226; --muted: #59636b; --line: #d6dad5; --amber: #f2a900; }
+@media (prefers-color-scheme: dark) {
+  :root { --paper: #1a1e22; --surface: #23282d; --ink: #eceeea; --muted: #a2abb2; --line: #353c42; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 400 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+main { max-width: 1080px; margin: 0 auto; padding: 2.5rem 1rem 4rem; }
+h1 { font-size: 2.1rem; line-height: 1.15; margin: 0 0 .5rem; }
+h2 { font-size: 1.35rem; margin: 3rem 0 .4rem; }
+p { margin: 0 0 1rem; max-width: 68ch; }
+.muted { color: var(--muted); }
+.panel { background: var(--surface); border-radius: 10px; padding: 1.5rem; }
+.row { display: flex; flex-wrap: wrap; gap: 1.25rem; align-items: center; }
+.dark { background: #101316; color: #f3f4f1; }
+.hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
+@media (max-width: 760px) { .hero { grid-template-columns: minmax(0, 1fr); } }
+.hero .panel { display: flex; align-items: center; justify-content: center; min-height: 260px; }
+.sizes img { display: block; }
+.sizes figure { margin: 0; text-align: center; font-size: .8rem; color: var(--muted); }
+.sizes figcaption { margin-top: .4rem; }
+.lockups { display: grid; gap: 1rem; }
+.lockups .panel img { width: min(100%, 400px); height: auto; display: block; }
+.map {
+  position: relative; height: 300px; border-radius: 10px; overflow: hidden;
+  background:
+    linear-gradient(90deg, transparent 0 46%, #ffffff 46% 50%, transparent 50%) 0 0 / 100% 100%,
+    linear-gradient(0deg, transparent 0 58%, #ffffff 58% 62%, transparent 62%) 0 0 / 100% 100%,
+    linear-gradient(25deg, transparent 0 30%, #f6f1e2 30% 33%, transparent 33%) 0 0 / 100% 100%,
+    #e7ebe4;
+}
+.map img { position: absolute; width: 40px; height: auto; transform: translate(-50%, -100%); filter: drop-shadow(0 2px 2px rgba(0,0,0,.25)); }
+.legend { display: flex; flex-wrap: wrap; gap: .5rem 1.5rem; margin-top: .8rem; font-size: .9rem; }
+.legend img { width: 22px; vertical-align: middle; margin-right: .35rem; }
+.card { width: 100%; height: auto; display: block; border-radius: 10px; }
+.alts { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1rem; }
+.alt { background: var(--surface); border-radius: 10px; padding: 1.2rem; }
+.alt.main { outline: 3px solid var(--amber); }
+.alt .pics { display: flex; align-items: end; gap: 1rem; margin-bottom: .8rem; }
+.alt h3 { margin: 0 0 .3rem; font-size: 1.05rem; }
+.alt p { font-size: .92rem; color: var(--muted); margin: 0; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: .75rem; }
+.swatch { border-radius: 8px; overflow: hidden; background: var(--surface); font-size: .85rem; }
+.swatch i { display: block; height: 64px; }
+.swatch span { display: block; padding: .5rem .7rem; }
+code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .9em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Logo MDGB: proposte</h1>
+  <p class="muted">Segnaposto da usare finché non c'è un logo definitivo. La proposta principale è "strisce e faro":
+    la M di MDGB è tagliata dalle strisce pedonali, come le vede chi arriva in auto, e il faro ambra nella sua punta
+    veglia sull'attraversamento.
+    Sotto: come appare dove verrà usato (pagina del tecnico, mappa della centrale, trailer) e tre alternative.</p>
+
+  <h2>Proposta principale: strisce e faro</h2>
+  <div class="hero">
+    <div class="panel"><img src="mdgb-simbolo.svg" width="200" height="200" alt="Simbolo MDGB su sfondo chiaro"></div>
+    <div class="panel dark"><img src="mdgb-simbolo.svg" width="200" height="200" alt="Simbolo MDGB su sfondo scuro"></div>
+  </div>
+
+  <h2>Con il nome</h2>
+  <div class="lockups">
+    <div class="panel"><img src="mdgb-logo.svg" alt="Logo MDGB orizzontale per sfondi chiari"></div>
+    <div class="panel dark"><img src="mdgb-logo-scuro.svg" alt="Logo MDGB orizzontale per sfondi scuri"></div>
+  </div>
+
+  <h2>Piccolo, come icona della pagina</h2>
+  <p class="muted">Deve restare leggibile come favicon e nella barra del telefono.</p>
+  <div class="panel row sizes">
+    <figure><img src="mdgb-simbolo.svg" width="16" height="16" alt=""><figcaption>16 px</figcaption></figure>
+    <figure><img src="mdgb-simbolo.svg" width="24" height="24" alt=""><figcaption>24 px</figcaption></figure>
+    <figure><img src="mdgb-simbolo.svg" width="32" height="32" alt=""><figcaption>32 px</figcaption></figure>
+    <figure><img src="mdgb-simbolo.svg" width="48" height="48" alt=""><figcaption>48 px</figcaption></figure>
+    <figure><img src="mdgb-simbolo.svg" width="96" height="96" alt=""><figcaption>96 px</figcaption></figure>
+  </div>
+
+  <h2>Sulla mappa della centrale</h2>
+  <p class="muted">Uno spillo per nodo; l'anello ha i colori di stato della mappa di <code>app/</code>. File in <code>mappa/</code>.</p>
+  <div class="map" role="img" aria-label="Esempio di mappa con quattro nodi">
+    <img src="mappa/pin-ok.svg" style="left: 22%; top: 48%" alt="">
+    <img src="mappa/pin-ok.svg" style="left: 48%; top: 30%" alt="">
+    <img src="mappa/pin-rete-giu.svg" style="left: 70%; top: 66%" alt="">
+    <img src="mappa/pin-guasto.svg" style="left: 38%; top: 82%" alt="">
+    <img src="mappa/pin-senza-dati.svg" style="left: 84%; top: 34%" alt="">
+  </div>
+  <div class="legend">
+    <span><img src="mappa/pin-ok.svg" alt="">Nodo OK</span>
+    <span><img src="mappa/pin-rete-giu.svg" alt="">Rete giù, nodo sano</span>
+    <span><img src="mappa/pin-guasto.svg" alt="">Guasto, manomissione o spento</span>
+    <span><img src="mappa/pin-senza-dati.svg" alt="">Camera senza dati</span>
+  </div>
+
+  <h2>Nel trailer</h2>
+  <p class="muted">Cartello 1920×1080 in <code>trailer/</code>: le strisce in prospettiva, il faro che illumina il logo.</p>
+  <img class="card" src="trailer/mdgb-cartello-16x9.svg" alt="Cartello del trailer con il logo MDGB">
+
+  <h2>Alternative</h2>
+  <div class="alts">
+    <div class="alt main">
+      <div class="pics"><img src="mdgb-simbolo.svg" width="96" height="96" alt=""><img src="mdgb-simbolo.svg" width="32" height="32" alt=""></div>
+      <h3>A. Strisce e faro (proposta)</h3>
+      <p>La M di MDGB tagliata dalle strisce pedonali, con il faro. Si legge anche a 16 px, funziona come spillo sulla mappa.</p>
+    </div>
+    <div class="alt">
+      <div class="pics"><img src="alternative/b-scudo.svg" width="96" height="96" alt=""><img src="alternative/b-scudo.svg" width="32" height="32" alt=""></div>
+      <h3>B. Scudo</h3>
+      <p>Il guardiano come scudo, dentro l'attraversamento visto dalla camera. Più istituzionale: dice sicurezza.</p>
+    </div>
+    <div class="alt">
+      <div class="pics"><img src="alternative/c-occhio.svg" width="96" height="96" alt=""><img src="alternative/c-occhio.svg" width="32" height="32" alt=""></div>
+      <h3>C. Occhio</h3>
+      <p>La visione: l'iride è la lampada ambra, sotto le strisce che guarda. Dice subito "computer vision".</p>
+    </div>
+    <div class="alt">
+      <div class="pics"><img src="alternative/d-lanterna.svg" width="96" height="96" alt=""><img src="alternative/d-lanterna.svg" width="32" height="32" alt=""></div>
+      <h3>D. Lanterna</h3>
+      <p>Il semaforo esistente che MDGB rende intelligente. Il più letterale: chiaro, meno distintivo.</p>
+    </div>
+  </div>
+
+  <h2>Colori</h2>
+  <div class="swatches">
+    <div class="swatch"><i style="background:#1d2226"></i><span>Asfalto <code>#1d2226</code></span></div>
+    <div class="swatch"><i style="background:#f3f4f1"></i><span>Bianco cartello <code>#f3f4f1</code></span></div>
+    <div class="swatch"><i style="background:#f2a900"></i><span>Faro ambra <code>#f2a900</code></span></div>
+    <div class="swatch"><i style="background:#3fbf6a"></i><span>Verde <code>#3fbf6a</code></span></div>
+    <div class="swatch"><i style="background:#e5483f"></i><span>Rosso <code>#e5483f</code></span></div>
+    <div class="swatch"><i style="background:#1f5fae"></i><span>Blu cartello <code>#1f5fae</code></span></div>
+  </div>
+</main>
+</body>
+</html>

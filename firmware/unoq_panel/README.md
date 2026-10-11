@@ -1,3 +1,5 @@
+<img src="../unoq_mcu/assets/logo.svg" alt="MDGB" width="56" align="right">
+
 # unoq_panel — il vecchio "mdgb" con il pannello del tecnico, senza visione dentro
 
 Owner: Salvatore Gullotta. È l'app App Lab `mdgb` di `code1.zip` (la visione gira **fuori** da App Lab, come
