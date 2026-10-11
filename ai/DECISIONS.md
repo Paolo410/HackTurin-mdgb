@@ -586,3 +586,20 @@ con v_ped 0,3 → 25 s.
     - **i video `Torino_*.mp4` sul Mac sono diventati illeggibili alle 7 circa dell'11/10** ("Operation not
       permitted": macOS li protegge, attributo `com.apple.macl`, forse dopo un'apertura da un'app). Le copie sulla
       scheda sono intatte; per il benchmark `MDGB_VIDEOS=<cartella con le copie>`.
+49. **Lancio della demo, 11/10 ore 11:00** (passi di `docs/ISTRUZIONI_AI.md` §2, sulla rete della sede):
+    - la scheda oggi è `MDGB.local` = 192.168.22.159. Sul Mac di Paolo la sua chiave ssh è salvata sotto l'indirizzo
+      di ieri: finché non la si accetta di nuovo per il nome nuovo, ssh va lanciato con
+      `-o HostKeyAlias=192.168.169.105` (stessa chiave, controllo rigoroso);
+    - passo 1: su `main` 277 test passati; sulla scheda c'era codice più vecchio (detector un frame su due), ora
+      aggiornato con `push_to_arduino.sh --bridge --applab mdgb`;
+    - passi 2–3: visione sulla camera, detector su ogni fotogramma: **7,5 FPS**, detect 125–138 ms (con il video se
+      ne misuravano 5,9; la camera costa meno della decodifica del video);
+    - passo 4: app `mdgb` avviata, lo sketch scrive "VISIONE collegata";
+    - kill test della visione: riga "FAIL-SAFE" dello sketch 0,65 s dopo il comando di kill (dentro ci sono la
+      chiusura del processo e il ritardo del log), visione riavviata da systemd dopo 3,4 s, ricollegata dopo 7,7 s;
+    - passo 5, **aperto, di Lorenzo:** `mdgb-comms` è `OFFLINE` (backup Bluetooth attivo, 3 eventi in coda) perché
+      `MQTT_HOST` in `comms/.env` è ancora l'indirizzo di ieri (192.168.169.12);
+    - passo 6, **aperto:** la camera è appoggiata sul tavolo, non montata: niente calibrazione, quindi la visione
+      conta ma non applica la regola. Il fotogramma si prende spostando un attimo la visione su un video
+      (`run_vision.sh video ...`), perché la camera la tiene occupata il servizio.
+
