@@ -1,3 +1,5 @@
+<img src="../docs/brand/mdgb-simbolo.svg" alt="MDGB" width="56" align="right">
+
 # ai/ — visione e regole di MDGB
 
 **Owner:** Paolo Malugani (data scientist).

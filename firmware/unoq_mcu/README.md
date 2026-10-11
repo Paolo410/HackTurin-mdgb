@@ -1,3 +1,5 @@
+<img src="assets/logo.svg" alt="MDGB" width="56" align="right">
+
 # unoq_mcu — app App Lab "mdgb"
 
 Owner: Salvatore Gullotta. Un'unica app di App Lab che fa tutto sulla UNO Q:
