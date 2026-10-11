@@ -91,16 +91,21 @@ def test_forecast_endpoint(store):
     client = create_app(store, CONFIG, forecaster=offline).test_client()
     f = client.get("/api/forecast/nodo01").get_json()
     assert f["available"] and f["mode"] == "fused" and f["history_windows"] == 2, "le due finestre di conteggi del nodo"
-    assert set(f["estimate"]) == {"ped_in", "ped_out", "cyclist", "vehicles"} and len(f["next"]) == 12
+    assert set(f["estimate"]) == {"ped_in", "ped_out", "cyclist", "vehicles"}
+    assert len(f["outlook"]) == 25 and f["outlook"][0]["now"], "adesso, poi le prossime 24 ore"
     g = client.get("/api/forecast/nodo09").get_json()
     assert g["mode"] == "model_only" and g["sources"]["located"], "camera sulla mappa ma senza dati: solo il modello"
     assert client.get("/api/forecast/mai-visto").get_json()["sources"]["located"] is False
+    flow = client.get("/api/flow").get_json()["nodes"]
+    assert set(flow) == {"nodo01", "nodo02", "nodo09"}, "tutte le camere: quelle con dati e quelle solo sulla mappa"
+    assert all(n["available"] and len(n["outlook"]) == 25 for n in flow.values())
 
     class Broken:
         def forecast(self, *a):
             raise RuntimeError("boom")
-    broken = create_app(store, CONFIG, forecaster=Broken()).test_client().get("/api/forecast/nodo01")
-    assert broken.status_code == 200 and broken.get_json()["available"] is False, "la dashboard non si ferma"
+    broken = create_app(store, CONFIG, forecaster=Broken()).test_client()
+    assert broken.get("/api/forecast/nodo01").get_json()["available"] is False, "la dashboard non si ferma"
+    assert broken.get("/api/flow").get_json()["nodes"]["nodo01"] == {"available": False, "error": "boom"}
 
 
 def test_repo_nodes_json_is_valid():
@@ -108,6 +113,23 @@ def test_repo_nodes_json_is_valid():
     cams = node_config()
     assert list(cams) == ["nodo01"], "solo il nodo vero: niente camere di esempio"
     assert all(-90 <= c["lat"] <= 90 and -180 <= c["lon"] <= 180 for c in cams.values())
+
+
+def test_app_moves_the_default_camera_but_keeps_edited_files(tmp_path):
+    """La camera di nodo01 è stata spostata: chi aveva già aperto l'app la ritrova nel posto nuovo, se non l'aveva toccata."""
+    import json
+    sys.path.insert(0, os.path.join(ROOT, "app", "desktop"))
+    import centrale_app
+    from dashboard import node_config
+    nodes = tmp_path / "nodes.json"
+    nodes.write_text(json.dumps({"_comment": "vecchio", "nodes": centrale_app.OLD_DEFAULT_CAMERAS}))
+    centrale_app.prepare_home(str(tmp_path))
+    cam = node_config(str(nodes))["nodo01"]
+    assert cam == node_config()["nodo01"] and "Castelfidardo" in cam["name"] and (cam["lat"], cam["lon"]) == (45.0614, 7.6581)
+    mine = {"nodes": [{"id": "nodo01", "name": "Via Roma, piazza San Carlo", "lat": 45.07, "lon": 7.68, "site": "urbano"}]}
+    nodes.write_text(json.dumps(mine))
+    centrale_app.prepare_home(str(tmp_path))
+    assert json.loads(nodes.read_text()) == mine, "posizione cambiata a mano: non si tocca"
 
 
 def test_old_example_cameras_are_ignored(tmp_path):

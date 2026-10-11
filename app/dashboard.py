@@ -3,7 +3,9 @@
     GET /            la pagina (app/dashboard.html, nessuna risorsa esterna: funziona senza Internet)
     GET /api/state   tutto quello che la pagina mostra, in JSON (aggiornato dalla pagina ogni 2 s)
     GET /api/info    stato della centrale stessa (MQTT, Bluetooth, cartella delle impostazioni)
-    GET /api/forecast/<nodo>   flusso atteso a quell'attraversamento (modello di ai/forecast, owner Paolo)
+    GET /api/flow    flusso atteso di tutte le camere, adesso e nelle prossime 24 ore (modello di ai/forecast,
+                     owner Paolo): aloni sulla mappa e riquadro "Flusso atteso"
+    GET /api/forecast/<nodo>   lo stesso per una camera sola
     POST /api/open/folder|config   apre la cartella delle impostazioni o il file di configurazione (app per il PC)
 
 Cosa mostra: mappa delle camere (posizioni in app/nodes.json; con Internet OpenStreetMap, senza una mappa schematica),
@@ -225,18 +227,26 @@ def create_app(store, config=None, info=None, forecaster=None):
     def api_info():
         return jsonify(info() if info else {})
 
-    @app.get("/api/forecast/<node>")
-    def api_forecast(node):
+    def forecast_for(node, cams):
         if models["forecast"] is None:
             models["forecast"] = load_forecaster() or False
         if not models["forecast"]:
-            return jsonify({"available": False})
-        cams = node_config() if config is None else config
+            return {"available": False}
         try:
-            return jsonify(models["forecast"].forecast(cams.get(node, {"id": node}), forecast_windows(store, node)))
+            return models["forecast"].forecast(cams.get(node, {"id": node}), forecast_windows(store, node))
         except Exception as e:                      # una stima mancata non deve mai fermare la dashboard
             logging.getLogger("forecast").exception("stima del flusso per %s fallita", node)
-            return jsonify({"available": False, "error": str(e)})
+            return {"available": False, "error": str(e)}
+
+    @app.get("/api/forecast/<node>")
+    def api_forecast(node):
+        return jsonify(forecast_for(node, node_config() if config is None else config))
+
+    @app.get("/api/flow")
+    def api_flow():
+        cams = node_config() if config is None else config
+        return jsonify({"now": time.time(),
+                        "nodes": {node: forecast_for(node, cams) for node in sorted(set(store.nodes()) | set(cams))}})
 
     @app.post("/api/open/<what>")
     def api_open(what):
