@@ -150,3 +150,45 @@ def test_calib_file_round_trip_and_example_fallback(tmp_path):
     assert used.name == "calib.example.json" and set(calib["lines"]) == {"ped", "veh"}
     with pytest.raises(FileNotFoundError):
         load_calib(cfg, tmp_path / "nope.json")
+
+
+def test_track_hidden_on_the_line_still_counts():
+    # A car seen left of the line, hidden (by a pole) for 8 detector frames, then seen right of it with the same ID.
+    def hidden_crossing(counter):
+        events = run(counter, 1, [260, 270, 280])
+        for _ in range(8):
+            events += counter.update(*frame((99, 50.0, 100.0, "pedestrian")))   # someone else, far away
+        return events + run(counter, 1, [360, 370, 380, 390])
+    assert [e["dir"] for e in hidden_crossing(make_counter(side_memory=30))] == ["in"]
+    # supervision's own limit (threshold + 1 = 4 frames) forgot the side: the crossing was lost.
+    assert hidden_crossing(make_counter(side_memory=0)) == []
+
+
+def _hidden_then_new_id(counter, old_speed=100.0):
+    """Track 1 walks toward the line x = 320 and is lost at x = 300; 0.4 s later track 2 appears at x = 345 and
+    walks on. Then track 1 shows up again on the far side (the tracker found it late)."""
+    events, t = [], 0.0
+    for x in range(240, 301, int(old_speed / 10)) if old_speed else [300] * 7:
+        events += counter.update(*frame((1, float(x), 100.0, "pedestrian")), t=t, born={1: 0.0})
+        t += 0.1
+    t += 0.3
+    born = {1: 0.0, 2: t}
+    for x in range(345, 400, 10):
+        events += counter.update(*frame((2, float(x), 100.0, "pedestrian")), t=t, born=born)
+        t += 0.1
+    for x in range(400, 440, 10):
+        events += counter.update(*frame((1, float(x), 100.0, "pedestrian")), t=t, born=born)
+        t += 0.1
+    return events
+
+
+def test_a_track_lost_before_the_line_and_a_new_one_after_it_count_once():
+    events = _hidden_then_new_id(make_counter(stitch_s=1.5))
+    assert [(e["track_id"], e["dir"]) for e in events] == [(2, "in")]
+    # Without the stitching the crossing is counted only if the tracker finds track 1 again (here, late).
+    assert [(e["track_id"], e["dir"]) for e in _hidden_then_new_id(make_counter(stitch_s=0))] == [(1, "in")]
+
+
+def test_no_stitching_for_a_track_that_was_standing_still():
+    events = _hidden_then_new_id(make_counter(stitch_s=1.5), old_speed=0)
+    assert [(e["track_id"], e["dir"]) for e in events] == [(1, "in")]   # only the real, late crossing of track 1

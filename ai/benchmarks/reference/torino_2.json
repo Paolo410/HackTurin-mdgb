@@ -1,0 +1,173 @@
+{
+ "video": "Torino_2.mp4",
+ "calib": "torino_2.json",
+ "made_with": {
+  "emulate_unoq": false,
+  "input_px": "960",
+  "threads": 0,
+  "conf": 0.1,
+  "frames_processed": 873,
+  "processed_fps": 15.0,
+  "calib": "torino_2.json",
+  "metric": true,
+  "site": "urbano",
+  "overrides": [
+   "model.path=\"models/yolox_l_960.onnx\"",
+   "model.input_size=960",
+   "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+   "model.detect_every_n=1",
+   "source.max_fps=15",
+   "counting.minimum_crossing_threshold=8",
+   "tracking.min_track_age=5"
+  ],
+  "camera": null,
+  "stabilized": false,
+  "max_camera_shift_px": null
+ },
+ "overrides": [
+  "model.path=\"models/yolox_l_960.onnx\"",
+  "model.input_size=960",
+  "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+  "model.detect_every_n=1",
+  "source.max_fps=15",
+  "counting.minimum_crossing_threshold=8",
+  "tracking.min_track_age=5"
+ ],
+ "crossings": [
+  {
+   "t": 1.56,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 1,
+   "x": 260.1,
+   "y": 624.5,
+   "t_count": 2.19
+  },
+  {
+   "t": 4.25,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 2,
+   "x": 258.9,
+   "y": 624.1,
+   "t_count": 4.92
+  },
+  {
+   "t": 11.04,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 4,
+   "x": 330.6,
+   "y": 644.9,
+   "t_count": 11.53
+  },
+  {
+   "t": 12.8,
+   "line": "ped",
+   "dir": "out",
+   "cls": "pedestrian",
+   "track_id": 9,
+   "x": 223.0,
+   "y": 613.7,
+   "t_count": 13.33
+  },
+  {
+   "t": 14.34,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 18,
+   "x": 271.7,
+   "y": 627.8,
+   "t_count": 14.86
+  },
+  {
+   "t": 15.86,
+   "line": "ped",
+   "dir": "out",
+   "cls": "cyclist",
+   "track_id": 23,
+   "x": 233.8,
+   "y": 616.8,
+   "t_count": 16.38
+  },
+  {
+   "t": 16.44,
+   "line": "ped",
+   "dir": "out",
+   "cls": "pedestrian",
+   "track_id": 28,
+   "x": 247.0,
+   "y": 620.7,
+   "t_count": 16.95
+  },
+  {
+   "t": 18.28,
+   "line": "ped",
+   "dir": "out",
+   "cls": "cyclist",
+   "track_id": 34,
+   "x": 238.0,
+   "y": 618.0,
+   "t_count": 18.81
+  },
+  {
+   "t": 37.41,
+   "line": "veh",
+   "dir": "out",
+   "cls": "motorcyclist",
+   "track_id": 55,
+   "x": 246.2,
+   "y": 652.4,
+   "t_count": 38.05
+  },
+  {
+   "t": 48.77,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 72,
+   "x": 187.7,
+   "y": 687.0,
+   "t_count": 49.25
+  },
+  {
+   "t": 50.64,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 68,
+   "x": 203.1,
+   "y": 677.9,
+   "t_count": 51.15
+  },
+  {
+   "t": 52.01,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 71,
+   "x": 213.9,
+   "y": 671.5,
+   "t_count": 52.54
+  },
+  {
+   "t": 56.65,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 76,
+   "x": 207.6,
+   "y": 675.2,
+   "t_count": 57.13
+  }
+ ],
+ "review": {
+  "removed": [],
+  "added": [],
+  "notes": []
+ }
+}

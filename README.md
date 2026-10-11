@@ -30,6 +30,8 @@ Progetto per la sfida GOMA Smart Crossing di HackTurin, su Arduino UNO Q.
 [`docs/en/`](docs/en/README.md).
 
 Come avviare tutto sulla scheda: [`ai/docs/DEPLOY_UNOQ.md`](ai/docs/DEPLOY_UNOQ.md).
+Quanto conta bene la visione, verificato su video veri: [`ai/docs/BENCHMARK.md`](ai/docs/BENCHMARK.md). Istruzioni per
+l'assistente AI che guida il lancio della demo e il miglioramento del modello: [`ai/docs/ISTRUZIONI_AI.md`](ai/docs/ISTRUZIONI_AI.md).
 Regole del team per git: [`PROMPT_GIT_TEAM.md`](PROMPT_GIT_TEAM.md). Specifica: [`PROMPT_SMART_CROSSING.md`](PROMPT_SMART_CROSSING.md).
 
 Il logo è un segnaposto: proposte e varianti (mappa, trailer) in [`docs/brand/`](docs/brand/README.md).

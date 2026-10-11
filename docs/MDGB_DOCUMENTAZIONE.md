@@ -503,7 +503,7 @@ sono in [`ai/config.yaml`](../ai/config.yaml); le decisioni e i loro motivi in [
 | **onnxruntime**, CPU, 3 thread | La UNO Q non ha NPU; il quarto core resta a camera, tracker e al resto |
 | Ingresso con la forma dell'immagine (`match_aspect`): 416x256 invece di 320x320 | Stessi pixel, nessun bordo sprecato: circa il doppio delle persone trovate allo stesso costo |
 | Zona d'interesse (`roi` in `calib.json`) | Il detector guarda solo strisce e strada prima: gli oggetti appaiono più grandi |
-| Detector su 1 fotogramma su 2 (`detect_every_n: 2`), tracker su tutti | Da 5,8 a 12,3 FPS sul video di prova; conta meglio che scendere a 256 px |
+| Detector su ogni fotogramma (`detect_every_n: 1`, dall'11/10; prima 1 su 2) | 5,9 analisi complete al secondo invece di 4,2: con il tracking corretto conta molti più passaggi (§7.9) |
 | Copia a ingresso libero del modello ufficiale (`make_dynamic_model.py`) | Il file ufficiale dichiara 416 px fissi; la rete al suo interno non ha dimensioni fisse |
 
 Classi tenute: person, bicycle, car, motorcycle, bus, truck, dog, cat, horse, sheep, cow, bear, bird.
@@ -516,6 +516,11 @@ nascono comunque solo da riquadri sopra 0,4. Altezza e voto di classe usano solo
 (`tracking.measure_min_conf`). Risultato: durata mediana delle tracce di notte da 0,8 a 1,7 s; veicoli contati sul
 video di Torino da 20+5 a 23+10. Una traccia vale dopo 5 fotogrammi su PC, dopo 2 a 10 FPS sulla scheda (5 fotogrammi
 sarebbero mezzo secondo: un'auto passerebbe la linea prima di contare).
+
+Correzioni dell'11/10 ([`ai/DECISIONS.md`](../ai/DECISIONS.md), punto 47): ByteTrack di supervision scartava dall'uscita
+le tracce degli oggetti veloci (seguite ma mai contate), ora ogni traccia esce con il box con cui è stata associata; i
+box si confrontano allargati del 50% (buffered IoU, dal tracker C-BIoU); la linea di conteggio ricorda il lato di un
+oggetto nascosto (dietro un palo) per 30 rilevamenti invece di 4.
 
 ### 7.3 Da pixel a metri: calibrazione e geometria
 
@@ -619,10 +624,27 @@ viene segnalata, non ignorata: nel dubbio si protegge. Provato in simulazione, n
 
 Obiettivo della specifica: almeno 8 FPS. Riferimenti per la stessa scheda: YOLOv8n a 640 px con OpenCV DNN 1–2 FPS.
 
+**Dall'11/10** il profilo `unoq` analizza ogni fotogramma: misurato sulla scheda con un video come sorgente, 5,9 FPS
+tutti analizzati contro 8,4 FPS di cui 4,2 analizzati (con la camera da rimisurare). Meno FPS, ma più passaggi contati.
+
+**Quanto conta bene** ([`ai/docs/BENCHMARK.md`](../ai/docs/BENCHMARK.md)): 8 video a camera ferma, confronto con un
+modello molto più grande (YOLOX-l a 960 px) controllato a vista.
+
+| | Passaggi veri | Contati fino al 10/10 | Contati dall'11/10 |
+|---|---:|---:|---:|
+| Pedoni | 23 | 9 | **13 (57%)** |
+| Ciclisti | 4 | 0 | **2** |
+| Veicoli | 77 | 24 | **47 (61%)** |
+
+Verso giusto nel 100% dei casi e nessun conteggio falso o doppio. Dove la camera vede bene la linea: 17 su 17. Le
+perdite sono nei video di Torino ripresi da un balcone (un palo copre la linea, persone di 15 pixel).
+
 ### 7.10 Limiti noti
 
 - Folle fitte: viene rilevata solo una parte dei pedoni; i conteggi in quelle scene non sono affidabili.
-- Con i limiti della scheda, in alcuni video il verso lontano dei veicoli quasi non si conta.
+- Con i limiti della scheda, in alcuni video il verso lontano dei veicoli quasi non si contava: era il tracker,
+  corretto l'11/10 (§7.2).
+- Persone sotto i 20 pixel di altezza (strisce lontane) vengono perse: la camera va montata vicino alle strisce.
 - Bici piccole e monopattini spesso non vengono rilevati, quindi chi li guida viene contato come pedone.
 - Le altezze (e `child`) dipendono da una buona calibrazione: da verificare con una persona di altezza nota sulla camera
   vera.
@@ -864,11 +886,12 @@ non visivo (PIR, ToF) letto direttamente dal microcontrollore; monitoraggio dell
 
 | Cosa | Come | Risultato |
 |---|---|---|
-| AI | `pytest` in `ai/` (valori della regola della specifica, conteggio senza doppioni, geometria, eventi, animali, termocamera, pagina del tecnico, controllo delle parti) | 186 test passano (2 falliscono solo su Windows: permessi dei file e ordine dei nomi dei file) |
+| AI | `pytest` in `ai/` (valori della regola della specifica, conteggio senza doppioni, geometria, eventi, animali, termocamera, pagina del tecnico, controllo delle parti) | 194 test passano l'11/10 (2 falliscono solo su Windows: permessi dei file e ordine dei nomi dei file) |
 | Rete e centrale | `pytest comms` (nodo vero su file veri, Wi-Fi spento/riacceso, PUBACK negativo, Bridge con la libreria ufficiale contro un router finto) | 41 test |
 | Flusso atteso | `pytest` su `ai/tests/test_forecast*.py` (modello, fusione, fonti con un server HTTP locale, cache, calendario, metriche, verifica della stima) | 80 test passano (rieseguiti su Windows, Python 3.11, 11/10) |
 | Centrale: flusso e API per i clienti | `pytest comms/tests/test_dashboard.py comms/tests/test_customers.py` (chiavi, zone, permessi, limite di richieste, CSV, messaggi MQTT) | 29 test passano (stessa prova); il JavaScript della mappa è stato provato a mano |
-| Visione sulla scheda | camera, profilo `unoq` | 9,2 FPS |
+| Visione sulla scheda | camera, profilo `unoq` | 9,2 FPS (10/10, detector 1 fotogramma su 2); dall'11/10 detector su ogni fotogramma, 5,9 FPS su video |
+| Conteggio contro un riferimento | `ai/scripts/benchmark.py`, 8 video a camera ferma, disaccordi controllati a vista | pedoni 13/23, ciclisti 2/4, veicoli 47/77; verso giusto 100%, 0 doppioni |
 | Kill test della visione | visione fermata | fail-safe dopo 485 ms; riavvio di systemd 3,8 s; "visione collegata" dopo 7,5 s |
 | Kill test della rete | MQTT tagliato per 100 s | backup Bluetooth a −41 dBm; di nuovo su Wi-Fi in 18 s; 0 persi, 0 doppioni |
 | Rosso d'urgenza via Bridge | richiesta con il verde acceso da 5 s | giallo a 8,0 s (verde minimo), giallo breve 1,5 s, rosso trattenuto finché richiesto |
@@ -998,7 +1021,8 @@ Una struttura possibile in 10 slide, costruita su questo documento:
 5. **Prima la sicurezza**: richieste entro i limiti, fail-safe in 485 ms (§6.3, §6.5).
 6. **Privacy fin dal progetto**: nessuna immagine salvata, solo metadati, tecnico dietro badge + login (§3, §8.8).
 7. **Non perde dati**: rete tagliata, backup Bluetooth, 0 eventi persi (§6.7).
-8. **Sotto il cofano**: AI locale a 9 FPS su una Arduino UNO Q, regola esplicita (§7).
+8. **Sotto il cofano**: AI locale su una Arduino UNO Q, ogni fotogramma analizzato; passaggi contati sempre nel
+   verso giusto e senza doppioni (§7.9); regola esplicita (§7).
 9. **Business**: aggiunta al semaforo esistente contro nuovi attraversamenti smart, fonti di ricavo, il servizio di
    dati che già funziona (mappa con gli aloni, chiavi API per zona), pilota (§11, §8.9).
 10. **Team e prossimi passi** (§12).

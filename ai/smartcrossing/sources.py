@@ -79,10 +79,13 @@ class FrameSource:
 
         native = float(self._cap.get(cv2.CAP_PROP_FPS) or 0.0)
         self.native_fps = native if native > 0 else 0.0
-        # Number of file frames consumed per processed frame.
-        self._step = 1
+        # File frames per processed frame: a fraction is kept (8.4 FPS out of 30 = 3.57, steps of 3 and 4 in turn),
+        # so a recorded video is analysed at the rate measured on the board, not at the nearest whole step.
+        self._ratio = 1.0
         if not self.is_live and self.max_fps > 0 and self.native_fps > self.max_fps:
-            self._step = max(1, round(self.native_fps / self.max_fps))
+            self._ratio = self.native_fps / self.max_fps
+        self._step = max(1, round(self._ratio))      # typical step, for estimates
+        self._emitted = 0
         self._frame_idx = -1
         self._t0 = None   # origin of the file timeline, set when the first frame is read
         self._last_emit = None
@@ -94,7 +97,7 @@ class FrameSource:
             if self.max_fps > 0 and (self.native_fps == 0 or self.max_fps < self.native_fps):
                 return self.max_fps
             return self.native_fps
-        return self.native_fps / self._step if self.native_fps else 0.0
+        return self.native_fps / self._ratio if self.native_fps else 0.0
 
     def read(self) -> tuple[np.ndarray, float] | None:
         """Returns the next (frame, t), or None when the source ends or fails."""
@@ -130,16 +133,18 @@ class FrameSource:
     def _read_file(self) -> np.ndarray | None:
         """The next file frame, max_fps steps apart. With loop, at the end the file starts again."""
         for _ in range(2):
+            step = max(1, round(self._emitted * self._ratio) - self._frame_idx)
             ok = True
-            for _ in range(self._step - 1):
+            for _ in range(step - 1):
                 if not self._cap.grab():
                     ok = False
                     break
             if ok:
                 ok, frame = self._cap.read()
             if ok:
-                self._frame_idx += self._step
-                self._pos += self._step
+                self._frame_idx += step
+                self._pos += step
+                self._emitted = max(self._emitted + 1, int(self._frame_idx / self._ratio) + 1)
                 return frame
             if not self.loop or self._frame_idx < 0:
                 return None

@@ -1,6 +1,6 @@
 # ai/ — decisions, numbers and interfaces
 
-> English translation of [`ai/DECISIONS.md`](../../../ai/DECISIONS.md), from `main` at `1f9a131` (11 October 2026). The Italian original is the reference: if the two differ, the original wins.
+> English translation of [`ai/DECISIONS.md`](../../../ai/DECISIONS.md), from `main` at `1f9a131` (11 October 2026), updated with the counting benchmark of 11 October (PR #22). The Italian original is the reference: if the two differ, the original wins.
 
 Owner: Paolo Malugani (data scientist). Extracted from `PROMPT_SMART_CROSSING.md` (the § refer to that file).
 If this file and the specification differ, the specification wins; if the specification and `docs/CONTRACTS.md`
@@ -551,3 +551,43 @@ with v_ped 0.3 → 25 s.
     - the jump in the video does not take the time of the vision back: it is like a cut in the scene;
     - tested in the browser on the Mac with a simulated badge and test credentials: the four buttons change video and
       position, and the live view and the caption on the image follow.
+45. **8-bit model (INT8): tried, not used (11/10, morning).** `scripts/quantize_model.py` quantizes YOLOX-nano after
+    training (onnxruntime, QDQ format, per-channel weights), with the activation scales taken from frames of the test
+    videos cut as the detector does:
+    - all in 8 bits the objects found collapsed (114 out of 983); keeping the first 4 convolutions (they see the raw
+      pixels) and the head in float, it finds the same objects as the float model (395/395 on 65 frames);
+    - **but on the UNO Q it is slower:** 283 ms against 208–230 ms. The CPU (Cortex-A53, `/proc/cpuinfo`: no
+      `asimddp`) has no 8-bit dot-product instructions, and onnxruntime 1.30 on the board only has the CPU provider
+      (no XNNPACK). Worth trying again on a board with a Cortex-A55 or A76.
+46. **PP-PicoDet-S instead of YOLOX-nano: tried, not used (11/10, morning).** A more recent light detector
+    (PaddleDetection, Apache-2.0), integrated with `model.family: picodet` and `scripts/get_picodet.py`:
+    - on 39 test frames it finds more people (183 against 135 for YOLOX-nano, +36%) and more vehicles (162 against
+      93); YOLOX-l at 960 px finds 322 and 168;
+    - **but on the board it is 2.2 times slower** (486 ms against 225 ms at 320 px, measured with the vision running):
+      fewer than 3 detections per second, too few to follow who crosses. The code stays, switched off.
+47. **Tracking fixed and detector on every frame (11/10, morning)**, numbers in `docs/BENCHMARK.md`:
+    - **cars tracked but never counted:** `sv.ByteTrack` returned a track only if its filtered position covered the
+      box by more than 50%; at 4–6 detections per second this did not happen for fast cars (it is the cause of the
+      "0 vehicles in the far direction" of point 42). Now every track comes out with the box it was matched with
+      (`_ByteTrack` in `tracking.py`, which wraps two methods of supervision 0.30.5: covered by the tests);
+    - **boxes enlarged by 50% for the matching** (`tracking.box_buffer`, buffered IoU of the C-BIoU tracker) and **side
+      of the line remembered for 30 detections** (`counting.side_memory`; supervision forgot it after 4);
+    - **detector on every frame on the board** (`profiles.unoq.model.detect_every_n: 1`): measured on the board with
+      Torino_1, 5.9 FPS all analysed against 8.4 FPS of which 4.2 analysed. At 416 px: 3.8 FPS;
+    - **result** (8 still-camera videos): pedestrians 9 → 13 out of 23, cyclists 0 → 2 out of 4, vehicles 24 → 47 out
+      of 77; right direction 100%, no extra counts, before and after;
+    - tried and left off: new tracks from 0.30, confirmation after 2 detections, stitching of tracks across the line
+      (`counting.stitch_s`, in the code with its tests).
+48. **Benchmark of the counting with a reference checked by eye (11/10, morning)** (`scripts/benchmark.py`,
+    `benchmarks/`, `docs/BENCHMARK.md`):
+    - reference: YOLOX-l at 960 px on every frame at 15 FPS, confirmation after 0.5 s as on the board; the
+      disagreements are looked at (`review`) and recorded (`judge`). So far 2 real crossings added, none removed;
+    - the board is emulated at the FPS measured on the real board, also fractional (`sources.py`: 8.4 out of 30 is no
+      longer 7.5);
+    - the point where the object goes over the line is compared, not that of the confirmation;
+    - only the still-camera videos count: NYC, Shibuya and two Mixkit are time-lapses or hand-held;
+    - to do: calibrate Torino_4 and Torino_7 (framings different from Torino_3 and 1) and redo everything with the
+      camera of the board mounted;
+    - **the `Torino_*.mp4` videos on the Mac became unreadable at about 7:00 on 11/10** ("Operation not permitted":
+      macOS protects them, attribute `com.apple.macl`, maybe after being opened by an app). The copies on the board
+      are intact; for the benchmark `MDGB_VIDEOS=<folder with the copies>`.

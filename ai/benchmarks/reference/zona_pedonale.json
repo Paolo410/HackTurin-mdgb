@@ -1,0 +1,76 @@
+{
+ "video": "50_zona_pedonale_pedoni_ciclisti_1080p.mp4",
+ "calib": "50.json",
+ "made_with": {
+  "emulate_unoq": false,
+  "input_px": "960",
+  "threads": 0,
+  "conf": 0.1,
+  "frames_processed": 151,
+  "processed_fps": 15.0,
+  "calib": "50.json",
+  "metric": false,
+  "site": "urbano",
+  "overrides": [
+   "model.path=\"models/yolox_l_960.onnx\"",
+   "model.input_size=960",
+   "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+   "model.detect_every_n=1",
+   "source.max_fps=15",
+   "counting.minimum_crossing_threshold=8",
+   "tracking.min_track_age=5"
+  ],
+  "camera": null,
+  "stabilized": false,
+  "max_camera_shift_px": null
+ },
+ "overrides": [
+  "model.path=\"models/yolox_l_960.onnx\"",
+  "model.input_size=960",
+  "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+  "model.detect_every_n=1",
+  "source.max_fps=15",
+  "counting.minimum_crossing_threshold=8",
+  "tracking.min_track_age=5"
+ ],
+ "crossings": [
+  {
+   "t": 7.31,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 19,
+   "x": 625.9,
+   "y": 293.3,
+   "t_count": 7.8
+  },
+  {
+   "t": 9.5,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 31,
+   "x": 236.4,
+   "y": 252.6,
+   "t_count": 10.0
+  }
+ ],
+ "review": {
+  "removed": [],
+  "added": [
+   {
+    "t": 2.85,
+    "line": "ped",
+    "dir": "out",
+    "cls": "pedestrian",
+    "track_id": 18,
+    "x": 906.8,
+    "y": 322.6,
+    "source": "scheda_nuova"
+   }
+  ],
+  "notes": [
+   "g0 (2,9 s): uomo con valigia che scende oltre la linea, passaggio vero perso dal riferimento (visto il 11/10)"
+  ]
+ }
+}

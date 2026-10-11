@@ -1,0 +1,96 @@
+{
+ "video": "01_strisce_nyc_folla_auto_bus_720p.mp4",
+ "calib": "01.json",
+ "made_with": {
+  "emulate_unoq": false,
+  "input_px": "960",
+  "threads": 0,
+  "conf": 0.1,
+  "frames_processed": 201,
+  "processed_fps": 15.0,
+  "calib": "01.json",
+  "metric": true,
+  "site": "urbano",
+  "overrides": [
+   "model.path=\"models/yolox_l_960.onnx\"",
+   "model.input_size=960",
+   "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+   "model.detect_every_n=1",
+   "source.max_fps=15",
+   "counting.minimum_crossing_threshold=8",
+   "tracking.min_track_age=5"
+  ],
+  "camera": {
+   "height_m": 16.6,
+   "focal_px": 2460
+  },
+  "stabilized": false,
+  "max_camera_shift_px": null
+ },
+ "overrides": [
+  "model.path=\"models/yolox_l_960.onnx\"",
+  "model.input_size=960",
+  "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+  "model.detect_every_n=1",
+  "source.max_fps=15",
+  "counting.minimum_crossing_threshold=8",
+  "tracking.min_track_age=5"
+ ],
+ "crossings": [
+  {
+   "t": 1.58,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 41,
+   "x": 554.3,
+   "y": 336.6,
+   "t_count": 3.53
+  },
+  {
+   "t": 6.79,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 17,
+   "x": 541.1,
+   "y": 415.6,
+   "t_count": 8.27
+  },
+  {
+   "t": 10.86,
+   "line": "ped",
+   "dir": "out",
+   "cls": "pedestrian",
+   "track_id": 120,
+   "x": 567.4,
+   "y": 310.8,
+   "t_count": 11.73
+  },
+  {
+   "t": 12.34,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 170,
+   "x": 234.1,
+   "y": 413.6,
+   "t_count": 12.87
+  },
+  {
+   "t": 12.05,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 104,
+   "x": 511.1,
+   "y": 415.4,
+   "t_count": 13.13
+  }
+ ],
+ "review": {
+  "removed": [],
+  "added": [],
+  "notes": []
+ }
+}

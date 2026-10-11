@@ -1,0 +1,263 @@
+{
+ "video": "Torino_3.mp4",
+ "calib": "torino_3.json",
+ "made_with": {
+  "emulate_unoq": false,
+  "input_px": "960",
+  "threads": 0,
+  "conf": 0.1,
+  "frames_processed": 1584,
+  "processed_fps": 15.0,
+  "calib": "torino_3.json",
+  "metric": false,
+  "site": "urbano",
+  "overrides": [
+   "model.path=\"models/yolox_l_960.onnx\"",
+   "model.input_size=960",
+   "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+   "model.detect_every_n=1",
+   "source.max_fps=15",
+   "counting.minimum_crossing_threshold=8",
+   "tracking.min_track_age=5"
+  ],
+  "camera": null,
+  "stabilized": false,
+  "max_camera_shift_px": null
+ },
+ "overrides": [
+  "model.path=\"models/yolox_l_960.onnx\"",
+  "model.input_size=960",
+  "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+  "model.detect_every_n=1",
+  "source.max_fps=15",
+  "counting.minimum_crossing_threshold=8",
+  "tracking.min_track_age=5"
+ ],
+ "crossings": [
+  {
+   "t": 32.44,
+   "line": "ped",
+   "dir": "out",
+   "cls": "pedestrian",
+   "track_id": 7,
+   "x": 277.5,
+   "y": 321.0,
+   "t_count": 32.93
+  },
+  {
+   "t": 32.48,
+   "line": "ped",
+   "dir": "out",
+   "cls": "pedestrian",
+   "track_id": 14,
+   "x": 264.3,
+   "y": 321.0,
+   "t_count": 33.0
+  },
+  {
+   "t": 35.87,
+   "line": "ped",
+   "dir": "out",
+   "cls": "pedestrian",
+   "track_id": 12,
+   "x": 269.4,
+   "y": 321.0,
+   "t_count": 36.39
+  },
+  {
+   "t": 41.16,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 16,
+   "x": 260.0,
+   "y": 338.5,
+   "t_count": 41.68
+  },
+  {
+   "t": 42.08,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 18,
+   "x": 260.0,
+   "y": 321.5,
+   "t_count": 42.61
+  },
+  {
+   "t": 43.9,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 19,
+   "x": 260.0,
+   "y": 339.4,
+   "t_count": 44.4
+  },
+  {
+   "t": 46.31,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 21,
+   "x": 260.0,
+   "y": 318.0,
+   "t_count": 46.79
+  },
+  {
+   "t": 49.42,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 23,
+   "x": 260.0,
+   "y": 325.3,
+   "t_count": 49.92
+  },
+  {
+   "t": 58.98,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 36,
+   "x": 260.0,
+   "y": 324.6,
+   "t_count": 59.46
+  },
+  {
+   "t": 64.51,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 41,
+   "x": 260.0,
+   "y": 337.7,
+   "t_count": 65.01
+  },
+  {
+   "t": 64.97,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 42,
+   "x": 260.0,
+   "y": 323.2,
+   "t_count": 65.47
+  },
+  {
+   "t": 66.92,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 44,
+   "x": 260.0,
+   "y": 326.3,
+   "t_count": 67.4
+  },
+  {
+   "t": 69.53,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 47,
+   "x": 260.0,
+   "y": 324.9,
+   "t_count": 70.06
+  },
+  {
+   "t": 71.56,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 51,
+   "x": 260.0,
+   "y": 321.1,
+   "t_count": 72.05
+  },
+  {
+   "t": 72.98,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 52,
+   "x": 260.0,
+   "y": 323.5,
+   "t_count": 73.48
+  },
+  {
+   "t": 74.02,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 54,
+   "x": 260.0,
+   "y": 318.9,
+   "t_count": 74.54
+  },
+  {
+   "t": 75.65,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 56,
+   "x": 260.0,
+   "y": 336.0,
+   "t_count": 76.14
+  },
+  {
+   "t": 77.61,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 58,
+   "x": 260.0,
+   "y": 326.1,
+   "t_count": 78.13
+  },
+  {
+   "t": 84.94,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 60,
+   "x": 260.0,
+   "y": 304.2,
+   "t_count": 85.41
+  },
+  {
+   "t": 87.4,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 61,
+   "x": 260.0,
+   "y": 309.9,
+   "t_count": 87.87
+  },
+  {
+   "t": 89.07,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 62,
+   "x": 260.0,
+   "y": 306.6,
+   "t_count": 89.6
+  },
+  {
+   "t": 98.81,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 64,
+   "x": 260.0,
+   "y": 307.1,
+   "t_count": 99.34
+  }
+ ],
+ "review": {
+  "removed": [],
+  "added": [],
+  "notes": []
+ }
+}

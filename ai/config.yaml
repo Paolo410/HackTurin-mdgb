@@ -3,6 +3,7 @@
 # "(spec)" = value fixed by PROMPT_SMART_CROSSING.md. The others are tunable defaults.
 
 model:
+  family: yolox                   # yolox | picodet (PP-PicoDet-S, scripts/get_picodet.py; fixed 320 or 416 input)
   path: models/yolox_nano_dynamic.onnx   # relative to ai/, made by scripts/get_model.sh (free input size)
   input_size: 320                 # (spec) 320, 416 optional. Must be a multiple of the largest stride.
   match_aspect: true              # same number of pixels as input_size squared, shaped like the image:
@@ -13,6 +14,8 @@ model:
   nms: 0.45                       # IoU threshold of the per-class NMS
   nms_cross_class: 0.85           # boxes of different classes above this IoU are one object: keep the best
   intra_op_num_threads: 0         # 0 = let onnxruntime decide
+  providers: [CPUExecutionProvider]   # onnxruntime providers. The board has a CPU only; the benchmark reference on a
+                                  # Mac uses [CoreMLExecutionProvider, CPUExecutionProvider]
   detect_every_n: 1               # run the detector every N frames; in between the last tracks are held
   strides: [8, 16, 32]            # YOLOX head strides
   pad_value: 114                  # (spec) letterbox padding value
@@ -33,6 +36,11 @@ tracking:
   minimum_matching_threshold: 0.9 # 1 - IoU allowed between a track and its box: at 5-6 detections per second
                                   # (board) an object moves more between two of them. Was 0.8
   minimum_consecutive_frames: 1
+  box_buffer: 0.5                 # boxes enlarged by this share of their size on each side for the pairing only
+                                  # (buffered IoU, see tracking.py): fast or far objects keep their ID. 0 = off.
+                                  # 0.5 counted more than 0.3 on the benchmark (ai/docs/BENCHMARK.md)
+  matched_box: true               # return each track with the box it was matched with (tracking.py); false =
+                                  # supervision's own pairing, which loses fast objects
   min_track_age: 5                # (spec) frames before a track is considered valid
   measure_min_conf: 0.30          # boxes below this score keep a track alive but measure no height, cast no class vote
   history_len: 150                # positions kept per track (5 s at 30 frames per second)
@@ -222,6 +230,12 @@ derive:
 
 counting:
   minimum_crossing_threshold: 3   # frames past the line before a crossing counts (no jitter counts)
+  side_memory: 30                 # detector frames the side of an unseen track is remembered (a car behind a
+                                  # pole); 0 = supervision's own limit, threshold + 1 frames
+  stitch_s: 0                     # a track lost just before the line and a new one just after it, heading the same
+                                  # way within this many seconds, are one crossing (counting.py); 0 = off
+  stitch_radius: 1.0              # tolerance around the point where the lost track was expected, in box heights
+  stitch_band: 2.0                # both tracks must be this close to the line, in box heights
   calib_path: calib.json          # made by scripts/calibrate.py
   example_calib_path: calib.example.json   # used when calib.json is missing
   lines:                          # roles counted on each line
@@ -275,7 +289,9 @@ bench:
 profiles:
   pc: {}
   unoq:
-    model: {input_size: 320, intra_op_num_threads: 3, detect_every_n: 2}
+    # detector on every frame: 5.9 FPS on the board, all analysed, against 8.4 FPS with half of them only held
+    # (4.2 analysed per second). More vehicles and pedestrians counted (ai/docs/BENCHMARK.md)
+    model: {input_size: 320, intra_op_num_threads: 3, detect_every_n: 1}
     source: {max_fps: 12, resize_width: 640}
     tracking: {min_track_age: 2}
 

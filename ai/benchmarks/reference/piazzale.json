@@ -1,0 +1,73 @@
+{
+ "video": "51_vista_alta_persona_bici_auto.mp4",
+ "calib": "51.json",
+ "made_with": {
+  "emulate_unoq": false,
+  "input_px": "960",
+  "threads": 0,
+  "conf": 0.1,
+  "frames_processed": 647,
+  "processed_fps": 12.0,
+  "calib": "51.json",
+  "metric": true,
+  "site": "urbano",
+  "overrides": [
+   "model.path=\"models/yolox_l_960.onnx\"",
+   "model.input_size=960",
+   "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+   "model.detect_every_n=1",
+   "source.max_fps=15",
+   "counting.minimum_crossing_threshold=8",
+   "tracking.min_track_age=5"
+  ],
+  "camera": null,
+  "stabilized": false,
+  "max_camera_shift_px": null
+ },
+ "overrides": [
+  "model.path=\"models/yolox_l_960.onnx\"",
+  "model.input_size=960",
+  "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+  "model.detect_every_n=1",
+  "source.max_fps=15",
+  "counting.minimum_crossing_threshold=8",
+  "tracking.min_track_age=5"
+ ],
+ "crossings": [
+  {
+   "t": 5.3,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 1,
+   "x": 684.4,
+   "y": 237.0,
+   "t_count": 5.92
+  },
+  {
+   "t": 18.09,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 2,
+   "x": 75.7,
+   "y": 237.0,
+   "t_count": 18.75
+  },
+  {
+   "t": 46.94,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 6,
+   "x": 192.2,
+   "y": 237.0,
+   "t_count": 47.58
+  }
+ ],
+ "review": {
+  "removed": [],
+  "added": [],
+  "notes": []
+ }
+}

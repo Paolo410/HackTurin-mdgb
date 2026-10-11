@@ -109,6 +109,35 @@ def nms(boxes: np.ndarray, scores: np.ndarray, iou_threshold: float) -> np.ndarr
     return np.asarray(keep, dtype=np.int64)
 
 
+# PP-PicoDet (PaddleDetection, Apache-2.0), the ONNX "without post-process": per level, class scores (sigmoid
+# already applied) and a distribution of 8 bins per side of the box (Generalized Focal Loss). Image resized to the
+# fixed input (no letterbox), RGB, ImageNet mean/std as in its training config. Decoding checked against the
+# official post-processed ONNX: same boxes (IoU 1.000) with the cell centres at +0.5.
+# https://github.com/PaddlePaddle/PaddleDetection/tree/release/2.8/configs/picodet
+PICODET_MEAN = np.array((123.675, 116.28, 103.53), np.float32)
+PICODET_STD = np.array((58.395, 57.12, 57.375), np.float32)
+PICODET_STRIDES = (8, 16, 32, 64)
+PICODET_REG_MAX = 7
+
+
+def picodet_decode(outputs: list[np.ndarray], in_w: int, in_h: int) -> np.ndarray:
+    """Raw PicoDet outputs -> rows like decode_outputs: cx, cy, w, h (input pixels), objectness 1, 80 class scores."""
+    levels = len(outputs) // 2
+    rows = []
+    for k, stride in enumerate(PICODET_STRIDES[:levels]):
+        cls, reg = outputs[k][0], outputs[k + levels][0]
+        gw, gh = -(-in_w // stride), -(-in_h // stride)
+        ys, xs = np.mgrid[0:gh, 0:gw]
+        cx = (xs.reshape(-1) + 0.5) * stride
+        cy = (ys.reshape(-1) + 0.5) * stride
+        d = reg.reshape(-1, 4, PICODET_REG_MAX + 1)
+        d = np.exp(d - d.max(-1, keepdims=True))
+        dist = (d / d.sum(-1, keepdims=True) * np.arange(PICODET_REG_MAX + 1, dtype=np.float32)).sum(-1) * stride
+        x1, y1, x2, y2 = cx - dist[:, 0], cy - dist[:, 1], cx + dist[:, 2], cy + dist[:, 3]
+        rows.append(np.column_stack([(x1 + x2) / 2, (y1 + y2) / 2, x2 - x1, y2 - y1, np.ones_like(cx), cls]))
+    return np.concatenate(rows).astype(np.float32)
+
+
 def postprocess(
     decoded: np.ndarray,
     ratio: float,
@@ -166,14 +195,16 @@ class Detector:
         options = ort.SessionOptions()
         if int(m["intra_op_num_threads"]) > 0:
             options.intra_op_num_threads = int(m["intra_op_num_threads"])
-        # CPU only: the UNO Q has no NPU, and the same code path must run on the PC.
-        self.session = ort.InferenceSession(str(path), sess_options=options, providers=["CPUExecutionProvider"])
+        # CPU on the board (the UNO Q has no NPU). Only the reference of the benchmark, on a Mac, asks for CoreML.
+        providers = [p for p in m["providers"] if p in ort.get_available_providers()] or ["CPUExecutionProvider"]
+        self.session = ort.InferenceSession(str(path), sess_options=options, providers=providers)
         model_input = self.session.get_inputs()[0]
         self.input_name = model_input.name
 
+        self.family = str(m.get("family", "yolox"))       # yolox | picodet
         self.input_size = int(m["input_size"])
-        self.strides = list(m["strides"])
-        if self.input_size % max(self.strides) != 0:
+        self.strides = list(m["strides"]) if self.family == "yolox" else list(PICODET_STRIDES)
+        if self.family == "yolox" and self.input_size % max(self.strides) != 0:
             raise ValueError(f"input_size={self.input_size} must be a multiple of {max(self.strides)}")
         # The official file has a fixed 416 px input; scripts/make_dynamic_model.py frees it.
         fixed = model_input.shape[2]
@@ -223,10 +254,23 @@ class Detector:
 
     def infer(self, image: np.ndarray) -> tuple[np.ndarray, float]:
         """Runs the network on an image. Returns the decoded predictions and the resize ratio."""
+        if self.family == "picodet":
+            return self._infer_picodet(image)
         grids, strides = self._grids_for(image.shape[1], image.shape[0])
         blob, ratio = letterbox(image, self.input_wh, self.pad_value)
         raw = self.session.run(None, {self.input_name: blob})[0][0]
         return decode_outputs(raw, grids, strides), ratio
+
+    def _infer_picodet(self, image: np.ndarray) -> tuple[np.ndarray, float]:
+        """PicoDet: plain resize to the fixed input, then boxes back to image pixels (ratio 1)."""
+        h, w = image.shape[:2]
+        in_w, in_h = self.input_wh
+        rgb = cv2.cvtColor(cv2.resize(image, (in_w, in_h), interpolation=cv2.INTER_LINEAR), cv2.COLOR_BGR2RGB)
+        blob = ((rgb.astype(np.float32) - PICODET_MEAN) / PICODET_STD).transpose(2, 0, 1)[None]
+        decoded = picodet_decode(self.session.run(None, {self.input_name: blob}), in_w, in_h)
+        decoded[:, [0, 2]] *= w / in_w
+        decoded[:, [1, 3]] *= h / in_h
+        return decoded, 1.0
 
     def detect(self, frame: np.ndarray) -> sv.Detections:
         x_off = y_off = 0
