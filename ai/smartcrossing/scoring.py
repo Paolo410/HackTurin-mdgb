@@ -4,7 +4,9 @@ A crossing is one event {"t", "line", "dir", "cls"} (plus "x", "y" in pixels whe
 start of the video, the counting line ("ped" or "veh"), the direction ("in" / "out") and the class.
 Each counted crossing is paired with at most one reference crossing of the same line and kind (pedestrian, vehicle,
 cyclist, animal), the closest in time within window_s (and, with positions, within max_px pixels); a crossing in the
-same direction is preferred, so a person counted twice (once each way) is one right count plus one extra. From the pairs:
+same direction is preferred, so a person counted twice (once each way) is one right count plus one extra. A person on
+foot and one on a bike may be paired too (two models often disagree on whether a person rides): the pair belongs to
+the kind of the reference crossing and "same_kind" says how often the kinds agree. From the pairs:
 - counted: reference crossings that the vision counted too (recall);
 - right direction: of those, how many with the same direction;
 - missed: reference crossings the vision did not count;
@@ -20,6 +22,7 @@ KINDS = {
     "animal": ("animal", "dog", "cat", "horse", "sheep", "cow", "bear", "bird"),
 }
 KIND_OF = {cls: kind for kind, classes in KINDS.items() for cls in classes}
+PEOPLE = {"pedestrian", "cyclist"}          # kinds that may be paired with each other
 LABELS = {"pedestrian": ("pedone", "pedoni"), "vehicle": ("veicolo", "veicoli"), "cyclist": ("ciclista", "ciclisti"),
           "animal": ("animale", "animali")}
 
@@ -30,12 +33,16 @@ def kind_of(cls: str) -> str | None:
 
 def match_crossings(reference: list[dict], counted: list[dict], window_s: float = 2.0,
                     max_px: float | None = None) -> dict[str, dict]:
-    """Per kind: {"reference", "counted", "matched", "same_dir", "missed", "extra", "pairs", "missed_idx", "extra_idx"}.
+    """Per kind: {"reference", "counted", "matched", "same_dir", "same_kind", "missed", "extra", "pairs", "missed_idx",
+    "extra_idx"}.
     Pairs are (reference index, counted index); the indexes refer to the lists given."""
     candidates = []
     for i, ref in enumerate(reference):
         for j, got in enumerate(counted):
-            if ref["line"] != got["line"] or kind_of(ref["cls"]) is None or kind_of(ref["cls"]) != kind_of(got["cls"]):
+            kind_ref, kind_got = kind_of(ref["cls"]), kind_of(got["cls"])
+            if ref["line"] != got["line"] or kind_ref is None or kind_got is None:
+                continue
+            if kind_ref != kind_got and not {kind_ref, kind_got} <= PEOPLE:
                 continue
             dt = abs(float(ref["t"]) - float(got["t"]))
             if dt > window_s:
@@ -45,8 +52,9 @@ def match_crossings(reference: list[dict], counted: list[dict], window_s: float 
                 dist = ((ref["x"] - got["x"]) ** 2 + (ref["y"] - got["y"]) ** 2) ** 0.5
                 if dist > max_px:
                     continue
-            wrong_way = 1.0 if ref["dir"] != got["dir"] else 0.0   # same direction first, then the closest
-            candidates.append((wrong_way + dt + dist / 1000.0, i, j))
+            wrong_way = 1.0 if ref["dir"] != got["dir"] else 0.0   # same direction first, then the same kind,
+            other_kind = 0.5 if kind_ref != kind_got else 0.0       # then the closest
+            candidates.append((wrong_way + other_kind + dt + dist / 1000.0, i, j))
     used_ref, used_got, pairs = set(), set(), []
     for _, i, j in sorted(candidates):          # closest first, each crossing used once
         if i not in used_ref and j not in used_got:
@@ -60,11 +68,13 @@ def match_crossings(reference: list[dict], counted: list[dict], window_s: float 
         kind_pairs = [(i, j) for i, j in pairs if kind_of(reference[i]["cls"]) == kind]
         if not refs and not gots:
             continue
+        extra_idx = [j for j in gots if j not in used_got]
         out[kind] = {
             "reference": len(refs), "counted": len(gots), "matched": len(kind_pairs),
             "same_dir": sum(reference[i]["dir"] == counted[j]["dir"] for i, j in kind_pairs),
-            "missed": len(refs) - len(kind_pairs), "extra": len(gots) - len(kind_pairs), "pairs": kind_pairs,
-            "missed_idx": [i for i in refs if i not in used_ref], "extra_idx": [j for j in gots if j not in used_got],
+            "same_kind": sum(kind_of(counted[j]["cls"]) == kind for _, j in kind_pairs),
+            "missed": len(refs) - len(kind_pairs), "extra": len(extra_idx), "pairs": kind_pairs,
+            "missed_idx": [i for i in refs if i not in used_ref], "extra_idx": extra_idx,
         }
     return out
 
@@ -74,8 +84,8 @@ def add_up(results: list[dict[str, dict]]) -> dict[str, dict]:
     total: dict[str, dict] = {}
     for result in results:
         for kind, r in result.items():
-            t = total.setdefault(kind, {"reference": 0, "counted": 0, "matched": 0, "same_dir": 0, "missed": 0,
-                                        "extra": 0})
+            t = total.setdefault(kind, {"reference": 0, "counted": 0, "matched": 0, "same_dir": 0, "same_kind": 0,
+                                        "missed": 0, "extra": 0})
             for key in t:
                 t[key] += r[key]
     return total

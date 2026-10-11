@@ -43,8 +43,18 @@ def variants() -> dict:
 
 
 def crossings_of(report: dict) -> list[dict]:
+    """The crossings of a run, at the moment and point where the object went over the line when known (t_line,
+    x_line, y_line), else at the moment it was counted."""
     keep = ("t", "line", "dir", "cls", "track_id", "x", "y")
-    return [{k: e[k] for k in keep if k in e} for e in report["events"] if e.get("type") == "crossing"]
+    out = []
+    for e in report["events"]:
+        if e.get("type") != "crossing":
+            continue
+        c = {k: e[k] for k in keep if k in e}
+        if "t_line" in e:
+            c.update(t=e["t_line"], x=e["x_line"], y=e["y_line"], t_count=e["t"])
+        out.append(c)
+    return out
 
 
 def reference_of(name: str) -> list[dict] | None:
@@ -115,11 +125,14 @@ def cmd_score(args) -> int:
     for variant in args.variants:
         per_video, total = score_variant(variant)
         print(f"\n=== {variant}: {variants()[variant]['what']} ({len(per_video)} videos)")
-        print(f"{'video':16s} {'kind':10s} {'ref':>4s} {'counted':>8s} {'ok %':>6s} {'dir ok':>7s} {'missed':>7s} {'extra':>6s}")
-        for name, r in per_video.items():
+        print(f"{'video':16s} {'kind':10s} {'ref':>4s} {'counted':>8s} {'ok %':>6s} {'dir ok':>7s} {'kind ok':>8s} "
+              f"{'missed':>7s} {'extra':>6s}")
+        rows = list(per_video.items()) + [("TOTAL", {"result": total})]
+        for name, r in rows:
             for kind, k in r["result"].items():
                 print(f"{name:16s} {kind:10s} {k['reference']:4d} {k['matched']:8d} {pct(k['matched'], k['reference']):>6s} "
-                      f"{pct(k['same_dir'], k['matched']):>7s} {k['missed']:7d} {k['extra']:6d}")
+                      f"{pct(k['same_dir'], k['matched']):>7s} {pct(k['same_kind'], k['matched']):>8s} {k['missed']:7d} "
+                      f"{k['extra']:6d}")
         print()
         for kind in KINDS:
             if kind in total:

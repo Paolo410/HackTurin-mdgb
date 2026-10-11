@@ -58,6 +58,22 @@ class Stabilizer:
         return cv2.warpAffine(frame, self.last, (width, height), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE)
 
 
+def crossing_point(history, start, end) -> dict:
+    """Where and when the track went over the line: the last change of side in its history, interpolated on the
+    line. The count comes minimum_crossing_threshold detector frames later (at 4 per second, 0.7 s and metres
+    further): the benchmark compares this point and time, not those of the count."""
+    def side(x, y):
+        return (end[0] - start[0]) * (y - start[1]) - (end[1] - start[1]) * (x - start[0])
+    samples = list(history)
+    for (t0, x0, y0), (t1, x1, y1) in zip(reversed(samples[:-1]), reversed(samples[1:])):
+        s0, s1 = side(x0, y0), side(x1, y1)
+        if (s0 < 0) != (s1 < 0):
+            k = s0 / (s0 - s1) if s0 != s1 else 0.0
+            return {"t_line": t0 + k * (t1 - t0), "x_line": round(x0 + k * (x1 - x0), 1),
+                    "y_line": round(y0 + k * (y1 - y0), 1)}
+    return {}
+
+
 def percentile(values: list[float], q: float) -> float | None:
     return float(np.percentile(values, q)) if values else None
 
@@ -201,6 +217,10 @@ def main() -> int:
             state = pipeline.tracker.tracks.get(event.get("track_id"))
             if event["type"] == "crossing" and state is not None and state.history:
                 where = {"x": round(state.history[-1][1], 1), "y": round(state.history[-1][2], 1)}   # bottom centre, px
+                line = pipeline.counter.lines[event["line"]]
+                at_line = crossing_point(state.history, line["start"], line["end"])
+                if at_line:
+                    where.update(at_line, t_line=round(at_line["t_line"] - t0, 2))
             events.append({"t": round(rel, 2), **event, **where})
             if event["type"] != "crossing" or reason is None:
                 reason = reason or f"{event.get('kind', event['type'])}"

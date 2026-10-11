@@ -44,3 +44,27 @@ def test_totals_and_the_sentence_for_everybody():
     assert (total["reference"], total["matched"], total["same_dir"], total["extra"]) == (3, 2, 2, 1)
     text = sentence("pedestrian", total)
     assert text == "Pedoni: su 3 passaggi la scheda ne ha contati 2 (67%), 2 nel verso giusto (100%); 1 conteggi in più (doppioni o falsi)."
+
+
+def test_a_person_on_a_bike_called_pedestrian_is_still_found():
+    reference = [crossing(1.0), crossing(4.0, "cyclist")]
+    counted = [crossing(1.1, "cyclist"), crossing(4.1, "cyclist"), crossing(7.0, "car", "ped")]
+    r = match_crossings(reference, counted)
+    ped, cyc = r["pedestrian"], r["cyclist"]
+    assert (ped["matched"], ped["same_kind"], ped["missed"]) == (1, 0, 0)   # found, but called a cyclist
+    assert (cyc["matched"], cyc["same_kind"], cyc["extra"]) == (1, 1, 0)
+    assert r["vehicle"]["extra"] == 1                                        # a car is never a person
+
+
+def test_crossing_point_is_where_the_track_went_over_the_line():
+    import importlib.util
+    from pathlib import Path
+    path = Path(__file__).resolve().parent.parent / "scripts" / "evaluate.py"
+    spec = importlib.util.spec_from_file_location("evaluate", path)
+    evaluate = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(evaluate)
+    # Vertical line x = 100; a car at 4 detections per second: 60, 90 | 130, 170, 210 (counted at the last one).
+    history = [(0.0, 60.0, 50.0), (0.25, 90.0, 50.0), (0.5, 130.0, 50.0), (0.75, 170.0, 50.0), (1.0, 210.0, 50.0)]
+    at = evaluate.crossing_point(history, (100, 0), (100, 200))
+    assert abs(at["t_line"] - 0.3125) < 1e-9 and at["x_line"] == 100.0 and at["y_line"] == 50.0
+    assert evaluate.crossing_point(history[:2], (100, 0), (100, 200)) == {}           # not over the line yet

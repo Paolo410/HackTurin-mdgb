@@ -2,7 +2,7 @@
  "note": "Settings compared by scripts/benchmark.py run/score. 'args' are options of scripts/evaluate.py.",
  "variants": {
   "riferimento": {
-   "what": "riferimento: YOLOX-l a 960 px su ogni fotogramma alla velocità del video (sul Mac con CoreML), da rivedere a vista",
+   "what": "riferimento: YOLOX-l a 960 px su ogni fotogramma a 15 FPS (sul Mac con CoreML), passaggio confermato dopo 0,5 s oltre la linea come sulla scheda; da rivedere a vista",
    "args": [
     "--set",
     "model.path=\"models/yolox_l_960.onnx\"",
@@ -13,31 +13,51 @@
     "--set",
     "model.detect_every_n=1",
     "--set",
-    "source.max_fps=0"
+    "source.max_fps=15",
+    "--set",
+    "counting.minimum_crossing_threshold=8",
+    "--set",
+    "tracking.min_track_age=5"
    ]
   },
-  "scheda": {
-   "what": "come gira oggi sulla scheda: 320 px, 12 FPS, detector un fotogramma su due",
+  "scheda_prima": {
+   "what": "come girava sulla scheda fino al 10/10: 320 px, 8,4 FPS, detector un fotogramma su due (4,2 al secondo), tracking senza le correzioni dell'11/10",
    "args": [
     "--emulate-unoq",
     "--set",
     "model.detect_every_n=2",
     "--set",
-    "source.max_fps=12"
+    "source.max_fps=8.4",
+    "--set",
+    "tracking.box_buffer=0",
+    "--set",
+    "tracking.matched_box=false",
+    "--set",
+    "counting.side_memory=0"
+   ]
+  },
+  "scheda": {
+   "what": "320 px, 8,4 FPS, detector un fotogramma su due (4,2 al secondo, misurato sulla scheda), tracking corretto",
+   "args": [
+    "--emulate-unoq",
+    "--set",
+    "model.detect_every_n=2",
+    "--set",
+    "source.max_fps=8.4"
    ]
   },
   "scheda_ogni_frame": {
-   "what": "320 px, 10 FPS, detector su ogni fotogramma",
+   "what": "320 px, 5,9 FPS, detector su ogni fotogramma (5,9 al secondo, misurato sulla scheda), tracking corretto",
    "args": [
     "--emulate-unoq",
     "--set",
     "model.detect_every_n=1",
     "--set",
-    "source.max_fps=10"
+    "source.max_fps=5.9"
    ]
   },
   "scheda_416": {
-   "what": "416 px, 12 FPS, detector un fotogramma su due",
+   "what": "416 px, 6 FPS stimati, detector un fotogramma su due (3 al secondo), tracking corretto",
    "args": [
     "--emulate-unoq",
     "--set",
@@ -45,7 +65,55 @@
     "--set",
     "model.detect_every_n=2",
     "--set",
-    "source.max_fps=12"
+    "source.max_fps=6"
+   ]
+  },
+  "scheda_attivazione_020": {
+   "what": "come scheda, ma una traccia nuova parte da punteggio 0.30 invece di 0.40",
+   "args": [
+    "--emulate-unoq",
+    "--set",
+    "model.detect_every_n=2",
+    "--set",
+    "source.max_fps=8.4",
+    "--set",
+    "tracking.track_activation_threshold=0.2"
+   ]
+  },
+  "ogni_frame_soglia2": {
+   "what": "come scheda_ogni_frame, passaggio confermato dopo 2 rilevamenti oltre la linea invece di 3",
+   "args": [
+    "--emulate-unoq",
+    "--set",
+    "model.detect_every_n=1",
+    "--set",
+    "source.max_fps=5.9",
+    "--set",
+    "counting.minimum_crossing_threshold=2"
+   ]
+  },
+  "ogni_frame_buffer05": {
+   "what": "come scheda_ogni_frame, box allargati del 50% invece del 30% per l'associazione",
+   "args": [
+    "--emulate-unoq",
+    "--set",
+    "model.detect_every_n=1",
+    "--set",
+    "source.max_fps=5.9",
+    "--set",
+    "tracking.box_buffer=0.5"
+   ]
+  },
+  "ogni_frame_attivazione020": {
+   "what": "come scheda_ogni_frame, una traccia nuova parte da punteggio 0.30 invece di 0.40",
+   "args": [
+    "--emulate-unoq",
+    "--set",
+    "model.detect_every_n=1",
+    "--set",
+    "source.max_fps=5.9",
+    "--set",
+    "tracking.track_activation_threshold=0.2"
    ]
   }
  }
