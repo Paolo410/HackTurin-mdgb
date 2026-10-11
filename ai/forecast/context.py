@@ -36,12 +36,15 @@ class Context:
         self.fetchers = default_fetchers() if fetchers is None else fetchers
         self.clock, self.background = clock, background
         self.lock = threading.Lock()
+        self.network = threading.Lock()     # one camera at a time: Overpass refuses bursts of requests
         self.busy = set()
         self.cache = {}                     # {"lat,lon": {part: {"at": epoch_s, "data": {...}}, "_failed": {part: epoch_s}}}
         if cache_file and os.path.exists(cache_file):
             try:
                 with open(cache_file, encoding="utf-8") as f:
                     self.cache = json.load(f)
+                for entry in self.cache.values():       # a failure of the last run is no reason to wait now
+                    entry.pop("_failed", None)
             except (OSError, ValueError):
                 log.warning("cache del contesto illeggibile (%s): si riparte da vuota", cache_file)
 
@@ -80,7 +83,8 @@ class Context:
                 due = self._due(self.cache.get(k, {}), self.clock())
             for part in due:
                 try:
-                    data, failed = self.fetchers[part](lat, lon), None
+                    with self.network:
+                        data, failed = self.fetchers[part](lat, lon), None
                 except Exception as e:          # no network, quota, a source that changed: the model does without
                     data, failed = None, e
                     log.warning("contesto %s per %s non disponibile: %s", part, k, e)

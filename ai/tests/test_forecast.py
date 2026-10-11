@@ -11,7 +11,7 @@ import pytest
 from forecast import features, fusion, sources
 from forecast.context import RETRY_S, TTL_S, Context
 from forecast.model import Model
-from forecast.service import NEXT_WINDOWS, Forecaster
+from forecast.service import OUTLOOK_HOURS, Forecaster
 
 CENTRE = {"poi": {"food": 60, "shop": 140, "transit": 10, "edu": 2, "leisure": 60, "road": 0},
           "esa": {"built": 0.95, "green": 0.03, "water": 0.0}}
@@ -132,11 +132,43 @@ def test_osm_counts_and_road_class():
                 {"type": "way", "tags": {"highway": "construction"}}]
         return json.dumps({"elements": els}).encode()
 
-    out = sources.osm_pois(45.0679, 7.6829, http=http)
+    out = sources.overpass_pois(45.0679, 7.6829, http=http)
     assert out == {"food": 76, "shop": 178, "transit": 14, "edu": 2, "leisure": 94, "road": 3}
-    assert "around%3A300%2C45.067900%2C7.682900" in seen["query"]
+    assert "around%3A300%2C45.067900%2C7.682900" in seen["query"] and "%5Bshop%5D" in seen["query"]
     with pytest.raises(ValueError):
-        sources.osm_pois(45.0, 7.0, http=lambda *a, **k: b'{"elements": []}')
+        sources.overpass_pois(45.0, 7.0, http=lambda *a, **k: b'{"elements": []}')
+
+
+def test_osm_api_when_overpass_is_down():
+    lat, lon, m = 45.0, 7.0, 1 / sources.M_PER_DEG                 # m = one metre north, in degrees
+    node = lambda i, north, east=0.0, tags="": '<node id="%d" lat="%.7f" lon="%.7f">%s</node>' % (
+        i, lat + north * m, lon + east * m / math.cos(math.radians(lat)), tags)
+    tag = lambda k, v: '<tag k="%s" v="%s"/>' % (k, v)
+    way = lambda i, refs, tags: '<way id="%d">%s%s</way>' % (i, "".join('<nd ref="%d"/>' % r for r in refs), tags)
+    xml = "<osm>" + "".join([
+        node(1, 100, tags=tag("amenity", "cafe")), node(2, -250, tags=tag("shop", "bakery")),
+        node(3, 400, tags=tag("amenity", "restaurant")),                # outside the 300 m
+        node(4, 50, tags=tag("highway", "bus_stop")), node(5, 10, tags=tag("tourism", "museum") + tag("amenity", "cafe")),
+        node(10, 20, east=-500), node(11, 20, east=500),                # a main road passing 20 m north
+        node(12, 200, east=-50), node(13, 200, east=50),                # a side street 200 m away
+        node(14, 350, east=-10), node(15, 290, east=-10),               # a school building crossing the 300 m circle
+        way(20, [10, 11], tag("highway", "primary")), way(21, [12, 13], tag("highway", "residential")),
+        way(22, [14, 15], tag("amenity", "school")), way(23, [12, 13], ""),
+        '<relation id="30"><tag k="shop" v="mall"/></relation>']) + "</osm>"
+    urls = []
+
+    def http(url, data=None, headers=None, timeout=None):
+        urls.append(url)
+        if "overpass" in url:
+            raise OSError("504 Gateway Timeout")
+        return xml.encode()
+
+    expected = {"food": 2, "shop": 1, "transit": 1, "edu": 1, "leisure": 1, "road": 4}
+    assert sources.osm_api_pois(lat, lon, http=http) == expected
+    assert "bbox=6.99" in urls[0] and urls[0].startswith(sources.OSM_API_URL)
+    assert sources.osm_pois(lat, lon, http=http) == expected, "Overpass fails, the official API answers"
+    assert "overpass" in urls[1] and urls[2].startswith(sources.OSM_API_URL)
+    assert sources._distance_to_path([(-500.0, 20.0), (500.0, 20.0)]) == pytest.approx(20.0)
 
 
 def test_open_meteo_hours():
@@ -245,8 +277,11 @@ def test_context_caches_retries_and_survives_restarts(tmp_path):
     ctx.refresh(45.0, 7.0)
     assert calls["poi"] == 2
 
-    again = Context(path, {}, clock=lambda: clock[0], background=False)
+    again = Context(path, {"weather": weather}, clock=lambda: clock[0], background=False)
     assert again.get(45.0, 7.0)["poi"]["food"] == 60, "the cache is on disk"
+    failed_just_now = calls["weather"]
+    again.refresh(45.0, 7.0)
+    assert calls["weather"] == failed_just_now + 1, "after a restart a source that had failed is asked again at once"
     assert again.get(None, None) == {"pending": False}, "a camera without coordinates"
 
 
@@ -295,8 +330,12 @@ def test_forecast_for_a_camera_that_never_sent_data(model):
     assert out["calibration"] == dict.fromkeys(features.TARGETS, 1.0) and out["anomaly"] is None
     est = out["estimate"]["ped_in"]
     assert est["mean"] == pytest.approx(est["model"], rel=0.01) and est["lo"] < est["mean"] < est["hi"]
-    assert len(out["next"]) == NEXT_WINDOWS and out["next"][0]["t0"] <= MONDAY_18 < out["next"][0]["t1"]
-    assert out["next"][1]["t0"] - out["next"][0]["t0"] == 900
+    look = out["outlook"]
+    assert len(look) == 1 + OUTLOOK_HOURS and look[0]["now"] and look[0]["t0"] == MONDAY_18
+    assert look[0]["ped_in"] == pytest.approx(4 * est["mean"], abs=0.1), "now: the estimate, as a count per hour"
+    assert look[1]["t0"] == MONDAY_18 + 3600 and look[2]["t0"] - look[1]["t0"] == 3600, "then the clock hours"
+    assert look[9]["ped_in"] < 0.2 * look[1]["ped_in"], "3 a.m. against 7 p.m."
+    assert look[24]["t0"] == MONDAY_18 + 24 * 3600 and look[24]["ped_in"] > 5 * look[9]["ped_in"], "and tomorrow evening"
     assert out["sources"] == {"places": "osm", "google": False, "esa": True, "weather": False, "traffic": False,
                               "google_key": False, "located": True, "pending": False}
     assert out["inputs"]["poi_food"] == 60 and out["inputs"]["esa_built"] == 0.95
@@ -310,13 +349,17 @@ def test_forecast_follows_what_the_node_counts(model):
     assert busy["mode"] == "fused" and busy["history_windows"] == 8
     assert est["mean"] > 2 * base and est["node_weight"] > 0.5, "the estimate moves to the counts"
     assert busy["calibration"]["ped_in"] > 1.5, "and the next hours are scaled the same way"
-    assert busy["next"][4]["ped_in"] > 1.5 * f.forecast(NODE, [])["next"][4]["ped_in"]
+    plain = f.forecast(NODE, [])["outlook"]
+    assert busy["outlook"][4]["ped_in"] > 1.5 * plain[4]["ped_in"]
     assert busy["anomaly"]["level"] == "normal", "three times the surroundings, but normal for this crossing"
 
     quiet_then_crowd = windows(MONDAY_18, 8, 900, ped_in=round(base))
     for w in quiet_then_crowd[-2:]:
         w["ped_in"] = round(8 * base)
-    assert f.forecast(NODE, quiet_then_crowd)["anomaly"]["level"] == "high"
+    crowd = f.forecast(NODE, quiet_then_crowd)
+    assert crowd["anomaly"]["level"] == "high"
+    lift = lambda h: crowd["outlook"][h]["ped_in"] / plain[h]["ped_in"]
+    assert lift(0) > lift(1) > 1.05 * lift(6), "the crowd of now fades over the next hours, it is not forecast for ever"
 
 
 def test_forecast_with_the_one_minute_windows_of_the_demo(model):

@@ -8,7 +8,8 @@ for a camera that has never sent data. All rates are counts per 15-minute window
 
 Three steps: the gradient boosting model turns calendar and surroundings into an expectation; the node's
 recent history says how much this crossing differs from it (calibration); the last windows are fused with the
-expectation into the estimate of the flow right now.
+expectation into the estimate of the flow right now. The outlook (now, then the next 24 clock hours) starts
+from that estimate and goes back to the calibrated model as the hours pass.
 """
 import os
 import tempfile
@@ -19,7 +20,8 @@ from .context import Context, default_fetchers
 from .model import Model
 
 HISTORY_WINDOWS = 96            # what the calibration looks at: 24 h of 15-minute windows (96 min in the demo)
-NEXT_WINDOWS = 12               # forecast: the next 3 hours
+OUTLOOK_HOURS = 24              # forecast: the next 24 clock hours, after "now"
+PERSISTENCE_HALF_LIFE_H = 1.0   # what is unusual right now (a crowd, an empty street) fades by half every hour
 ANOMALY_MIN_EXPECTED = 20       # below this many expected pedestrians an "unusual" hour is just noise
 ANOMALY_LIMITS = (0.6, 1.6)
 
@@ -80,18 +82,28 @@ class Forecaster:
             anomaly = {"ratio": round(ratio, 2), "measured": round(last_hour["measured"]), "expected": round(usual),
                        "level": "low" if ratio < ANOMALY_LIMITS[0] else "high" if ratio > ANOMALY_LIMITS[1] else "normal"}
 
-        t_start = int(now // W) * W
-        nxt = []
-        for i in range(NEXT_WINDOWS):
-            t0 = t_start + i * W
-            mu = expect(t0 + W / 2.0)
-            nxt.append(dict({t: round(mu[t] * cal[t], 2) for t in features.TARGETS}, t0=t0, t1=t0 + W))
+        # counts per hour: the estimate of now, then the next clock hours from the calibrated model
+        quarters = 3600 // W
+        outlook = [dict({t: round(estimate[t]["mean"] * quarters, 1) for t in features.TARGETS},
+                        t0=now, t1=now + 3600, now=True)]
+        unusual = {t: min(max(estimate[t]["mean"] / max(mu_now[t] * cal[t], fusion.MIN_RATE), 0.25), 4.0)
+                   for t in features.TARGETS}
+        first = (int(now // 3600) + 1) * 3600
+        for i in range(OUTLOOK_HOURS):
+            t0 = first + i * 3600
+            fade = 0.5 ** ((t0 + 1800 - now) / 3600.0 / PERSISTENCE_HALF_LIFE_H)
+            hour = dict.fromkeys(features.TARGETS, 0.0)
+            for q in range(quarters):
+                mu = expect(t0 + (q + 0.5) * W)
+                for t in features.TARGETS:
+                    hour[t] += mu[t] * cal[t] * unusual[t] ** fade
+            outlook.append(dict({t: round(v, 1) for t, v in hour.items()}, t0=t0, t1=t0 + 3600))
 
         now_row = features.row(now, ctx)
         return {
             "available": True, "node": node.get("id"), "now": now, "window_s": W,
             "mode": "fused" if any(now - w["t1"] <= 4 * fusion.HALF_LIFE_S for w, _, _ in seen) else "model_only",
-            "estimate": estimate, "next": nxt, "anomaly": anomaly,
+            "estimate": estimate, "outlook": outlook, "anomaly": anomaly,
             "calibration": {t: round(c, 2) for t, c in cal.items()}, "history_windows": len(seen),
             "inputs": {k: now_row[k] for k in features.FEATURES if k not in ("hour", "dow")},
             "sources": {"places": "osm" if ctx.get("poi") else "google" if ctx.get("google") else None,

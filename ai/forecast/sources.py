@@ -5,6 +5,7 @@ results and decides what to do when a source is unreachable. Only the coordinate
 
   No key, free:
     osm_pois         places and road class around the crossing   https://wiki.openstreetmap.org/wiki/Overpass_API
+                     (or, when Overpass is down, the official API)   https://wiki.openstreetmap.org/wiki/API_v0.6
     open_meteo       weather of the next hours                   https://open-meteo.com/en/docs
     esa_worldcover   ESA WorldCover 10 m 2021 v200 (land cover)  https://registry.opendata.aws/esa-worldcover-vito/
   With GOOGLE_MAPS_API_KEY (free monthly quota, see README.md):
@@ -12,21 +13,25 @@ results and decides what to do when a source is unreachable. Only the coordinate
     google_traffic   live congestion             https://developers.google.com/maps/documentation/routes/reference/rest/v2/TopLevel/computeRoutes
 """
 import json
+import logging
 import math
 import ssl
 import struct
 import urllib.parse
 import urllib.request
 import zlib
+from xml.etree import ElementTree
 
 from .features import CATEGORIES
 
+log = logging.getLogger("forecast")
 USER_AGENT = "MDGB-Centrale/1.0 (HackTurin; github.com/Paolo410/HackTurin-mdgb)"
 TIMEOUT_S = 12
-OVERPASS_TIMEOUT_S = 45            # the public server is shared and often slow; asked once a month per crossing
+OVERPASS_TIMEOUT_S = 25            # the public server is shared and often slow; asked once a month per crossing
 M_PER_DEG = 111320.0
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
+OSM_API_URL = "https://api.openstreetmap.org/api/0.6/map"
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 WORLDCOVER_URL = ("https://esa-worldcover.s3.eu-central-1.amazonaws.com/v200/2021/map/"
                   "ESA_WorldCover_10m_2021_v200_%s_Map.tif")
@@ -49,26 +54,32 @@ def http(url, data=None, headers=None, timeout=TIMEOUT_S):
         return r.read()
 
 
-# ---------------------------------------------------------------- OpenStreetMap (Overpass)
-_OSM_FILTERS = {
-    "food": ['[amenity~"^(restaurant|cafe|bar|pub|fast_food|ice_cream|food_court)$"]'],
-    "shop": ["[shop]", '[amenity~"^(marketplace|bank|pharmacy|post_office)$"]'],
-    "transit": ["[highway=bus_stop]", '[railway~"^(station|halt|tram_stop|subway_entrance)$"]',
-                "[amenity=bus_station]"],
-    "edu": ['[amenity~"^(school|university|college|kindergarten|library)$"]'],
-    "leisure": ["[tourism]", '[amenity~"^(theatre|cinema|arts_centre|nightclub)$"]',
-                '[leisure~"^(park|playground|sports_centre|fitness_centre)$"]'],
+# ---------------------------------------------------------------- OpenStreetMap
+# What counts as a place of each category: {tag key: accepted values, None = any value}.
+_OSM_TAGS = {
+    "food": {"amenity": ("restaurant", "cafe", "bar", "pub", "fast_food", "ice_cream", "food_court")},
+    "shop": {"shop": None, "amenity": ("marketplace", "bank", "pharmacy", "post_office")},
+    "transit": {"highway": ("bus_stop",), "railway": ("station", "halt", "tram_stop", "subway_entrance"),
+                "amenity": ("bus_station",)},
+    "edu": {"amenity": ("school", "university", "college", "kindergarten", "library")},
+    "leisure": {"tourism": None, "amenity": ("theatre", "cinema", "arts_centre", "nightclub"),
+                "leisure": ("park", "playground", "sports_centre", "fitness_centre")},
 }
 ROAD_RANK = {"pedestrian": 0, "footway": 0, "living_street": 1, "residential": 1, "service": 1,
              "unclassified": 2, "tertiary": 2, "secondary": 3, "primary": 4, "trunk": 4, "motorway": 4}
 
 
-def osm_pois(lat, lon, radius_m=300, road_m=30, http=http):
-    """Places within radius_m, by category, and the class of the biggest road within road_m of the crossing."""
+def _road_rank(tags):
+    return ROAD_RANK.get(tags.get("highway", "").replace("_link", ""))
+
+
+def overpass_pois(lat, lon, radius_m=300, road_m=30, http=http):
+    """One Overpass query: the server counts the places and returns only the roads next to the crossing."""
     around = "(around:%d,%.6f,%.6f)" % (radius_m, lat, lon)
     query = "[out:json][timeout:20];"
     for c in CATEGORIES:
-        query += "(" + "".join("nw%s%s;" % (around, f) for f in _OSM_FILTERS[c]) + ");out count;"
+        filters = ["[%s]" % k if v is None else '[%s~"^(%s)$"]' % (k, "|".join(v)) for k, v in _OSM_TAGS[c].items()]
+        query += "(" + "".join("nw%s%s;" % (around, f) for f in filters) + ");out count;"
     query += "way(around:%d,%.6f,%.6f)[highway];out tags;" % (road_m, lat, lon)
     body = http(OVERPASS_URL, data=urllib.parse.urlencode({"data": query}).encode(), timeout=OVERPASS_TIMEOUT_S)
     elements = json.loads(body)["elements"]
@@ -76,14 +87,67 @@ def osm_pois(lat, lon, radius_m=300, road_m=30, http=http):
     if len(counts) != len(CATEGORIES):
         raise ValueError("Overpass: %d counts instead of %d" % (len(counts), len(CATEGORIES)))
     out = dict(zip(CATEGORIES, counts))
-    ranks = [ROAD_RANK[e["tags"]["highway"].replace("_link", "")] for e in elements
-             if e.get("type") == "way" and e["tags"]["highway"].replace("_link", "") in ROAD_RANK]
-    out["road"] = max(ranks) if ranks else None
+    ranks = [_road_rank(e["tags"]) for e in elements if e.get("type") == "way"]
+    out["road"] = max([r for r in ranks if r is not None], default=None)
     return out
 
 
+def _distance_to_path(points):
+    """Metres from the origin to a polyline given as [(x, y), ...] (a single point is its own path)."""
+    if len(points) == 1:
+        return math.hypot(*points[0])
+    best = float("inf")
+    for (x1, y1), (x2, y2) in zip(points, points[1:]):
+        dx, dy = x2 - x1, y2 - y1
+        t = max(0.0, min(1.0, -(x1 * dx + y1 * dy) / (dx * dx + dy * dy))) if dx or dy else 0.0
+        best = min(best, math.hypot(x1 + t * dx, y1 + t * dy))
+    return best
+
+
+def osm_api_pois(lat, lon, radius_m=300, road_m=30, http=http):
+    """The same answer from the map data of the official OpenStreetMap API (1-2 MB of XML for a city block),
+    counted here. https://wiki.openstreetmap.org/wiki/API_v0.6#Retrieving_map_data_by_bounding_box:_GET_/api/0.6/map"""
+    d_lat = radius_m / M_PER_DEG
+    d_lon = d_lat / math.cos(math.radians(lat))
+    url = "%s?bbox=%.6f,%.6f,%.6f,%.6f" % (OSM_API_URL, lon - d_lon, lat - d_lat, lon + d_lon, lat + d_lat)
+    root = ElementTree.fromstring(http(url, timeout=OVERPASS_TIMEOUT_S))
+    kx, ky = M_PER_DEG * math.cos(math.radians(lat)), M_PER_DEG
+    where = {}                                  # node id -> metres east and north of the crossing
+    out, ranks = dict.fromkeys(CATEGORIES, 0), []
+    for el in root:                             # the API lists all the nodes first, then the ways
+        if el.tag == "node":
+            path = [((float(el.get("lon")) - lon) * kx, (float(el.get("lat")) - lat) * ky)]
+            where[el.get("id")] = path[0]
+        elif el.tag == "way":
+            path = [where[nd.get("ref")] for nd in el.iter("nd") if nd.get("ref") in where]
+        else:
+            continue
+        tags = {tag.get("k"): tag.get("v") for tag in el.iter("tag")}
+        if not tags or not path:
+            continue
+        distance = _distance_to_path(path)
+        if distance <= radius_m:
+            for c in CATEGORIES:
+                if any(k in tags and (v is None or tags[k] in v) for k, v in _OSM_TAGS[c].items()):
+                    out[c] += 1
+        if el.tag == "way" and distance <= road_m and _road_rank(tags) is not None:
+            ranks.append(_road_rank(tags))
+    out["road"] = max(ranks, default=None)
+    return out
+
+
+def osm_pois(lat, lon, radius_m=300, road_m=30, http=http):
+    """Places within radius_m, by category, and the class of the biggest road within road_m of the crossing.
+    Overpass first; its public servers are often overloaded, so on any failure the official API is asked."""
+    try:
+        return overpass_pois(lat, lon, radius_m, road_m, http)
+    except Exception as e:
+        log.info("Overpass non risponde (%s): luoghi dall'API di OpenStreetMap", e)
+        return osm_api_pois(lat, lon, radius_m, road_m, http)
+
+
 # ---------------------------------------------------------------- Open-Meteo
-def open_meteo(lat, lon, hours=6, http=http):
+def open_meteo(lat, lon, hours=30, http=http):
     """Hourly temperature (°C) and rain (mm in the hour) from the current hour on: [[epoch_s, temp_c, rain_mm], ...]."""
     query = urllib.parse.urlencode({"latitude": "%.4f" % lat, "longitude": "%.4f" % lon,
                                     "hourly": "temperature_2m,precipitation", "forecast_hours": hours,
