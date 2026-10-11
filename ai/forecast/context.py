@@ -21,8 +21,9 @@ RETRY_S = 300
 
 
 def default_fetchers(google_key=""):
-    """{part: f(lat, lon) -> dict}. The Google parts exist only with a key."""
-    f = {"poi": sources.osm_pois, "esa": sources.esa_worldcover, "weather": sources.open_meteo}
+    """{part: f(lat, lon) -> dict}, quickest first: they are asked one after the other and Overpass can take
+    half a minute. The Google parts exist only with a key."""
+    f = {"weather": sources.open_meteo, "esa": sources.esa_worldcover, "poi": sources.osm_pois}
     if google_key:
         f["google"] = lambda lat, lon: sources.google_places(lat, lon, google_key)
         f["traffic"] = lambda lat, lon: sources.google_traffic(lat, lon, google_key)
