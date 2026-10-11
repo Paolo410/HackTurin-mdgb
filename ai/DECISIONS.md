@@ -602,4 +602,21 @@ con v_ped 0,3 → 25 s.
     - passo 6, **aperto:** la camera è appoggiata sul tavolo, non montata: niente calibrazione, quindi la visione
       conta ma non applica la regola. Il fotogramma si prende spostando un attimo la visione su un video
       (`run_vision.sh video ...`), perché la camera la tiene occupata il servizio.
+50. **Centrale lanciabile da qualunque PC (11/10, 11:15)**, chiesto da Paolo: `avvia_centrale.py` nella root.
+    - Il problema: la scheda aveva nel broker l'IP del PC di ieri, e ogni cambio di rete o di PC chiedeva di
+      riscriverlo sulla scheda con `sudo`.
+    - La soluzione: il PC che lancia la centrale annuncia in rete il nome `mdgb-centrale.local` (mDNS, libreria
+      `zeroconf==0.151.5`); la scheda ha quel nome in `MQTT_HOST`. Provato: la scheda lo risolve e si collega; con
+      `MQTT_HOST=mdgb-centrale.local` il nodo è passato a `rete=ONLINE` e ha consegnato i 17 eventi in coda alla
+      centrale sul Mac di Paolo.
+    - Il lanciatore usa la centrale di `app/` così com'è (nessuna modifica nelle cartelle di Lorenzo): prepara
+      `app/.venv`, sceglie una porta libera per la dashboard se la 8080 è occupata (sul Mac di Paolo lo era), apre
+      la dashboard alla rete locale.
+    - Scartato: broker sulla scheda. Toglierebbe ogni configurazione, ma spegnendo il Wi-Fi il nodo continuerebbe a
+      vedere il broker e non passerebbe al Bluetooth: la prova "rete giù" della demo non funzionerebbe più.
+    - **Aperto, da concordare con Lorenzo:** alle 11:15:44 un altro PC (192.168.22.99) ha rilanciato lo script di
+      copia della rete, che ha rimesso nella scheda il proprio IP: da quel momento il nodo è `OFFLINE` verso quel PC.
+      Va deciso quale PC fa da centrale, oppure lo script va lanciato con `--broker mdgb-centrale.local`.
+    - Limiti: una centrale alla volta; serve una rete che lasci passare mDNS (quella della sede lo fa); Mosquitto
+      va installato a mano sul PC.
 

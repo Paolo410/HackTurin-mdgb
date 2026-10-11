@@ -72,8 +72,15 @@ Fai un passo alla volta, controlla l'esito e riferiscilo prima di passare al suc
      la scheda.
 4. **Semaforo e sketch:** `arduino-app-cli app list` deve mostrare `mdgb` avviata. Se va riavviata: `stop` e poi
    `start` (`restart` risponde "Is Running"), ma **chiedi prima a Salvatore**.
-5. **Centrale:** sul PC di Lorenzo la dashboard deve mostrare il nodo collegato, con stato e conteggi che cambiano.
-   La rete è di Lorenzo: per problemi leggi `comms/README.md` e chiedi a lui.
+5. **Centrale:** la dashboard deve mostrare il nodo collegato, con stato e conteggi che cambiano.
+   - Da qualunque PC del team: `python avvia_centrale.py` dalla cartella del repo (vedi il README principale). Apre
+     la centrale di `app/` e annuncia in rete il nome `mdgb-centrale.local`.
+   - La scheda deve avere `MQTT_HOST=mdgb-centrale.local` in `~/HackTurin-mdgb/comms/.env` (una volta sola, poi
+     `sudo systemctl restart mdgb-comms`): controlla con `grep MQTT_HOST` prima di cambiare qualcosa. Se c'è un
+     indirizzo IP, qualcuno ha rilanciato `comms/deploy/push_to_arduino.sh` senza `--broker mdgb-centrale.local`:
+     **mettiti d'accordo con Lorenzo prima di riscriverlo** (l'11/10 alle 11:15 due PC lo hanno cambiato insieme).
+   - `journalctl -u mdgb-comms -n 3` deve dire `rete=ONLINE`. La rete è di Lorenzo: per problemi leggi
+     `comms/README.md` e chiedi a lui.
 6. **Calibrazione della camera montata.** Senza `ai/calib.json` la visione usa le linee d'esempio: conta, ma non
    misura velocità e non applica la regola. Appena la camera è fissata: prendi un fotogramma o un breve video dalla
    camera (con `run_vision.sh video ...` o salvandone uno a mano, solo per la calibrazione), poi sul PC
