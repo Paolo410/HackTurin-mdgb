@@ -34,8 +34,8 @@ jobs:
       - name: Test della centrale su Windows
         run: |
           python -m pip install -q -r comms/requirements-dev.txt -r app/requirements.txt
-          python -m pytest comms/tests/test_dashboard.py comms/tests/test_offline.py -q
-          python -m pytest ai/tests/test_forecast.py ai/tests/test_forecast_sources.py ai/tests/test_forecast_service.py -q
+          python -m pytest comms/tests/test_dashboard.py comms/tests/test_customers.py comms/tests/test_offline.py -q
+          python -m pytest ai/tests/test_forecast.py ai/tests/test_forecast_sources.py ai/tests/test_forecast_service.py ai/tests/test_forecast_analytics.py -q
 
       - name: Build e autotest dell'app
         shell: pwsh
