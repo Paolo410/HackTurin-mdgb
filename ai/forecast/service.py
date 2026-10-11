@@ -105,11 +105,11 @@ def quality(seen):
 
 
 class Forecaster:
-    def __init__(self, model=None, context=None, clock=time.time):
+    def __init__(self, model=None, context=None, clock=None):
         self.model = model or Model.load()
         if context is None:
             context = Context(default_cache_file(), default_fetchers(os.environ.get("GOOGLE_MAPS_API_KEY", "")))
-        self.context, self.clock = context, clock
+        self.context, self.clock = context, clock or time.time
 
     def forecast(self, node, windows, now=None):
         now = self.clock() if now is None else now

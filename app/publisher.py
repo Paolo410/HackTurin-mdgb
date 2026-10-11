@@ -54,8 +54,8 @@ def publish(client, flow, prefix="mdgb"):
 class Publisher:
     """Chiama publish() ogni `period_s` secondi, quando il client è collegato. tick() si chiama spesso: decide lei."""
 
-    def __init__(self, client, flow, prefix="mdgb", period_s=30, clock=time.time):
-        self.client, self.flow, self.prefix, self.period_s, self.clock = client, flow, prefix, period_s, clock
+    def __init__(self, client, flow, prefix="mdgb", period_s=30, clock=None):
+        self.client, self.flow, self.prefix, self.period_s, self.clock = client, flow, prefix, period_s, clock or time.time
         self.last, self.sent = None, 0
 
     def tick(self):

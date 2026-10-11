@@ -31,10 +31,10 @@ def default_fetchers(google_key=""):
 
 
 class Context:
-    def __init__(self, cache_file=None, fetchers=None, clock=time.time, background=True):
+    def __init__(self, cache_file=None, fetchers=None, clock=None, background=True):
         self.cache_file = cache_file
         self.fetchers = default_fetchers() if fetchers is None else fetchers
-        self.clock, self.background = clock, background
+        self.clock, self.background = clock or time.time, background
         self.lock = threading.Lock()
         self.network = threading.Lock()     # one camera at a time: Overpass refuses bursts of requests
         self.busy = set()

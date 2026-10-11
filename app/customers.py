@@ -180,8 +180,8 @@ class KeyStore:
 class RateLimit:
     """Al massimo `per_minute` richieste al minuto per chiave (conteggio in memoria, minuto per minuto)."""
 
-    def __init__(self, per_minute=RATE_PER_MINUTE, clock=time.time):
-        self.per_minute, self.clock, self.lock, self.seen = per_minute, clock, threading.Lock(), {}
+    def __init__(self, per_minute=RATE_PER_MINUTE, clock=None):
+        self.per_minute, self.clock, self.lock, self.seen = per_minute, clock or time.time, threading.Lock(), {}
 
     def allow(self, key_id):
         minute = int(self.clock() // 60)
