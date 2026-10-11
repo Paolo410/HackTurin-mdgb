@@ -7,6 +7,8 @@
 #                                         came from the camera: same commands to the traffic light, page, events
 #   run_vision.sh video samples/X.mp4 --once     one pass, then the table of the times (and again, systemd restarts it)
 #   run_vision.sh camera                  back to the camera
+#   run_vision.sh record 60 [name]        records a clip from the camera into samples/clips/ (benchmark, checks):
+#                                         only while the vision is on a video, because the camera has one reader
 #   run_vision.sh restart                 restart the service (after a code update)
 # Log in ~/HackTurin-mdgb/logs/vision.log. The technician's page is on port 8090.
 set -euo pipefail
@@ -42,6 +44,8 @@ case "${1:-status}" in
     mkdir -p "$LOGS"
     cd "$AI"
     C3="$(cat .c3_dir 2>/dev/null || echo "$LOGS/c3")"
+    export LIBCAMERA_IPA_CONFIG_PATH="$AI/deploy/camera_tuning"   # camera without the automatic exposure
+    "$HOME/venv/bin/python" scripts/camera_exposure.py || true    # exposure and gain for the light of this moment
     # libcamerify: the camera of the board is a CSI sensor read by libcamera. -u: the log is written at once.
     MDGB_C3_DIR="$C3" nohup libcamerify "$HOME/venv/bin/python" -u -m smartcrossing.app --source 0 --profile unoq \
         --headless --actuator bridge --operator-port 8090 "${@:2}" >> "$LOG" 2>&1 &
@@ -68,6 +72,18 @@ case "${1:-status}" in
   log)
     if service_on; then journalctl -u mdgb-ai -f; else tail -f "$LOG"; fi
     ;;
+  record)
+    cd "$AI"
+    if service_on && [ ! -s .vision_args ]; then
+      echo "La camera è occupata dalla visione. Prima: run_vision.sh video samples/<video>.mp4   Alla fine: run_vision.sh camera"; exit 1
+    fi
+    if running; then echo "La camera è occupata dalla visione accesa a mano: run_vision.sh stop"; exit 1; fi
+    export LIBCAMERA_IPA_CONFIG_PATH="$AI/deploy/camera_tuning"
+    "$HOME/venv/bin/python" scripts/camera_exposure.py || true
+    NAME=()
+    [ -n "${3:-}" ] && NAME=(--name "$3")
+    libcamerify "$HOME/venv/bin/python" scripts/record_clip.py --seconds "${2:-30}" "${NAME[@]}" 2>&1 | grep -v " WARN \| INFO "
+    ;;
   video)
     need_service
     [ -n "${2:-}" ] || { echo "uso: run_vision.sh video <file video> [--calib <calib.json>] [--once] [altre opzioni]"; exit 2; }
@@ -92,6 +108,6 @@ case "${1:-status}" in
     restart_service
     ;;
   *)
-    echo "uso: run_vision.sh start|stop|status|log|video|camera|restart"; exit 2
+    echo "uso: run_vision.sh start|stop|status|log|video|camera|record|restart"; exit 2
     ;;
 esac

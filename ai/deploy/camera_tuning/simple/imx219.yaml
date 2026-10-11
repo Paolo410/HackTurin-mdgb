@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: CC0-1.0
+# Tuning of the board's camera (Sony IMX219) for libcamera's software ISP ("simple" pipeline), used through
+# LIBCAMERA_IPA_CONFIG_PATH=<ai>/deploy/camera_tuning. It is libcamera's uncalibrated.yaml WITHOUT the Agc
+# algorithm: the automatic exposure of this ISP does not settle, the brightness cycles dark / medium / bright
+# every three frames (measured on the board, 11/10/2026). Exposure and gain are set once, before the camera
+# starts, by scripts/camera_exposure.py.
+%YAML 1.1
+---
+version: 1
+algorithms:
+  - BlackLevel:
+  - Awb:
+  - Lut:
+...
