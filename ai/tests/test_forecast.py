@@ -1,10 +1,8 @@
 """Expected-flow model (ai/forecast): no network, no hardware. The sources are tested on canned answers."""
 import json
 import math
-import struct
 import threading
 import time
-import zlib
 
 import pytest
 
@@ -12,18 +10,7 @@ from forecast import features, fusion, sources
 from forecast.context import RETRY_S, TTL_S, Context
 from forecast.model import Model
 from forecast.service import OUTLOOK_HOURS, Forecaster
-
-CENTRE = {"poi": {"food": 60, "shop": 140, "transit": 10, "edu": 2, "leisure": 60, "road": 0},
-          "esa": {"built": 0.95, "green": 0.03, "water": 0.0}}
-SUBURB = {"poi": {"food": 2, "shop": 8, "transit": 2, "edu": 1, "leisure": 3, "road": 4},
-          "esa": {"built": 0.6, "green": 0.35, "water": 0.0}}
-
-
-def local(day, hour, minute=0, month=10, year=2026):
-    return time.mktime((year, month, day, hour, minute, 0, 0, 0, -1))
-
-
-MONDAY_18 = local(12, 18)           # 12 October 2026 is a Monday
+from forecast_helpers import CENTRE, MONDAY_18, NODE, SUBURB, forecaster, local, tiled_tiff, windows
 
 
 @pytest.fixture(scope="module")
@@ -179,26 +166,6 @@ def test_open_meteo_hours():
     assert features.weather_at(out, 1791687600 + 3 * 3600) is None
 
 
-def tiled_tiff(pixels, tile=32, lon0=6.0, lat0=48.0, scale=1 / 12000.0):
-    """A small GeoTIFF laid out like ESA WorldCover: little-endian, 8 bit, deflate, square tiles."""
-    h, w = len(pixels), len(pixels[0])
-    tiles = [zlib.compress(bytes(pixels[r][c] for r in range(tr, tr + tile) for c in range(tc, tc + tile)))
-             for tr in range(0, h, tile) for tc in range(0, w, tile)]
-    n = len(tiles)
-    entries = [(256, 3, 1, w), (257, 3, 1, h), (258, 3, 1, 8), (259, 3, 1, 8), (317, 3, 1, 1), (322, 3, 1, tile),
-               (323, 3, 1, tile), (324, 4, n, None), (325, 4, n, None), (33550, 12, 3, None), (33922, 12, 6, None)]
-    at = 8 + 2 + 12 * len(entries) + 4
-    extra = {324: at, 325: at + 4 * n, 33550: at + 8 * n, 33922: at + 8 * n + 24}
-    data_at = at + 8 * n + 24 + 48
-    offsets = [data_at + sum(len(t) for t in tiles[:i]) for i in range(n)]
-    out = b"II*\x00" + struct.pack("<I", 8) + struct.pack("<H", len(entries))
-    for tag, typ, count, value in entries:
-        out += struct.pack("<HHII", tag, typ, count, extra.get(tag, value))
-    out += struct.pack("<I", 0) + struct.pack("<%dI" % n, *offsets) + struct.pack("<%dI" % n, *map(len, tiles))
-    out += struct.pack("<3d", scale, scale, 0.0) + struct.pack("<6d", 0.0, 0.0, 0.0, lon0, lat0, 0.0)
-    return out + b"".join(tiles)
-
-
 def test_worldcover_reads_the_tiles_around_the_point():
     # 64x64 pixels, 4 tiles: left half built-up (50), right half trees (10), one corner of water far from the point
     pixels = [[80 if r < 4 and c < 4 else 50 if c < 32 else 10 for c in range(64)] for r in range(64)]
@@ -307,22 +274,6 @@ def test_context_get_does_not_wait_for_the_network():
 
 
 # ---------------------------------------------------------------- service
-NODE = {"id": "nodo01", "name": "Via Roma", "lat": 45.0679, "lon": 7.6829}
-
-
-def forecaster(model, parts=CENTRE, now=MONDAY_18):
-    ctx = Context(None, {k: (lambda lat, lon, v=v: dict(v)) for k, v in parts.items()}, clock=lambda: now,
-                  background=False)
-    ctx.refresh(NODE["lat"], NODE["lon"])
-    return Forecaster(model, ctx, clock=lambda: now)
-
-
-def windows(now, n, length, ped_in, ped_out=0, vehicles=0):
-    t1 = int(now // length) * length
-    return [{"t0": t1 - (i + 1) * length, "t1": t1 - i * length, "ped_in": ped_in, "ped_out": ped_out, "cyclist": 0,
-             "vehicles": vehicles, "animals": 0, "provisional": False, "env": {"t_c": 14.0}} for i in reversed(range(n))]
-
-
 def test_forecast_for_a_camera_that_never_sent_data(model):
     out = forecaster(model).forecast(NODE, [])
     json.dumps(out)
