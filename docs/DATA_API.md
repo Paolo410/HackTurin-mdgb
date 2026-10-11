@@ -52,6 +52,13 @@ Indirizzo: `http://<PC della centrale>:8080/api/v1/`. Di base la centrale ascolt
 raggiungere dalla rete serve `WEB_HOST=0.0.0.0` nelle impostazioni. **Fuori da una rete fidata va messa dietro HTTPS**
 (un proxy con certificato): la chiave viaggia nell'intestazione e in HTTP semplice si può leggere.
 
+Due avvertenze per chi la espone:
+
+- Il proxy deve inoltrare **solo `/api/v1/`**. La gestione delle chiavi (`/api/keys`) riconosce il PC della centrale
+  dall'indirizzo di chi chiama: dietro un proxy sulla stessa macchina ogni richiesta sembra locale.
+- Il resto della dashboard (`/`, `/api/state`, `/api/flow`) non ha chiavi: è pensato per chi controlla gli
+  attraversamenti, sulla rete della centrale.
+
 La chiave va in un'intestazione, mai nell'indirizzo:
 
 ```bash
