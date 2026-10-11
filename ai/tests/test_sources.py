@@ -48,6 +48,17 @@ def test_max_fps_skips_frames_like_a_live_camera(video):
     assert np.diff([t for _, t in items]) == pytest.approx(3 / FPS)
 
 
+def test_a_rate_that_is_not_a_divisor_of_the_video_rate_is_kept_on_average(video):
+    # 7.5 FPS out of 30: steps of 4 frames; 12 FPS: steps of 2 and 3 in turn (2.5 on average), not always 2 or 3.
+    cfg = load_config()
+    cfg["source"]["max_fps"] = 12
+    source = FrameSource(str(video), cfg, realtime=False)
+    assert source.fps == pytest.approx(12)
+    times = [t for _, t in _read_all(source)]
+    steps = np.round(np.diff(times) * FPS).astype(int)
+    assert set(steps) == {2, 3} and np.mean(steps) == pytest.approx(2.5, abs=0.1)
+
+
 def test_wide_frames_are_downscaled(video):
     cfg = load_config()
     cfg["source"]["resize_width"] = 160

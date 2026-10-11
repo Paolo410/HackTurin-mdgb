@@ -10,6 +10,8 @@ Usage (from ai/):
     python scripts/benchmark.py run scheda                                       # the board settings on every video
     python scripts/benchmark.py score scheda [other variants...]                 # numbers, and sentences for everybody
     python scripts/benchmark.py review scheda torino_1                           # images of the disagreements, to check
+    python scripts/benchmark.py judge scheda torino_1 --remove r3 --add g7 --note "r3: same person twice"
+                                    # after looking: r3 was not a crossing (out of the reference), g7 was (in it)
 
 Development tool: `run` and `review` write frames to samples/report (not in git), the product never does.
 """
@@ -163,12 +165,14 @@ def cmd_review(args) -> int:
     for kind, k in result.items():
         if args.kind and kind != args.kind:
             continue
-        cases += [("MISSED", ref[i]) for i in k["missed_idx"]] + [("EXTRA", got[j]) for j in k["extra_idx"]]
-        cases += [("DIR", got[j]) for i, j in k["pairs"] if ref[i]["dir"] != got[j]["dir"]]
+        cases += [(f"MISSED r{i}", ref[i]) for i in k["missed_idx"]] + [(f"EXTRA g{j}", got[j]) for j in k["extra_idx"]]
+        cases += [(f"DIR r{i} g{j}", got[j]) for i, j in k["pairs"] if ref[i]["dir"] != got[j]["dir"]]
     if not cases:
         print("no disagreements")
         return 0
-    calib, _ = load_calib(load_config(), SAMPLES / "calib" / v["calib"])
+    cfg = load_config()
+    calib, _ = load_calib(cfg, SAMPLES / "calib" / v["calib"])
+    width_cap = int(cfg["source"]["resize_width"])
     cap = cv2.VideoCapture(str(SAMPLES / v["video"]))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     tiles = []
@@ -180,6 +184,9 @@ def cmd_review(args) -> int:
             if not ok:
                 frame = np.zeros((240, 240, 3), np.uint8)
             h, w = frame.shape[:2]
+            if 0 < width_cap < w:   # positions are in the frames the vision saw, downscaled like FrameSource does
+                frame = cv2.resize(frame, (width_cap, int(round(h * width_cap / w))), interpolation=cv2.INTER_AREA)
+                h, w = frame.shape[:2]
             line = calib["lines"][e["line"]]
             p0 = (int(line["start"][0] * w), int(line["start"][1] * h))
             p1 = (int(line["end"][0] * w), int(line["end"][1] * h))
@@ -207,6 +214,38 @@ def cmd_review(args) -> int:
     return 0
 
 
+def cmd_judge(args) -> int:
+    """Records what was seen in the review sheets: reference crossings that were not real (--remove r<i>, indexes of
+    the reviewed reference as the sheets print them) and crossings of the run that were real (--add g<j>)."""
+    path = BENCH / "reference" / f"{args.name}.json"
+    data = json.loads(path.read_text())
+    review = data.setdefault("review", {"removed": [], "added": [], "notes": []})
+    original = list(range(len(data["crossings"])))
+    kept = [i for i in original if i not in set(review["removed"])]
+    # reference_of() orders kept + added by time: map its indexes back to the stored crossings
+    view = sorted([("c", i, data["crossings"][i]) for i in kept] + [("a", k, e) for k, e in enumerate(review["added"])],
+                  key=lambda item: item[2]["t"])
+    got = crossings_of(json.loads((RUNS / args.variant / f"{args.name}.json").read_text()))
+    drop_added = set()
+    for tag in args.remove:
+        kind, idx, _ = view[int(tag.lstrip("r"))]
+        if kind == "c":
+            review["removed"] = sorted(set(review["removed"]) | {idx})
+        else:
+            drop_added.add(idx)
+    review["added"] = [e for k, e in enumerate(review["added"]) if k not in drop_added]
+    for tag in args.add:
+        e = dict(got[int(tag.lstrip("g"))])
+        e.pop("t_count", None)
+        e.update(source=args.variant)
+        review["added"].append(e)
+    if args.note:
+        review["notes"].append(args.note)
+    path.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n")
+    print(f"{args.name}: removed {len(review['removed'])}, added {len(review['added'])}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -222,8 +261,15 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("variant")
     r.add_argument("name")
     r.add_argument("--kind", choices=list(KINDS))
+    r = sub.add_parser("judge")
+    r.add_argument("variant")
+    r.add_argument("name")
+    r.add_argument("--remove", nargs="*", default=[], help="r<i>: reference crossings that were not real")
+    r.add_argument("--add", nargs="*", default=[], help="g<j>: crossings of the run that were real")
+    r.add_argument("--note")
     args = p.parse_args(argv)
-    return {"reference": cmd_reference, "run": cmd_run, "score": cmd_score, "review": cmd_review}[args.cmd](args)
+    return {"reference": cmd_reference, "run": cmd_run, "score": cmd_score, "review": cmd_review,
+            "judge": cmd_judge}[args.cmd](args)
 
 
 if __name__ == "__main__":
