@@ -69,6 +69,9 @@ WEB_PORT=8080
 GOOGLE_MAPS_API_KEY=
 """
 
+# nodes.json delle versioni precedenti: nodo01 era in piazza San Carlo (vedi default_camera_moved)
+OLD_DEFAULT_CAMERAS = [{"id": "nodo01", "name": "Via Roma, piazza San Carlo", "lat": 45.0679, "lon": 7.6829, "site": "urbano"}]
+
 log = logging.getLogger("app")
 
 
@@ -94,6 +97,16 @@ def read_config(path):
     return out
 
 
+def default_camera_moved(nodes):
+    """True se nodes.json nelle impostazioni è ancora quello copiato da una versione precedente e mai modificato:
+    va sostituito, perché la camera di nodo01 ora è in corso Castelfidardo. Un file toccato a mano resta com'è."""
+    try:
+        with open(nodes, encoding="utf-8") as f:
+            return json.load(f).get("nodes") == OLD_DEFAULT_CAMERAS
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
 def prepare_home(home):
     """Primo avvio: crea la cartella con config.env, certs/ e nodes.json."""
     os.makedirs(os.path.join(home, "certs"), exist_ok=True)
@@ -102,7 +115,7 @@ def prepare_home(home):
         with open(cfg, "w", encoding="utf-8") as f:
             f.write(CONFIG_TEMPLATE)
     nodes = os.path.join(home, "nodes.json")
-    if not os.path.exists(nodes):
+    if not os.path.exists(nodes) or default_camera_moved(nodes):
         shutil.copy(os.path.join(RESOURCES, "nodes.json"), nodes)
     return cfg
 
