@@ -25,6 +25,10 @@ Progetto per la sfida GOMA Smart Crossing di HackTurin, su Arduino UNO Q.
 | [`hardware/`](hardware/BOM.md) | circuito, sensori, distinta dei componenti | Kuzey Bicher |
 | [`docs/`](docs/CONTRACTS.md) | contratti tra le parti, logo in [`docs/brand/`](docs/brand/README.md) | tutti |
 
+**Documentazione di riferimento** (problema, sistema con diagrammi, dettagli di AI e comunicazioni, business plan):
+[italiano](docs/MDGB_DOCUMENTAZIONE.md) · [English](docs/MDGB_DOCUMENTATION.md). Tutti i documenti in inglese:
+[`docs/en/`](docs/en/README.md).
+
 Come avviare tutto sulla scheda: [`ai/docs/DEPLOY_UNOQ.md`](ai/docs/DEPLOY_UNOQ.md).
 Regole del team per git: [`PROMPT_GIT_TEAM.md`](PROMPT_GIT_TEAM.md). Specifica: [`PROMPT_SMART_CROSSING.md`](PROMPT_SMART_CROSSING.md).
 
