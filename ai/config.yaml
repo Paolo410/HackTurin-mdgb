@@ -30,6 +30,22 @@ source:
   samples_dir: samples            # default video folder (git-ignored); if empty the webcam is used
   video_extensions: [.mp4, .mov, .avi, .mkv, .m4v]
 
+camera:                           # the board's camera (IMX219 on CSI): exposure set once before it starts,
+                                  # because the automatic exposure of libcamera's software ISP does not settle
+  sensor: imx219                  # name of the sensor among /dev/v4l-subdev*
+  target_brightness: 125          # mean brightness (0-255) aimed at
+  brightness_band: [100, 150]     # nothing is changed while the measured brightness is in this band
+  attempts: 3                     # measure-and-set rounds at most (each about 2 s)
+  gain_base: 256                  # IMX219: analogue gain = 256 / (256 - code)
+  gain_min: 0                     # limits of the sensor's controls (v4l2-ctl --list-ctrls)
+  gain_max: 232
+  exposure_min: 4
+  exposure_max: 3522              # lines; raised only when the gain is at its top (a long exposure blurs motion)
+  measure_frames: 12              # frames read for one measurement,
+  measure_period_s: 0.1           # one every this long,
+  measure_keep: 5                 # the last ones are averaged
+  measure_timeout_s: 20
+
 tracking:
   track_activation_threshold: 0.30
   lost_track_buffer: 30           # frames a lost track is kept before its ID is dropped

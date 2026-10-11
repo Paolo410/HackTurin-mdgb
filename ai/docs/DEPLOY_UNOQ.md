@@ -99,6 +99,11 @@ Senza `calib.json` la visione conta i passaggi ma non misura velocità e non app
 
 ## 5. Camera
 
+> **Esposizione (11/10):** l'esposizione automatica di libcamera per questo sensore oscilla (un fotogramma su tre
+> molto più scuro). È spenta dalla taratura in `deploy/camera_tuning`; `scripts/camera_exposure.py` imposta il
+> guadagno una volta, prima che la camera parta, e resta fisso fino al prossimo avvio. Dettagli: `DECISIONS.md`,
+> punto 51. Clip di prova: `deploy/run_vision.sh record 30`.
+
 La camera della scheda è un sensore **IMX219 su CSI**, letto da libcamera: non è una webcam e OpenCV da solo non la
 apre. Basta lanciare il programma con `libcamerify` davanti (pacchetto `libcamera-v4l2`, già sulla scheda): OpenCV
 la vede come `/dev/video0`, 632x480.

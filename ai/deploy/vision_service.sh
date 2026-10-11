@@ -9,6 +9,10 @@ cd "$AI"
 ARGS="--source 0"
 if [ -s .vision_args ]; then ARGS="$(cat .vision_args)"; fi
 echo "vision source: $ARGS"
+# Camera without libcamera's automatic exposure, which does not settle (brightness cycling every three frames):
+# the tuning folder switches it off, and exposure and gain are set here, once, for the light of this moment.
+export LIBCAMERA_IPA_CONFIG_PATH="$AI/deploy/camera_tuning"
+case "$ARGS" in "--source 0"*) "${HOME:-/home/arduino}/venv/bin/python" scripts/camera_exposure.py || true ;; esac
 # libcamerify: the camera of the board is a CSI sensor read by libcamera (harmless with a video file).
 # $ARGS unquoted on purpose: it holds several options.
 exec /usr/bin/libcamerify "${HOME:-/home/arduino}/venv/bin/python" -u -m smartcrossing.app --profile unoq --headless \
