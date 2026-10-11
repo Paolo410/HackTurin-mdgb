@@ -35,3 +35,21 @@ l'assistente AI che guida il lancio della demo e il miglioramento del modello: [
 Regole del team per git: [`PROMPT_GIT_TEAM.md`](PROMPT_GIT_TEAM.md). Specifica: [`PROMPT_SMART_CROSSING.md`](PROMPT_SMART_CROSSING.md).
 
 Il logo è un segnaposto: proposte e varianti (mappa, trailer) in [`docs/brand/`](docs/brand/README.md).
+
+## Avviare la centrale da qualunque PC
+
+```bash
+python avvia_centrale.py        # python3 su Mac e Linux; dalla cartella del repo
+```
+
+Un solo comando: al primo avvio prepara le librerie in `app/.venv`, poi apre la centrale di `app/` (broker MQTT,
+dashboard, finestra) e annuncia in rete che questo PC è `mdgb-centrale.local`. La scheda è impostata una volta
+sola su quel nome (`MQTT_HOST=mdgb-centrale.local` in `comms/.env`) e segue il PC che lancia il comando: non serve
+cambiare indirizzi IP quando cambia la rete o il PC, né avere accesso alla scheda.
+
+- Una centrale alla volta: due PC che lo lanciano insieme si contendono il nome.
+- Va installato a mano solo il broker Mosquitto (`brew install mosquitto`, su Windows dal sito, su Linux `apt`).
+- Se la porta 8080 del PC è occupata, la dashboard usa la prima libera e lo scrive.
+- `comms/deploy/push_to_arduino.sh` senza `--broker` rimette nella scheda l'IP del PC da cui parte: per tenere il
+  nome va lanciato con `--broker mdgb-centrale.local`.
+
