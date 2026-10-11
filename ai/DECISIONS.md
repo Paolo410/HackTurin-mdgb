@@ -521,4 +521,16 @@ con v_ped 0,3 → 25 s.
       detector un fotogramma su due). La calibrazione di quel video è a occhio (punto 28): va verificato con una
       persona di altezza nota sulla camera vera. Sempre 0 veicoli nel verso lontano con il detector un
       fotogramma su due: dipende da linea di conteggio e frequenza, è da guardare a parte.
+43. **Benchmark sulla scheda con i video di prova (11/10, 03:40)**, chiesto da Paolo per vedere dal vivo, su MQTT
+    e sulla pagina del tecnico, come vengono analizzati:
+    - **video al posto della camera, senza `sudo`:** `run_vision.sh video <file> [--calib ...] [--once]` e
+      `run_vision.sh camera`. Il servizio esegue `deploy/vision_service.sh`, che legge la sorgente da
+      `ai/.vision_args`. Serve una sola password, per installare il servizio in questa forma;
+    - **il video si comporta come una camera:** in tempo reale salta i fotogrammi in ritardo
+      (`source.file_drop_late`). Prima una scheda più lenta del video lo vedeva al rallentatore, con numeri non
+      confrontabili con la camera;
+    - **`--loop`:** ricomincia dall'inizio senza fermarsi, e a ogni passata stampa la tabella dei tempi per fase;
+    - **prima prova:** Torino_1 sulla scheda a 8,4–8,6 FPS, auto contate e arrivate in centrale, 0 eventi persi,
+      nessun comando rifiutato dal Bridge;
+    - 21 video e le calibrazioni copiati in `~/HackTurin-mdgb/ai/samples/` sulla scheda (246 MB, fuori da git).
 

@@ -68,3 +68,37 @@ def test_default_source_prefers_samples_then_webcam(tmp_path):
     (tmp_path / "a.mov").touch()
     (tmp_path / "notes.txt").touch()
     assert default_source(cfg).endswith("a.mov")
+
+
+def test_a_looped_file_starts_again_and_its_timeline_goes_on(video):
+    source = FrameSource(str(video), load_config(), realtime=False, loop=True)
+    items = [source.read() for _ in range(N_FRAMES * 2 + N_FRAMES // 2)]
+    assert all(item is not None for item in items) and source.loops == 2
+    assert np.diff([t for _, t in items]) == pytest.approx(1 / FPS)        # no jump back in time at the restart
+
+
+class SlowClock:
+    """Fake time for the source: every frame handed over costs `cost` seconds of processing."""
+
+    def __init__(self, cost):
+        self.now, self.cost = 1000.0, cost
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+
+def test_in_real_time_a_slow_reader_gets_the_frames_a_camera_would_give(video, monkeypatch):
+    """A board slower than the video does not see it in slow motion: late frames are skipped."""
+    from smartcrossing import sources
+    clock = SlowClock(cost=0.1)                                             # 10 frames per second at most
+    monkeypatch.setattr(sources, "time", clock)
+    source = FrameSource(str(video), load_config(), realtime=True)
+    times = []
+    while (item := source.read()) is not None:
+        times.append(item[1])
+        clock.now += clock.cost
+    assert len(times) <= N_FRAMES // 3 + 1 and source.dropped >= N_FRAMES // 2
+    assert times[-1] - times[0] == pytest.approx(clock.now - clock.cost - 1000.0, abs=2 / FPS)  # video time = wall time

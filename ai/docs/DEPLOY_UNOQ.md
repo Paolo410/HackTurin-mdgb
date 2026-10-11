@@ -139,6 +139,24 @@ la visione gira lo stesso, il semaforo fa il suo ciclo normale e badge e antifur
 del codice: `push_to_arduino.sh ... --bridge --applab mdgb`, poi `sudo sh ~/mdgb-tools/installa_servizio_visione.sh`.
 `run_vision.sh` serve solo dove il servizio non è installato: se il servizio è attivo, non parte.
 
+### Benchmark e prove su un video registrato, come se arrivasse dalla camera
+
+I video di prova e le calibrazioni stanno in `~/HackTurin-mdgb/ai/samples/` sulla scheda (copiati a mano: non li porta
+`push_to_arduino.sh`). Senza `sudo`, da `~/HackTurin-mdgb/ai`:
+
+```bash
+deploy/run_vision.sh video samples/Torino_1.mp4 --calib samples/calib/torino_1.json   # in loop, finché non torni alla camera
+deploy/run_vision.sh video samples/Torino_night_1.mp4 --once                          # una passata, poi la tabella dei tempi
+deploy/run_vision.sh camera                                                            # di nuovo la camera
+journalctl -u mdgb-ai | grep -a -A8 "^pass "                                          # tempi per fase di ogni passata
+```
+
+- Tutto il resto funziona come con la camera: comandi al semaforo, pagina del tecnico (vista dal vivo con i riquadri),
+  eventi in centrale. Per non muovere il semaforo vero: in fondo al comando `--actuator sim`.
+- Gli eventi del video arrivano in centrale come `nodo01`: le statistiche del giorno li comprendono.
+- Il video va a velocità reale: se la scheda è più lenta, salta i fotogrammi in ritardo come farebbe con la camera
+  (`source.file_drop_late`).
+
 A mano, senza `sudo`, in background (resta accesa anche chiudendo ssh):
 
 ```bash

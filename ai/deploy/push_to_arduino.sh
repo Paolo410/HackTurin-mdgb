@@ -24,7 +24,7 @@ BRIDGE_PACKAGE="arduino-router-bridge==0.5.1"                       # same pin a
 case " $* " in *" --bridge "*) BRIDGE=1 ;; *) BRIDGE=0 ;; esac
 FILES=(ai/smartcrossing ai/config.yaml ai/calib.example.json ai/calib_thermal.example.json ai/requirements.txt
        ai/scripts/bench.py ai/scripts/operator_login.py ai/deploy/mdgb-ai.service ai/deploy/run_vision.sh
-       ai/models/yolox_nano_dynamic.onnx)
+       ai/deploy/vision_service.sh ai/models/yolox_nano_dynamic.onnx)
 [ -f "$ROOT/ai/calib.json" ] && FILES+=(ai/calib.json)            # the calibration of the mounted camera, if made
 [ -f "$ROOT/ai/calib_thermal.json" ] && FILES+=(ai/calib_thermal.json)
 [ -f "$ROOT/ai/models/yolox_nano_dynamic.onnx" ] || { echo "Manca il modello: lancia prima ai/scripts/get_model.sh"; exit 1; }

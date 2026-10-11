@@ -2,6 +2,12 @@
 # Starts and stops the vision on the board by hand, in the background (no sudo needed, unlike the service).
 #   ~/HackTurin-mdgb/ai/deploy/run_vision.sh start [more options of smartcrossing.app]
 #   ~/HackTurin-mdgb/ai/deploy/run_vision.sh stop | status | log
+# With the vision installed as a service (mdgb-ai), no sudo needed either:
+#   run_vision.sh video samples/Torino_1.mp4 --calib samples/calib/torino_1.json   a recorded video, in a loop, as if it
+#                                         came from the camera: same commands to the traffic light, page, events
+#   run_vision.sh video samples/X.mp4 --once     one pass, then the table of the times (and again, systemd restarts it)
+#   run_vision.sh camera                  back to the camera
+#   run_vision.sh restart                 restart the service (after a code update)
 # Log in ~/HackTurin-mdgb/logs/vision.log. The technician's page is on port 8090.
 set -euo pipefail
 AI="$(cd "$(dirname "$0")/.." && pwd)"
@@ -11,6 +17,22 @@ PIDFILE="$LOGS/vision.pid"
 running() { [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; }
 
 service_on() { systemctl is-active --quiet mdgb-ai 2>/dev/null; }
+
+# The service runs as this user: Ctrl+C to its process, and systemd starts it again with the new source.
+restart_service() {
+  local old new
+  old="$(systemctl show mdgb-ai -p MainPID --value)"
+  [ "$old" != 0 ] && kill -INT "$old"
+  for _ in $(seq 1 60); do
+    new="$(systemctl show mdgb-ai -p MainPID --value)"
+    if [ "$new" != 0 ] && [ "$new" != "$old" ]; then echo "Visione riavviata (pid $new). Log: journalctl -u mdgb-ai -f"; return 0; fi
+    sleep 0.5
+  done
+  echo "La visione non è ripartita: journalctl -u mdgb-ai -n 30"; return 1
+}
+need_service() {
+  service_on || { echo "Serve la visione installata come servizio (mdgb-ai): sudo sh ~/mdgb-tools/installa_servizio_visione.sh"; exit 1; }
+}
 
 case "${1:-status}" in
   start)
@@ -40,13 +62,36 @@ case "${1:-status}" in
     ;;
   status)
     if running; then echo "Visione accesa (pid $(cat "$PIDFILE"))."; grep -a "state=" "$LOG" | tail -2
-    elif service_on; then echo "Visione accesa come servizio (mdgb-ai). Log: journalctl -u mdgb-ai -n 20"
+    elif service_on; then echo "Visione accesa come servizio (mdgb-ai), sorgente: $(cat "$AI/.vision_args" 2>/dev/null || echo camera). Log: journalctl -u mdgb-ai -n 20"
     else echo "Visione spenta."; fi
     ;;
   log)
-    tail -f "$LOG"
+    if service_on; then journalctl -u mdgb-ai -f; else tail -f "$LOG"; fi
+    ;;
+  video)
+    need_service
+    [ -n "${2:-}" ] || { echo "uso: run_vision.sh video <file video> [--calib <calib.json>] [--once] [altre opzioni]"; exit 2; }
+    cd "$AI"
+    [ -f "$2" ] || { echo "Video non trovato: $2 (percorso da ~/HackTurin-mdgb/ai)"; exit 1; }
+    VIDEO="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
+    LOOP="--loop"
+    EXTRA=()
+    for a in "${@:3}"; do if [ "$a" = "--once" ]; then LOOP=""; else EXTRA+=("$a"); fi; done
+    echo "--source $VIDEO $LOOP ${EXTRA[*]:-}" > .vision_args
+    echo "Visione sul video $VIDEO ${LOOP:+(in loop)}: semaforo, pagina del tecnico ed eventi come con la camera."
+    restart_service
+    ;;
+  camera)
+    need_service
+    rm -f "$AI/.vision_args"
+    echo "Visione sulla camera."
+    restart_service
+    ;;
+  restart)
+    need_service
+    restart_service
     ;;
   *)
-    echo "uso: run_vision.sh start|stop|status|log"; exit 2
+    echo "uso: run_vision.sh start|stop|status|log|video|camera|restart"; exit 2
     ;;
 esac
