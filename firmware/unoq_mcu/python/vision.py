@@ -41,7 +41,7 @@ from smartcrossing.mcu import McuState  # noqa: E402
 from smartcrossing.overlay import KMH, ROLE_GROUP  # noqa: E402
 from smartcrossing.pipeline import PHASES, Pipeline  # noqa: E402
 
-from health import Health  # noqa: E402
+from health import Health, app_parts  # noqa: E402
 
 logger = Logger("mdgb-vision")
 
@@ -179,7 +179,7 @@ class VisionService:
         self.cfg = load_config(profile=PROFILE)
         self.mcu = McuState(self.cfg)
         self.log: deque = deque(maxlen=EVENT_LOG_LEN)  # last events for the page, in memory only
-        self.health = Health(on_change=self._health_changed)
+        self.health = Health(app_parts(), on_change=self._health_changed)
         self._started = time.time()
         self._viewers: set[str] = set()
         self._stop = threading.Event()
@@ -222,7 +222,7 @@ class VisionService:
 
     def _on_connect(self, sid: str) -> None:
         self._viewers.add(sid)
-        self.ui.send_message("config", {"live": LIVE_VIEW, "profile": PROFILE})
+        self.ui.send_message("config", {"mode": "app", "live": LIVE_VIEW, "profile": PROFILE})
 
     def _run_forever(self) -> None:
         while not self._stop.is_set():

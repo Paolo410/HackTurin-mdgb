@@ -19,7 +19,7 @@
       <nav class="nav" aria-label="Sezioni">
         <a href="#sec-overview">Panoramica</a>
         <a href="#sec-health">Sensori</a>
-        <a href="#sec-live">Vista dal vivo</a>
+        <a href="#sec-live" id="nav-live">Vista dal vivo</a>
         <a href="#sec-data">Traffico</a>
         <a href="#sec-log">Registro</a>
       </nav>
@@ -50,10 +50,10 @@
             <div class="rule">
               <div class="state" id="state">—</div>
               <p class="reason" id="reason">In attesa della visione…</p>
-              <div class="reqs" id="reqs"></div>
+              <div class="reqs app-only" id="reqs"></div>
             </div>
           </div>
-          <div class="displays">
+          <div class="displays app-only">
             <div>
               <small class="muted">Display conducenti (LCD)</small>
               <pre class="lcd" id="lcd">                </pre>
@@ -81,7 +81,19 @@
       </section>
 
       <!-- 3. Live view -->
-      <section id="sec-live" class="card">
+      <!-- 3b. Panel without the vision (unoq_panel): the camera belongs to the vision service -->
+      <section id="sec-vision-page" class="card panel-only">
+        <div class="card-head">
+          <div>
+            <h3>Vista dal vivo</h3>
+            <p class="sub">In questa versione la camera la usa il servizio della visione: l'immagine con i riquadri è sulla sua pagina.</p>
+          </div>
+        </div>
+        <a class="btn primary" id="vision-link" href="#" target="_blank" rel="noopener">Apri la pagina della visione ↗</a>
+        <p class="sub">Serve il badge sul lettore, poi utente e password.</p>
+      </section>
+
+      <section id="sec-live" class="card app-only">
         <div class="card-head">
           <div>
             <h3>Vista dal vivo</h3>
@@ -126,11 +138,11 @@
             <div class="bignum"><span id="fps">—</span><small>fotogrammi al secondo</small></div>
             <div class="bars" id="bars"></div>
             <dl class="kv">
-              <dt>Fotogrammi elaborati</dt><dd id="frames">—</dd>
-              <dt>Comandi allo sketch (C1)</dt><dd id="c1">—</dd>
-              <dt>Heartbeat accettati (C2)</dt><dd id="c2">—</dd>
-              <dt>Righe rifiutate</dt><dd id="rej">—</dd>
-              <dt>Profilo / ingresso AI</dt><dd id="profile">—</dd>
+              <dt class="app-only">Fotogrammi elaborati</dt><dd class="app-only" id="frames">—</dd>
+              <dt class="app-only">Comandi allo sketch (C1)</dt><dd class="app-only" id="c1">—</dd>
+              <dt class="app-only">Heartbeat accettati (C2)</dt><dd class="app-only" id="c2">—</dd>
+              <dt class="app-only">Righe rifiutate</dt><dd class="app-only" id="rej">—</dd>
+              <dt class="app-only">Profilo / ingresso AI</dt><dd class="app-only" id="profile">—</dd>
               <dt>Attiva da</dt><dd id="uptime">—</dd>
             </dl>
           </details>

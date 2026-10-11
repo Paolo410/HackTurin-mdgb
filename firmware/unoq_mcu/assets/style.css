@@ -378,3 +378,10 @@ small, .small { font-size: 0.8rem; }
   .log li > span:last-child { grid-column: 1 / -1; }
   .displays { grid-template-columns: 1fr; }
 }
+
+/* ---------- the two versions of the page ---------- */
+/* mode-panel: app without the vision inside (unoq_panel), set by the "config" message of the board */
+.panel-only { display: none; }
+.mode-panel .panel-only { display: block; }
+.mode-panel .app-only { display: none !important; }
+.btn.primary { display: inline-block; background: var(--accent); color: #fff; border-color: var(--accent); text-decoration: none; font-weight: 700; }

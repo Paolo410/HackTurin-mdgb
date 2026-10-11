@@ -1,13 +1,18 @@
 """Health of every part of the node, for the technician: is each sensor sending plausible values?
 
-Every part reports with Health.seen(key, value): the sketch notifications from main.py, the camera, the AI and
-the link from vision.py. Health.evaluate() turns age and value into one status per part:
+Every part reports with Health.seen(key, value). Health.evaluate() turns age and value into one status per part:
 
     ok        sends plausible values
     warn      sends values, but something looks wrong (lens covered, light always 0, slow AI...)
     fault     no data within its timeout, or impossible values
     waiting   nothing yet, still within STARTUP_GRACE_S of the start
     untested  works only on demand (badge reader): needs a test by the technician
+
+Two sets of parts:
+- app_parts(): the app with the vision inside (vision.py): camera, AI and link measured directly;
+- panel_parts(): the app without the vision (unoq_panel/panel.py): camera and AI read from the status lines that
+  the vision service writes in data/c3, the link from the messages of the sketch.
+The sensors of the sketch are the same in both.
 
 Pure Python, no Arduino import: it can be tried on the PC.
 """
@@ -30,6 +35,9 @@ ACCEL_MIN_G, ACCEL_MAX_G = 0.65, 1.15   # same thresholds as the anti-theft alar
 AHT20_ZERO_C = -49.9         # raw reading 0 -> -50 C: the sensor did not answer (Adafruit AHTX0 formula)
 LIGHT_SAMPLES = 10           # light readings kept to tell a stuck sensor from a dark scene
 LIGHT_SATURATED = 1020
+C3_STATUS_S = 12.0           # the vision service writes a status line every 5 s (ai/config.yaml, logger)
+
+Judge = Callable[[object, deque], tuple[str, str, str]]   # (value, history) -> (status, detail, shown)
 
 
 @dataclass
@@ -37,10 +45,11 @@ class Part:
     key: str
     name: str
     where: str                  # where it is connected, for the technician
-    timeout_s: float | None     # None = sends only on demand (no timeout)
+    timeout_s: float | None     # None = sends only when something happens (no timeout)
     hint: str                   # what to do when it does not work
+    judge: Judge
     stale: str = "nessun dato da {age:.0f} s"
-    untested: str = ""
+    never: tuple[str, str] = (FAULT, "nessun dato dall'avvio dell'app")   # nothing at all after the start
     last_t: float | None = None
     value: object = None
     history: deque = field(default_factory=lambda: deque(maxlen=LIGHT_SAMPLES))
@@ -48,42 +57,9 @@ class Part:
     detail: str = ""
 
 
-def _parts() -> list[Part]:
-    return [
-        Part("camera", "Camera", "camera della scheda (CSI o USB)", 2.0,
-             "Controlla il cavo flat della camera e che nessun altro programma la stia usando "
-             "(run_vision.sh, servizio mdgb-ai). Verifiche in firmware/README.md, sezione Camera.",
-             stale="nessuna immagine da {age:.0f} s"),
-        Part("ai", "Riconoscimento (AI)", "YOLOX-nano + tracking sulla CPU", 3.0,
-             "Guarda i log dell'app in App Lab: la visione si riavvia da sola dopo un errore. "
-             "Se è solo lenta, chiudi le altre app sulla scheda.",
-             stale="nessun fotogramma elaborato da {age:.0f} s"),
-        Part("link", "Collegamento con lo sketch", "Bridge Linux ↔ microcontrollore", 3.0,
-             "Riavvia l'app da App Lab. Se resta così, ricarica lo sketch. Intanto il semaforo fa il ciclo normale.",
-             stale="la visione non manda heartbeat da {age:.0f} s: lo sketch è in fail-safe"),
-        Part("lamp", "Ciclo del semaforo", "LED pin 11-13 comandati dallo sketch", 60.0,
-             "Lo sketch non segnala cambi di fase: riavvia l'app; se persiste ricarica lo sketch.",
-             stale="nessun cambio di fase da {age:.0f} s"),
-        Part("accel", "Accelerometro", "Modulino Movement, porta Qwiic", SKETCH_SENSOR_S,
-             "Controlla il cavo Qwiic del Modulino Movement e che sia fissato bene al supporto della camera."),
-        Part("env", "Temperatura e umidità", "AHT20, porta I2C dello shield", SKETCH_SENSOR_S,
-             "Controlla il cavo Grove dell'AHT20 sulla porta I2C dello shield (selettore su 3,3 V)."),
-        Part("air", "Qualità dell'aria", "SGP30, porta I2C dello shield", SKETCH_SENSOR_S,
-             "Controlla il cavo Grove dell'SGP30 sulla porta I2C dello shield."),
-        Part("light", "Sensore di luce", "pin A0 dello shield", SKETCH_SENSOR_S,
-             "Controlla il cavo Grove sul pin A0 e che il sensore non sia coperto."),
-        Part("rfid", "Lettore badge", "lettore RFID su Serial1", None,
-             "Passa il badge: se non compare nulla controlla il cavo e l'alimentazione del lettore.",
-             untested="passa il badge sul lettore per provarlo"),
-        Part("storage", "Salvataggio eventi", "file C3 nella cartella data/ dell'app", 5.0,
-             "Controlla lo spazio libero sulla scheda (df -h) e i permessi della cartella data/ dell'app.",
-             stale="la visione è ferma da {age:.0f} s: nessun evento salvato"),
-    ]
+# ---------- judgements: (value, history) -> (status, detail, shown) ----------
 
-
-# ---------- per-part judgement: value -> (status, detail, display) ----------
-
-def _camera(v: dict):
+def _camera(v: dict, _):
     shown = f"{v['w']}×{v['h']}" + (f" · luminosità {v['lum']:.0f}/255" if v.get("lum") is not None else "")
     if v.get("fault") == "lens_covered":
         return WARN, "immagine senza dettagli: lente coperta, sporca o sfocata", shown
@@ -92,14 +68,14 @@ def _camera(v: dict):
     return OK, "immagini regolari", shown
 
 
-def _ai(v: dict):
+def _ai(v: dict, _):
     shown = f"{v['fps']:.1f} FPS" + (f" · rilevamento {v['detect_ms']:.0f} ms" if v.get("detect_ms") else "")
     if v["fps"] and v["fps"] < AI_MIN_FPS:
         return WARN, f"lenta: {v['fps']:.1f} FPS (servono almeno {AI_MIN_FPS:.0f})", shown
     return OK, "riconosce persone, veicoli e animali", shown
 
 
-def _link(v: dict):
+def _link(v: dict, _):
     shown = f"comandi {v['c1']} · heartbeat {v['c2']}"
     if v["failsafe"]:
         return FAULT, "lo sketch non accetta gli heartbeat: è in fail-safe (ciclo normale)", shown
@@ -108,14 +84,38 @@ def _link(v: dict):
     return OK, "lo sketch riceve i comandi della visione", shown
 
 
+def _c3_camera(v: dict, _):
+    """Status line of the vision service (C3): it is written only while frames arrive."""
+    shown = f"stato {v.get('state', '?')}"
+    if v.get("state") == "DEGRADED":
+        return WARN, "la visione si dichiara non affidabile: lente coperta, abbagliamento o guasto lampada", shown
+    return OK, "la visione riceve immagini", shown
+
+
+def _c3_ai(v: dict, _):
+    fps = float(v.get("fps") or 0.0)
+    detect = (v.get("lat_ms") or {}).get("detect")
+    shown = f"{fps:.1f} FPS" + (f" · rilevamento {detect} ms" if detect is not None else "")
+    if fps < AI_MIN_FPS:
+        return WARN, f"lenta: {fps:.1f} FPS (servono almeno {AI_MIN_FPS:.0f})", shown
+    return OK, "riconosce persone, veicoli e animali", shown
+
+
+def _sketch_link(v: str, _):
+    """What the sketch says about the heartbeat of the vision (led_status messages)."""
+    if v == "failsafe":
+        return FAULT, "visione assente: lo sketch è in fail-safe (ciclo normale)", "fail-safe"
+    return OK, "lo sketch riceve gli heartbeat: semaforo adattivo", "collegata"
+
+
 _LAMP_NAMES = {"green": "verde", "yellow": "giallo", "red": "rosso"}
 
 
-def _lamp(v: str):
+def _lamp(v: str, _):
     return OK, "lo sketch cambia fase regolarmente", f"fase veicoli: {_LAMP_NAMES.get(v, v)}"
 
 
-def _accel(v):
+def _accel(v, _):
     x, y, z = v
     g = math.sqrt(x * x + y * y + z * z)
     shown = f"{g:.2f} g"
@@ -126,7 +126,7 @@ def _accel(v):
     return OK, "fermo, nessuna scossa", shown
 
 
-def _env(v):
+def _env(v, _):
     t, rh = v
     shown = f"{t:.1f} °C · {rh:.0f} %"
     if t <= AHT20_ZERO_C:
@@ -136,7 +136,7 @@ def _env(v):
     return OK, "valori plausibili", shown
 
 
-def _air(v):
+def _air(v, _):
     eco2, tvoc = v
     shown = f"eCO₂ {eco2} ppm · TVOC {tvoc} ppb"
     if eco2 == 400 and tvoc == 0:
@@ -154,11 +154,11 @@ def _light(v, history: deque):
     return OK, "valori plausibili", shown
 
 
-def _rfid(v: str):
+def _rfid(v: str, _):
     return OK, "ha letto almeno un badge", f"ultimo: {v}"
 
 
-def _storage(v: dict):
+def _storage(v: dict, _):
     if not v["enabled"]:
         return WARN, "salvataggio disattivato in config.yaml (logger.enabled)", "spento"
     if v.get("error"):
@@ -166,22 +166,86 @@ def _storage(v: dict):
     return OK, "gli eventi vengono salvati", f"{v['written']} righe salvate"
 
 
-_JUDGES = {"camera": _camera, "ai": _ai, "link": _link, "lamp": _lamp, "accel": _accel, "env": _env,
-           "air": _air, "rfid": _rfid, "storage": _storage}
+# ---------- the parts ----------
+
+def _sketch_parts() -> list[Part]:
+    """Everything the sketch reports, the same in both apps."""
+    return [
+        Part("lamp", "Ciclo del semaforo", "LED pin 11-13 comandati dallo sketch", 60.0,
+             "Lo sketch non segnala cambi di fase: riavvia l'app; se persiste ricarica lo sketch.", _lamp,
+             stale="nessun cambio di fase da {age:.0f} s"),
+        Part("accel", "Accelerometro", "Modulino Movement, porta Qwiic", SKETCH_SENSOR_S,
+             "Controlla il cavo Qwiic del Modulino Movement e che sia fissato bene al supporto della camera.", _accel),
+        Part("env", "Temperatura e umidità", "AHT20, porta I2C dello shield", SKETCH_SENSOR_S,
+             "Controlla il cavo Grove dell'AHT20 sulla porta I2C dello shield (selettore su 3,3 V).", _env),
+        Part("air", "Qualità dell'aria", "SGP30, porta I2C dello shield", SKETCH_SENSOR_S,
+             "Controlla il cavo Grove dell'SGP30 sulla porta I2C dello shield.", _air),
+        Part("light", "Sensore di luce", "pin A0 dello shield", SKETCH_SENSOR_S,
+             "Controlla il cavo Grove sul pin A0 e che il sensore non sia coperto.", _light),
+        Part("rfid", "Lettore badge", "lettore RFID su Serial1", None,
+             "Passa il badge: se non compare nulla controlla il cavo e l'alimentazione del lettore.", _rfid,
+             never=(UNTESTED, "passa il badge sul lettore per provarlo")),
+    ]
+
+
+def app_parts() -> list[Part]:
+    """The app with the vision inside (unoq_mcu/python/vision.py)."""
+    return [
+        Part("camera", "Camera", "camera della scheda (CSI o USB)", 2.0,
+             "Controlla il cavo flat della camera e che nessun altro programma la stia usando "
+             "(run_vision.sh, servizio mdgb-ai). Verifiche in firmware/README.md, sezione Camera.", _camera,
+             stale="nessuna immagine da {age:.0f} s"),
+        Part("ai", "Riconoscimento (AI)", "YOLOX-nano + tracking sulla CPU", 3.0,
+             "Guarda i log dell'app in App Lab: la visione si riavvia da sola dopo un errore. "
+             "Se è solo lenta, chiudi le altre app sulla scheda.", _ai,
+             stale="nessun fotogramma elaborato da {age:.0f} s"),
+        Part("link", "Collegamento con lo sketch", "Bridge Linux ↔ microcontrollore", 3.0,
+             "Riavvia l'app da App Lab. Se resta così, ricarica lo sketch. Intanto il semaforo fa il ciclo normale.",
+             _link, stale="la visione non manda heartbeat da {age:.0f} s: lo sketch è in fail-safe"),
+        *_sketch_parts(),
+        Part("storage", "Salvataggio eventi", "file C3 nella cartella data/ dell'app", 5.0,
+             "Controlla lo spazio libero sulla scheda (df -h) e i permessi della cartella data/ dell'app.", _storage,
+             stale="la visione è ferma da {age:.0f} s: nessun evento salvato"),
+    ]
+
+
+_VISION_SERVICE_HINT = ("La visione gira fuori da App Lab. Sulla scheda: ~/HackTurin-mdgb/ai/deploy/run_vision.sh status "
+                        "(e start). Perché questo pannello la veda deve scrivere gli eventi in "
+                        "~/ArduinoApps/mdgb/data/c3 (push_to_arduino.sh --applab mdgb).")
+
+
+def panel_parts() -> list[Part]:
+    """The app without the vision (unoq_panel/): the vision is a separate service, read through its C3 files."""
+    return [
+        Part("camera", "Camera", "letta dal servizio della visione", C3_STATUS_S,
+             "Se la visione è accesa ma non scrive: controlla il cavo flat della camera e che nessun altro "
+             "programma la stia usando (verifiche in firmware/README.md). " + _VISION_SERVICE_HINT, _c3_camera,
+             stale="nessuna notizia dalla visione da {age:.0f} s: è spenta o non riceve immagini",
+             never=(FAULT, "nessuna riga di stato in data/c3: visione spenta o eventi scritti altrove")),
+        Part("ai", "Riconoscimento (AI)", "servizio della visione (YOLOX-nano)", C3_STATUS_S,
+             _VISION_SERVICE_HINT, _c3_ai,
+             stale="nessuna notizia dalla visione da {age:.0f} s",
+             never=(FAULT, "nessuna riga di stato in data/c3: visione spenta o eventi scritti altrove")),
+        Part("link", "Collegamento visione → sketch", "heartbeat via Bridge, visto dallo sketch", None,
+             "Accendi la visione (run_vision.sh start). Intanto il semaforo fa il ciclo normale.", _sketch_link,
+             never=(WARN, "lo sketch non ha ancora detto se la visione è collegata")),
+        *_sketch_parts(),
+    ]
+
 
 _STATUS_WORDS = {OK: "funziona", WARN: "da controllare", FAULT: "non funziona", WAITING: "in attesa",
                  UNTESTED: "da provare"}
 
 
 class Health:
-    def __init__(self, clock: Callable[[], float] = time.monotonic,
+    def __init__(self, parts: list[Part], clock: Callable[[], float] = time.monotonic,
                  on_change: Callable[[str, str], None] | None = None):
         """on_change(level, text): called when a part changes status (level: "info" or "warning")."""
-        self.parts = {p.key: p for p in _parts()}
+        self.parts = {p.key: p for p in parts}
         self._clock = clock
         self._t0 = clock()
         self._on_change = on_change
-        self._lock = threading.Lock()   # values arrive from the Bridge threads and from the vision thread
+        self._lock = threading.Lock()   # values arrive from the Bridge threads and from the other threads
         self._startup_reported = False
 
     def seen(self, key: str, value=None) -> None:
@@ -219,11 +283,9 @@ class Health:
 
     def _judge(self, part: Part, now: float) -> tuple[str, str, str]:
         if part.last_t is None:
-            if part.timeout_s is None:
-                return UNTESTED, part.untested, "—"
-            if now - self._t0 < STARTUP_GRACE_S:
+            if part.never[0] != UNTESTED and now - self._t0 < STARTUP_GRACE_S:
                 return WAITING, "in attesa del primo dato", "—"
-            return FAULT, "nessun dato dall'avvio dell'app", "—"
+            return part.never[0], part.never[1], "—"
         age = now - part.last_t
         if part.timeout_s is not None and age > part.timeout_s:
             _, _, shown = self._value(part)
@@ -233,9 +295,7 @@ class Health:
     @staticmethod
     def _value(part: Part) -> tuple[str, str, str]:
         try:
-            if part.key == "light":
-                return _light(part.value, part.history)
-            return _JUDGES[part.key](part.value)
+            return part.judge(part.value, part.history)
         except (TypeError, ValueError, KeyError, IndexError):
             return WARN, "valore non leggibile", str(part.value)
 

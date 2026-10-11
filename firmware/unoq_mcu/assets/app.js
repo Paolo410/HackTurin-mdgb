@@ -12,12 +12,12 @@ const GROUP_COLORS = {
 };
 const STATE_COLORS = {
   IDLE: "#7a828c", PRESENCE: "#d0d4d9", WARN_DRIVER: "#ffaa00", WARN_PEDESTRIAN: "#ff4d4f",
-  ANIMAL_WARN: "#ffaa00", ANIMAL_ALERT: "#ff7a1a", DEGRADED: "#ffe14d",
+  ANIMAL_WARN: "#ffaa00", ANIMAL_ALERT: "#ff7a1a", DEGRADED: "#ffe14d", UNKNOWN: "#7a828c",
 };
 const STATE_NAMES = {
   IDLE: "Strada libera", PRESENCE: "Pedone presente", WARN_DRIVER: "Avviso ai conducenti",
   WARN_PEDESTRIAN: "Avviso ai pedoni", ANIMAL_WARN: "Animale vicino", ANIMAL_ALERT: "Animale in strada",
-  DEGRADED: "Visione non affidabile",
+  DEGRADED: "Visione non affidabile", UNKNOWN: "Visione non disponibile",
 };
 const ROLE_NAMES = {
   pedestrian: "pedoni", cyclist: "ciclisti", motorcyclist: "motociclisti", car: "auto", bus: "bus",
@@ -65,6 +65,11 @@ const ui = new WebUI();
 ui.on_connect(() => { connected = true; showConn(); });
 ui.on_disconnect(() => { connected = false; showConn(); showHero(); });
 ui.on_message("config", (cfg) => {
+  // "panel": app without the vision inside; the live view is on the page of the vision service.
+  const panel = cfg.mode === "panel";
+  document.body.classList.toggle("mode-panel", panel);
+  $("nav-live").href = panel ? "#sec-vision-page" : "#sec-live";
+  if (cfg.vision_port) $("vision-link").href = `http://${window.location.hostname}:${cfg.vision_port}/`;
   $("privacy").textContent = cfg.live
     ? "Le immagini non vengono mai salvate: si producono solo mentre questa pagina è aperta."
     : "Vista dal vivo disattivata (MDGB_LIVE_VIEW=0): solo riquadri e numeri.";
