@@ -12,14 +12,43 @@ ciascuna delle prossime 24 ore. Quattro passi:
 1. **Modello.** Un gradient boosting (uno per classe, loss di Poisson) trasforma calendario e contesto
    dell'attraversamento in un conteggio atteso per finestre di 15 minuti.
 2. **Calibrazione.** Lo storico del nodo dice quanto quell'attraversamento si scosta da ciò che il contesto fa
-   prevedere (un fattore per classe, tra 0,1 e 10, che resta vicino a 1 finché i conteggi sono pochi).
+   prevedere (un fattore per classe, tra 0,05 e 20, che resta vicino a 1 finché i conteggi sono pochi).
 3. **Fusione.** Le ultime finestre contate dal nodo correggono la stima di adesso (Gamma-Poisson: il modello pesa
-   quanto 15 minuti di conteggi, una finestra vecchia di 30 minuti pesa la metà).
+   quanto 10 passaggi attesi, una finestra vecchia di 30 minuti pesa la metà). Quanto indietro guardare dipende da
+   quanto c'è da contare: si aggiungono finestre, dalla più recente, finché non ci si aspettano 80 passaggi. Un
+   attraversamento affollato segue l'ultima finestra, uno tranquillo ne media molte. Se i conteggi smentiscono
+   il modello (dieci volte le persone attese) il modello perde subito peso, invece di frenare la stima per un'ora.
 4. **Prossime ore.** La previsione parte dalla stima di adesso e torna al modello calibrato: ciò che adesso è
    insolito (una folla, una strada vuota) si dimezza a ogni ora.
 
 Una camera che non manda dati (mai collegata, spenta, rete giù) ha comunque la stima del solo modello. Con i
 conteggi dell'ultima ora la centrale dice anche se il passaggio è nella norma, sopra o sotto il solito.
+
+## Metriche e verifica della stima
+
+- **Metriche della camera** (`analytics.py`), sulle ultime 24 ore: conteggi dell'ultima ora, di oggi e ora per ora
+  (con la quota di ogni ora davvero misurata), ora di punta, quota di pedoni in un verso; precedenza data, quasi
+  incidenti per 1000 attraversamenti, pedoni fragili, incidenti per tipo.
+- **Verifica della stima** (`service.quality`): ogni finestra già contata viene stimata con i soli dati disponibili
+  prima che iniziasse, e l'errore medio (pedoni per finestra) si confronta con due riferimenti: ripetere l'ultimo
+  conteggio, e il solo modello senza la camera. Serve almeno una ventina di finestre.
+
+Cosa ha mostrato la verifica, su conteggi inventati (Poisson intorno a un ritmo noto):
+
+| Situazione | Media per finestra | Stima | Ripetere l'ultimo | Solo modello |
+|---|---|---|---|---|
+| Affollato, finestre da 15 min, ritmo del modello | 90,5 | 15,1 | 13,9 | 40,6 |
+| Affollato, 15 min, ritmo in ritardo di un'ora | 79,1 | 15,4 | 13,0 | 37,5 |
+| Affollato, 15 min, conteggi piatti giorno e notte | 128,0 | 12,9 | 13,0 | 78,2 |
+| Affollato, finestre da 1 min | 11,4 | 3,3 | 3,9 | 5,6 |
+| Tranquillo, 15 min | 4,1 | 1,9 | 2,6 | 3,1 |
+
+Dove i passaggi sono molti la stima vale quanto ripetere l'ultimo conteggio (poco peggio); dove sono pochi è
+meglio. La prima versione faceva la media di due ore di finestre anche dove bastava l'ultima, e sui conteggi alti
+sbagliava più del doppio: la verifica è nata per questo, e ora si vede nella dashboard e nell'API per ogni camera.
+
+Metriche, stime e previsioni escono dalla centrale su MQTT e con un'API a chiavi per i clienti:
+[`docs/DATA_API.md`](../../docs/DATA_API.md).
 
 ## Nella centrale
 
@@ -112,11 +141,11 @@ aggregati direttamente nel database della centrale.
 L'app impacchettata (`build_mac.sh`, `build_windows.ps1`) contiene il modello: l'autotest della build controlla anche
 che `/api/forecast/nodo01` risponda.
 
-Test, senza rete (67 del modello, 12 della dashboard):
+Test, senza rete (80 del modello, 29 della centrale):
 
 ```bash
-cd ai && python -m pytest tests/test_forecast.py tests/test_forecast_sources.py tests/test_forecast_service.py -q
-python -m pytest comms/tests/test_dashboard.py -q          # dalla root: endpoint e pagina della centrale
+cd ai && python -m pytest tests/test_forecast.py tests/test_forecast_sources.py tests/test_forecast_service.py tests/test_forecast_analytics.py -q
+python -m pytest comms/tests/test_dashboard.py comms/tests/test_customers.py -q     # dalla root
 ```
 
 | File | Cosa controlla |
@@ -124,7 +153,9 @@ python -m pytest comms/tests/test_dashboard.py -q          # dalla root: endpoin
 | `ai/tests/test_forecast.py` | il percorso principale: modello, feature, fusione, fonti, cache, servizio |
 | `ai/tests/test_forecast_sources.py` | lo scambio HTTP vero (server sul PC di prova), i casi limite di ESA WorldCover e OpenStreetMap, le richieste a Google, la cache quando una fonte cade o più camere si aggiornano insieme |
 | `ai/tests/test_forecast_service.py` | calendario e festività, lettura degli alberi, intervalli, previsione oraria, anomalie, simulatore e addestramento; e che il runtime usi solo la libreria standard, sia Python 3.9 e sia tutto nel pacchetto dell'app |
+| `ai/tests/test_forecast_analytics.py` | metriche di traffico e sicurezza, stima di adesso, verifica della stima sui conteggi successivi |
 | `comms/tests/test_dashboard.py` | `/api/flow` e `/api/forecast` dagli aggregati del nodo, modello assente, autotest dell'app, coerenza della pagina (id, colori, indirizzi chiamati) |
+| `comms/tests/test_customers.py` | chiavi (impronta, scadenza, revoca), zone, API dei clienti (permessi, limite di richieste, CSV, zona senza camere), messaggi su MQTT |
 
 I test che addestrano un modello si saltano da soli dove mancano numpy e scikit-learn (per esempio nella build dell'app).
 La parte in JavaScript della pagina (aloni, cursore, grafico) non ha test automatici: è stata provata a mano nel browser.
@@ -162,7 +193,8 @@ da ciò che nessuna fonte vede (nel simulatore `site_effect` e `in_bias`): è la
 | `context.py` | cache su disco del contesto, aggiornata in background | libreria standard |
 | `model.py` | legge `model.json` e calcola la stima | libreria standard |
 | `fusion.py` | calibrazione e fusione con i conteggi del nodo | libreria standard |
-| `service.py` | `Forecaster.forecast(camera, finestre)`: stima di adesso e delle prossime 24 ore | libreria standard |
+| `analytics.py` | metriche di traffico e sicurezza delle ultime 24 ore | libreria standard |
+| `service.py` | `Forecaster.forecast(camera, finestre)`: stima di adesso, prossime 24 ore, verifica della stima | libreria standard |
 | `simulate.py`, `train.py` | storico simulato e addestramento | numpy, scikit-learn |
 | `model.json` | gli alberi addestrati (214 KB di testo) | — |
 
