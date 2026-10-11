@@ -74,6 +74,9 @@ class Tracker:
         self.edge_margin = None if k["edge_margin"] is None else float(k["edge_margin"])
         self.height_samples = int(cfg["attributes"]["height_samples"])
         self.height_min_box_px = float(cfg["attributes"]["height_min_box_px"])
+        # Boxes below this score only keep a track alive (ByteTrack's second association): they are often cut,
+        # so they neither measure a height nor vote for the class.
+        self.measure_min_conf = float(t["measure_min_conf"])
         with warnings.catch_warnings():
             # Known deprecation of sv.ByteTrack: the version is pinned, see the module docstring.
             warnings.simplefilter("ignore", FutureWarning)
@@ -98,8 +101,10 @@ class Tracker:
         if tracked.tracker_id is None:
             return tracked
         metric = geometry is not None and geometry.metric
-        for xyxy, class_id, track_id in zip(tracked.xyxy, tracked.class_id, tracked.tracker_id):
+        scores = tracked.confidence if tracked.confidence is not None else [1.0] * len(tracked)
+        for xyxy, class_id, track_id, score in zip(tracked.xyxy, tracked.class_id, tracked.tracker_id, scores):
             track_id = int(track_id)
+            sure = float(score) >= self.measure_min_conf
             state = self.tracks.get(track_id)
             if state is None:
                 state = TrackState(track_id=track_id, first_t=t, history=deque(maxlen=self.history_len),
@@ -110,12 +115,13 @@ class Tracker:
                 self.tracks[track_id] = state
             foot = (float((xyxy[0] + xyxy[2]) / 2), float(xyxy[3]))   # bottom centre: on the ground
             if metric:
-                self._update_metric(state, xyxy, foot, t, geometry)
+                self._update_metric(state, xyxy, foot, t, geometry, sure)
             state.age += 1
             state.last_t = t
             state.last_frame = self._frame
             state.history.append((t, foot[0], foot[1]))
-            state.class_votes[int(class_id)] += 1
+            if sure or not state.class_votes:   # a track first seen on a weak box still needs a class
+                state.class_votes[int(class_id)] += 1
         self._drop_stale()
         return tracked
 
@@ -127,7 +133,8 @@ class Tracker:
                 return False   # the object is entering or leaving the image: its box is cut
         return geometry.metres_per_pixel(*foot) <= self.max_metres_per_px
 
-    def _update_metric(self, state: TrackState, xyxy, foot: tuple[float, float], t: float, geometry) -> None:
+    def _update_metric(self, state: TrackState, xyxy, foot: tuple[float, float], t: float, geometry,
+                       sure: bool = True) -> None:
         position = geometry.to_ground(*foot)
         if not self._measurable(xyxy, foot, geometry):
             # Keep the position (zones still work) but forget the speed: it is not known here.
@@ -181,7 +188,7 @@ class Tracker:
             # height is a rough estimate), the box is not tiny (2 px are 10% of 20 px), and it does not
             # touch the top of the image (the head is cut).
             top_inside = self.edge_margin is None or xyxy[1] > self.edge_margin * geometry.height
-            if geometry.camera is not None and box_h >= self.height_min_box_px and top_inside:
+            if sure and geometry.camera is not None and box_h >= self.height_min_box_px and top_inside:
                 state.precise_heights.append(height)
         state.length_m = geometry.size_in_metres(float(xyxy[2] - xyxy[0]), *foot)
 

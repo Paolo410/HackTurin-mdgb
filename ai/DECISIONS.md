@@ -478,4 +478,27 @@ con v_ped 0,3 → 25 s.
       `~/HackTurin-mdgb/backups/`) e zip per Salvatore aggiornato;
     - **provato:** visione interrotta → riga di fail-safe dopo circa 0,7 s → la centrale mostra "nodo guasto
       (semaforo in fail-safe)" → con la visione ripartita da sola torna "nodo OK" dopo 12 s.
+42. **Tracce che non si spezzano (11/10, notte)**, misurato su 13 video di prova, compreso il nuovo
+    `Torino_night_1.mp4` (notte, 4 min 48 s, ripreso dall'alto, non calibrato):
+    - **problema:** con i limiti della scheda le tracce duravano meno di 1 s in mediana, di notte (0,8 s) come di
+      giorno (Torino_1 0,9 s, Shibuya 0,8 s). Un pedone che attraversa diventava più "persone": conteggi doppi,
+      attributi mai decisi. Non è un effetto del buio;
+    - **causa:** il detector passava al tracker solo i riquadri sopra 0,30, quindi il secondo aggancio di
+      ByteTrack (riquadri tra 0,1 e la soglia) non lavorava mai. Con 5–6 rilevamenti al secondo lo spostamento
+      tra due rilevamenti superava anche la tolleranza dell'aggancio;
+    - **scelta:** `model.conf` 0,10 e `tracking.minimum_matching_threshold` 0,9 (era 0,8), scelte su 4 varianti.
+      Le tracce nuove nascono comunque solo da riquadri sopra 0,4 (regola di ByteTrack). Altezza e voto di
+      classe solo dai riquadri sopra 0,30 (`tracking.measure_min_conf`): quelli deboli sono spesso tagliati e
+      facevano salire i falsi "bambini";
+    - **risultati** (`--emulate-unoq`, prima → dopo):
+      - durata mediana delle tracce: notte 0,8 → 1,7 s; Torino_1 0,9 → 1,5 s; Torino_3 1,2 → 2,0 s; Shibuya 0,8 → 1,4 s;
+      - tracce sotto 1 s su Torino_1: 54 → 28;
+      - veicoli contati su Torino_1: 20+5 → **23+10** (riferimento a 30 FPS e 512 px: 22+13);
+      - con il detector un fotogramma su due (come sulla scheda): notte, tracce sotto 1 s 12 → 3; veicoli su
+        Torino_1 12+0 → 18+0;
+    - **sulla scheda:** 8,8 FPS come prima, detector 125 ms;
+    - **non risolto:** i "bambini" su Torino_1 salgono da 9 a 11 con `--emulate-unoq` (restano 5 con il
+      detector un fotogramma su due). La calibrazione di quel video è a occhio (punto 28): va verificato con una
+      persona di altezza nota sulla camera vera. Sempre 0 veicoli nel verso lontano con il detector un
+      fotogramma su due: dipende da linea di conteggio e frequenza, è da guardare a parte.
 
