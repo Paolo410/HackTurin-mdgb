@@ -159,7 +159,8 @@ class Pipeline:
             valid = self.tracker.valid_mask(tracked)
             self._update_attributes(tracked, roles, t, frame)
             if self.counter is not None:
-                events = [self._describe(event) for event in self.counter.update(tracked, roles, valid)]
+                born = {i: state.first_t for i, state in self.tracker.tracks.items()}
+                events = [self._describe(event) for event in self.counter.update(tracked, roles, valid, t, born)]
             self._last, self._last_roles, self._last_t = tracked, roles, t
             lat_ms["track"] = (perf_counter() - t1) * 1000.0
 
