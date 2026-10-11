@@ -3,6 +3,7 @@
 import http.client
 import importlib.util
 import json
+import os
 import secrets
 import stat
 import threading
@@ -11,11 +12,12 @@ from pathlib import Path
 
 import cv2
 import numpy as np
+import pytest
 import supervision as sv
 
 from smartcrossing import app
 from smartcrossing.actuator import SimActuator
-from smartcrossing.config import load_config
+from smartcrossing.config import load_config, resolve_path
 from smartcrossing.mcu import C5FileTail, McuState
 from smartcrossing.pipeline import Pipeline
 from smartcrossing.sim import FRAME_SIZE, demo_calib
@@ -25,6 +27,9 @@ CFG = load_config()
 SHOCK = {"v": 1, "src": "mcu", "type": "tamper", "code": 1}
 BADGE = {"v": 1, "src": "mcu", "type": "tamper", "code": 3}
 USER, PASSWORD = "tecnico", secrets.token_urlsafe(12)     # made up for each run: never a real password
+# The whole app loads the detector: its weights are not in git (same rule as in test_detector.py).
+needs_model = pytest.mark.skipif(not resolve_path(CFG["model"]["path"]).is_file(),
+                                 reason="model not prepared (bash scripts/get_model.sh)")
 
 
 class Clock:
@@ -141,7 +146,8 @@ def test_password_is_stored_only_as_a_salted_hash(tmp_path, monkeypatch):
     tool.write_credentials(path, USER, PASSWORD)
     text = path.read_text()
     assert "OTHER=1" in text and "old" not in text and PASSWORD not in text
-    assert stat.S_IMODE(path.stat().st_mode) == 0o600                    # readable by the owner only
+    if os.name != "nt":   # Windows has no POSIX permissions: chmod only sets the read-only flag, stat gives 0o666
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600                # readable by the owner only
 
     monkeypatch.delenv(USER_VAR, raising=False)
     monkeypatch.delenv(HASH_VAR, raising=False)
@@ -381,6 +387,7 @@ def test_the_technician_reaches_the_sketch_in_the_command_at_once():
     assert pipeline.no_frame(0.2)["tech"] is False and sim.sent[-1]["tech"] is False
 
 
+@needs_model
 def test_the_app_reads_the_files_of_the_sketch_app_and_serves_the_page(tmp_path, capsys, monkeypatch):
     monkeypatch.delenv(USER_VAR, raising=False)
     monkeypatch.delenv(HASH_VAR, raising=False)
@@ -397,6 +404,7 @@ def test_the_app_reads_the_files_of_the_sketch_app_and_serves_the_page(tmp_path,
     assert f"mcu_files={tmp_path}/applab-*.jsonl" in out and "operator_page=:" in out and "images=on" in out
 
 
+@needs_model
 def test_with_the_example_calibration_crossings_stay_on_the_screen(tmp_path, capsys, monkeypatch):
     """The counting lines of the example are not on the stripes of the real scene: their crossings must not reach
     the central as real ones. With the calibration of the view they do."""
