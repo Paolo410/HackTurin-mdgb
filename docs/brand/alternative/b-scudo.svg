@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-labelledby="t">
+  <title id="t">MDGB, proposta alternativa: scudo</title>
+  <!-- Alternative B, "scudo": the guardian is a shield; inside, the crossing seen by the camera, in perspective,
+       and the beacon above it. More institutional, reads as "safety". -->
+  <defs><clipPath id="alt-scudo-clip"><path d="M32 4 54 11v19c0 15-9.5 25.5-22 30C19.5 55.5 10 45 10 30V11Z"/></clipPath></defs>
+  <path d="M32 4 54 11v19c0 15-9.5 25.5-22 30C19.5 55.5 10 45 10 30V11Z" fill="#1d2226"/>
+  <g clip-path="url(#alt-scudo-clip)" fill="#f3f4f1">
+    <path d="M12 54h40l-3.2-7.5H15.2Z"/>
+    <path d="M16.4 43h31.2l-2.4-5.6H18.8Z"/>
+    <path d="M20 34.6h24l-1.8-4.1H21.8Z"/>
+  </g>
+  <path d="M25.5 19.5a7.5 7.5 0 0 1 13 0" fill="none" stroke="#f2a900" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="32" cy="22" r="3.8" fill="#f2a900"/>
+</svg>
