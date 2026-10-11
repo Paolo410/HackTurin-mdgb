@@ -1,0 +1,52 @@
+{
+ "note": "Settings compared by scripts/benchmark.py run/score. 'args' are options of scripts/evaluate.py.",
+ "variants": {
+  "riferimento": {
+   "what": "riferimento: YOLOX-l a 960 px su ogni fotogramma alla velocità del video (sul Mac con CoreML), da rivedere a vista",
+   "args": [
+    "--set",
+    "model.path=\"models/yolox_l_960.onnx\"",
+    "--set",
+    "model.input_size=960",
+    "--set",
+    "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+    "--set",
+    "model.detect_every_n=1",
+    "--set",
+    "source.max_fps=0"
+   ]
+  },
+  "scheda": {
+   "what": "come gira oggi sulla scheda: 320 px, 12 FPS, detector un fotogramma su due",
+   "args": [
+    "--emulate-unoq",
+    "--set",
+    "model.detect_every_n=2",
+    "--set",
+    "source.max_fps=12"
+   ]
+  },
+  "scheda_ogni_frame": {
+   "what": "320 px, 10 FPS, detector su ogni fotogramma",
+   "args": [
+    "--emulate-unoq",
+    "--set",
+    "model.detect_every_n=1",
+    "--set",
+    "source.max_fps=10"
+   ]
+  },
+  "scheda_416": {
+   "what": "416 px, 12 FPS, detector un fotogramma su due",
+   "args": [
+    "--emulate-unoq",
+    "--set",
+    "model.input_size=416",
+    "--set",
+    "model.detect_every_n=2",
+    "--set",
+    "source.max_fps=12"
+   ]
+  }
+ }
+}

@@ -1,0 +1,18 @@
+{
+  "note": "Videos of the benchmark (ai/samples, not in git) with their calibration (ai/samples/calib). The reference crossings of each one are in reference/<name>.json.",
+  "videos": [
+    {"name": "torino_1", "video": "Torino_1.mp4", "calib": "torino_1.json", "what": "Turin, crossing from above, day: cars and a few pedestrians"},
+    {"name": "torino_2", "video": "Torino_2.mp4", "calib": "torino_2.json", "what": "Turin, day (calibration by eye does not pass the check: counts only)"},
+    {"name": "torino_3", "video": "Torino_3.mp4", "calib": "torino_3.json", "what": "Turin, junction with turning vehicles, day"},
+    {"name": "torino_night_1", "video": "Torino_night_1.mp4", "calib": "torino_night_1.json", "what": "Turin, crossing from above, night"},
+    {"name": "nyc_strisce", "video": "01_strisce_nyc_folla_auto_bus_720p.mp4", "calib": "01.json", "what": "New York, crowd on the stripes"},
+    {"name": "nyc_incrocio", "video": "02_incrocio_nyc_pedoni_taxi_720p.mp4", "calib": "02.json", "what": "New York, junction, pedestrians and taxis"},
+    {"name": "shibuya", "video": "03_shibuya_folla_bus_auto_720p.mp4", "calib": "03.json", "what": "Tokyo Shibuya, dense crowd"},
+    {"name": "zona_pedonale", "video": "50_zona_pedonale_pedoni_ciclisti_1080p.mp4", "calib": "50.json", "what": "pedestrian street from above, pedestrians and cyclists"},
+    {"name": "piazzale", "video": "51_vista_alta_persona_bici_auto.mp4", "calib": "51.json", "what": "square from above: person, bicycle, car"},
+    {"name": "strada_auto", "video": "52_strada_auto_frontale_1080p.mp4", "calib": "52.json", "what": "country road, cars from the front"},
+    {"name": "mixkit_4194", "video": "mdgb_mixkit_4194.mp4", "calib": "4194.json", "what": "crossing with traffic"},
+    {"name": "mixkit_4335", "video": "mdgb_mixkit_4335.mp4", "calib": "4335.json", "what": "road with a few cars"},
+    {"name": "mixkit_61", "video": "mdgb_mixkit_61.mp4", "calib": "61.json", "what": "crossing, cars and pedestrians"}
+  ]
+}

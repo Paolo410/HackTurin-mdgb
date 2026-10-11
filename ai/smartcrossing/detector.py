@@ -166,8 +166,9 @@ class Detector:
         options = ort.SessionOptions()
         if int(m["intra_op_num_threads"]) > 0:
             options.intra_op_num_threads = int(m["intra_op_num_threads"])
-        # CPU only: the UNO Q has no NPU, and the same code path must run on the PC.
-        self.session = ort.InferenceSession(str(path), sess_options=options, providers=["CPUExecutionProvider"])
+        # CPU on the board (the UNO Q has no NPU). Only the reference of the benchmark, on a Mac, asks for CoreML.
+        providers = [p for p in m["providers"] if p in ort.get_available_providers()] or ["CPUExecutionProvider"]
+        self.session = ort.InferenceSession(str(path), sess_options=options, providers=providers)
         model_input = self.session.get_inputs()[0]
         self.input_name = model_input.name
 

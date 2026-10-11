@@ -197,7 +197,11 @@ def main() -> int:
                                   "reason": command["reason"]})
         last_state, last_t = command["state"], t
         for event in result.events:
-            events.append({"t": round(rel, 2), **event})
+            where = {}
+            state = pipeline.tracker.tracks.get(event.get("track_id"))
+            if event["type"] == "crossing" and state is not None and state.history:
+                where = {"x": round(state.history[-1][1], 1), "y": round(state.history[-1][2], 1)}   # bottom centre, px
+            events.append({"t": round(rel, 2), **event, **where})
             if event["type"] != "crossing" or reason is None:
                 reason = reason or f"{event.get('kind', event['type'])}"
 

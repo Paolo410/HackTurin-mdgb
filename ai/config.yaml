@@ -13,6 +13,8 @@ model:
   nms: 0.45                       # IoU threshold of the per-class NMS
   nms_cross_class: 0.85           # boxes of different classes above this IoU are one object: keep the best
   intra_op_num_threads: 0         # 0 = let onnxruntime decide
+  providers: [CPUExecutionProvider]   # onnxruntime providers. The board has a CPU only; the benchmark reference on a
+                                  # Mac uses [CoreMLExecutionProvider, CPUExecutionProvider]
   detect_every_n: 1               # run the detector every N frames; in between the last tracks are held
   strides: [8, 16, 32]            # YOLOX head strides
   pad_value: 114                  # (spec) letterbox padding value
