@@ -112,12 +112,22 @@ aggregati direttamente nel database della centrale.
 L'app impacchettata (`build_mac.sh`, `build_windows.ps1`) contiene il modello: l'autotest della build controlla anche
 che `/api/forecast/nodo01` risponda.
 
-Test, senza rete:
+Test, senza rete (67 del modello, 12 della dashboard):
 
 ```bash
-cd ai && python -m pytest tests/test_forecast.py -q        # 21 test
-python -m pytest comms/tests/test_dashboard.py -q          # dalla root: endpoint della centrale
+cd ai && python -m pytest tests/test_forecast.py tests/test_forecast_sources.py tests/test_forecast_service.py -q
+python -m pytest comms/tests/test_dashboard.py -q          # dalla root: endpoint e pagina della centrale
 ```
+
+| File | Cosa controlla |
+|---|---|
+| `ai/tests/test_forecast.py` | il percorso principale: modello, feature, fusione, fonti, cache, servizio |
+| `ai/tests/test_forecast_sources.py` | lo scambio HTTP vero (server sul PC di prova), i casi limite di ESA WorldCover e OpenStreetMap, le richieste a Google, la cache quando una fonte cade o più camere si aggiornano insieme |
+| `ai/tests/test_forecast_service.py` | calendario e festività, lettura degli alberi, intervalli, previsione oraria, anomalie, simulatore e addestramento; e che il runtime usi solo la libreria standard, sia Python 3.9 e sia tutto nel pacchetto dell'app |
+| `comms/tests/test_dashboard.py` | `/api/flow` e `/api/forecast` dagli aggregati del nodo, modello assente, autotest dell'app, coerenza della pagina (id, colori, indirizzi chiamati) |
+
+I test che addestrano un modello si saltano da soli dove mancano numpy e scikit-learn (per esempio nella build dell'app).
+La parte in JavaScript della pagina (aloni, cursore, grafico) non ha test automatici: è stata provata a mano nel browser.
 
 ## Riaddestrare
 
