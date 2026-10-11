@@ -6,6 +6,9 @@ https://supervision.roboflow.com/latest/detection/tools/line_zone/
 - minimum_crossing_threshold frames on the other side are needed before a crossing counts, so a track
   that jitters on the line is not counted;
 - on top of that, every track is counted at most once per direction on each line.
+LineZone forgets the side of a track after it misses crossing_history_length (= threshold + 1) frames: a car hidden
+by a pole for 4 detector frames came back with the same ID but no memory, and its crossing was lost. Here the side
+is kept for side_memory frames (the life of a lost track in ByteTrack), see _SideKeepingLineZone.
 """
 from __future__ import annotations
 
@@ -17,6 +20,31 @@ from .geometry import to_pixels
 DIRECTIONS = ("in", "out")
 
 
+class _SideKeepingLineZone(sv.LineZone):
+    """sv.LineZone that keeps the side of an unseen track for max_absent frames instead of threshold + 1.
+
+    Overrides a private method of the pinned supervision 0.30.5 (same code, other limit): covered by
+    tests/test_counting.py::test_track_hidden_on_the_line_still_counts.
+    """
+
+    def __init__(self, *args, max_absent: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_absent = max(int(max_absent), self.crossing_history_length)
+
+    def _evict_stale_crossing_history(self, current_keys: set[int]) -> None:
+        for key in list(self.crossing_state_history):
+            if key in current_keys:
+                self._tracker_frames_absent.pop(key, None)
+                continue
+            absent = self._tracker_frames_absent.get(key, 0) + 1
+            if absent >= self.max_absent:
+                del self.crossing_state_history[key]
+                self._confirmed_crossing_side.pop(key, None)
+                self._tracker_frames_absent.pop(key, None)
+            else:
+                self._tracker_frames_absent[key] = absent
+
+
 class LineCounter:
     """Counts the crossings of the calibrated lines ("ped" along the stripes, "veh" across the lane)."""
 
@@ -24,6 +52,8 @@ class LineCounter:
         """frame_size is (width, height) of the frames given to the tracker."""
         c = cfg["counting"]
         width, height = frame_size
+        # 0 = supervision's own limit (threshold + 1 frames)
+        side_memory = int(c.get("side_memory", 0))
         self.lines: dict[str, dict] = {}
         for name, classes in c["lines"].items():
             spec = (calib.get("lines") or {}).get(name)
@@ -34,11 +64,12 @@ class LineCounter:
                 "start": start,
                 "end": end,
                 "classes": set(classes),
-                "zone": sv.LineZone(
+                "zone": _SideKeepingLineZone(
                     start=sv.Point(*start),
                     end=sv.Point(*end),
                     triggering_anchors=[sv.Position.BOTTOM_CENTER],
                     minimum_crossing_threshold=int(c["minimum_crossing_threshold"]),
+                    max_absent=side_memory,
                 ),
             }
         # counts[line][role] = {"in": n, "out": n}

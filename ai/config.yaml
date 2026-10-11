@@ -36,6 +36,10 @@ tracking:
   minimum_matching_threshold: 0.9 # 1 - IoU allowed between a track and its box: at 5-6 detections per second
                                   # (board) an object moves more between two of them. Was 0.8
   minimum_consecutive_frames: 1
+  box_buffer: 0.3                 # boxes enlarged by this share of their size on each side for the pairing only
+                                  # (buffered IoU, see tracking.py): fast or far objects keep their ID. 0 = off
+  matched_box: true               # return each track with the box it was matched with (tracking.py); false =
+                                  # supervision's own pairing, which loses fast objects
   min_track_age: 5                # (spec) frames before a track is considered valid
   measure_min_conf: 0.30          # boxes below this score keep a track alive but measure no height, cast no class vote
   history_len: 150                # positions kept per track (5 s at 30 frames per second)
@@ -225,6 +229,8 @@ derive:
 
 counting:
   minimum_crossing_threshold: 3   # frames past the line before a crossing counts (no jitter counts)
+  side_memory: 30                 # detector frames the side of an unseen track is remembered (a car behind a
+                                  # pole); 0 = supervision's own limit, threshold + 1 frames
   calib_path: calib.json          # made by scripts/calibrate.py
   example_calib_path: calib.example.json   # used when calib.json is missing
   lines:                          # roles counted on each line

@@ -76,3 +76,26 @@ def test_a_track_first_seen_on_a_weak_box_still_has_a_class(monkeypatch):
     monkeypatch.setattr(tracker._bytetrack, "update_with_detections", lambda detections: weak)
     tracked = tracker.update(weak, t=0.0)
     assert tracker.class_names(tracked) == ["dog"]
+
+
+def _track_fast_object(box_buffer):
+    """A 40 px wide box that moves 34 px per detector frame (a car at 5-6 detections per second).
+    Returns the IDs given and the boxes of the frames in which it was tracked."""
+    cfg = load_config()
+    cfg["tracking"]["box_buffer"] = box_buffer
+    tracker = Tracker(cfg, frame_rate=6)
+    ids, boxes = set(), []
+    for i in range(8):
+        tracked = tracker.update(_detection(100.0 + 34 * i, score=0.5), t=i / 6)
+        ids.update(int(k) for k in tracked.tracker_id)
+        boxes += tracked.xyxy.tolist()
+    return ids, boxes
+
+
+def test_buffered_boxes_keep_the_id_of_a_fast_object_and_give_back_the_real_box():
+    ids, boxes = _track_fast_object(0.3)
+    assert len(ids) == 1 and len(boxes) == 8
+    assert boxes[-1] == [100.0 + 34 * 7, 100.0, 140.0 + 34 * 7, 200.0]   # real size, not the enlarged one
+    # Without the buffer two boxes in a row barely overlap: ByteTrack never confirms a track after the first frame.
+    _, boxes = _track_fast_object(0.0)
+    assert len(boxes) < 4

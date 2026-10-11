@@ -150,3 +150,15 @@ def test_calib_file_round_trip_and_example_fallback(tmp_path):
     assert used.name == "calib.example.json" and set(calib["lines"]) == {"ped", "veh"}
     with pytest.raises(FileNotFoundError):
         load_calib(cfg, tmp_path / "nope.json")
+
+
+def test_track_hidden_on_the_line_still_counts():
+    # A car seen left of the line, hidden (by a pole) for 8 detector frames, then seen right of it with the same ID.
+    def hidden_crossing(counter):
+        events = run(counter, 1, [260, 270, 280])
+        for _ in range(8):
+            events += counter.update(*frame((99, 50.0, 100.0, "pedestrian")))   # someone else, far away
+        return events + run(counter, 1, [360, 370, 380, 390])
+    assert [e["dir"] for e in hidden_crossing(make_counter(side_memory=30))] == ["in"]
+    # supervision's own limit (threshold + 1 = 4 frames) forgot the side: the crossing was lost.
+    assert hidden_crossing(make_counter(side_memory=0)) == []

@@ -3,6 +3,18 @@
 supervision.ByteTrack API (verified on the pinned supervision 0.30.5):
 https://supervision.roboflow.com/latest/trackers/
 ByteTrack is deprecated in supervision and removed in 0.31: keep the pin in requirements.txt below 0.31.
+
+Buffered IoU (tracking.box_buffer): ByteTrack pairs a track with a box only if they overlap enough. At 5-6 detector
+frames per second a car moves most of its length between two of them, and a pedestrian far away is a few pixels
+wide: the boxes no longer overlap and the track breaks (new ID, crossing lost). The boxes are given to ByteTrack
+enlarged by box_buffer of their size on each side and given back at their real size, as in the C-BIoU tracker
+(Yang et al., "Hard to Track Objects with Irregular Motions and Similar Appearances? Make It Easier by Buffering
+the Matching Space", WACV 2023, https://arxiv.org/abs/2211.14317). No cost: a few multiplications per box.
+
+Returned boxes (_ByteTrack): sv.ByteTrack.update_with_detections pairs its tracks with the boxes again by overlap
+(IoU > 0.5) with the Kalman-filtered position, which trails behind a fast object. At 4-6 detections per second a
+car was tracked inside ByteTrack but missing from what it returned, so it was never counted. Here every track
+remembers the box it was matched with in this frame and is returned with that box.
 """
 from __future__ import annotations
 
@@ -12,8 +24,57 @@ from dataclasses import dataclass, field
 
 import numpy as np
 import supervision as sv
+from supervision.tracker.byte_tracker import matching as _matching
+from supervision.tracker.byte_tracker import single_object_track as _sot
 
 from .detector import COCO_CLASSES
+
+
+def _remember_box(method):
+    """Wraps STrack.update / re_activate: keeps the box of the detection the track is matched with (a detection
+    is an STrack without Kalman state, so its tlbr is its own box)."""
+    def wrapper(self, new_track, frame_id, *args, **kwargs):
+        self.matched_tlbr = new_track.tlbr
+        return method(self, new_track, frame_id, *args, **kwargs)
+    return wrapper
+
+
+def _remember_own_box(method):
+    """Wraps STrack.activate: a new track starts from its own box."""
+    def wrapper(self, *args, **kwargs):
+        self.matched_tlbr = self.tlbr
+        return method(self, *args, **kwargs)
+    return wrapper
+
+
+# Patched once on the class of the pinned supervision 0.30.5 (tests/test_tracking.py checks the effect).
+if not getattr(_sot.STrack, "_mdgb_matched_box", False):
+    _sot.STrack.update = _remember_box(_sot.STrack.update)
+    _sot.STrack.re_activate = _remember_box(_sot.STrack.re_activate)
+    _sot.STrack.activate = _remember_own_box(_sot.STrack.activate)
+    _sot.STrack._mdgb_matched_box = True
+
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", FutureWarning)   # deprecation of sv.ByteTrack: version pinned, see above
+
+    class _ByteTrack(sv.ByteTrack):
+        """sv.ByteTrack that returns each track with the detection it was matched with in this frame."""
+
+        def update_with_detections(self, detections: sv.Detections) -> sv.Detections:
+            if detections.confidence is None:
+                raise ValueError("Detections confidence must be provided for tracking.")
+            tensors = np.hstack((detections.xyxy, detections.confidence[:, np.newaxis]))
+            tracks = self.update_with_tensors(tensors=tensors)
+            tracked = detections.select(slice(None))
+            tracked.tracker_id = np.full(len(detections), -1, dtype=int)
+            if tracks and len(detections):
+                matched = np.asarray([t.matched_tlbr for t in tracks], dtype=np.float32)
+                ious = sv.box_iou_batch(detections.xyxy.astype(np.float32), matched)
+                pairs, _, _ = _matching.linear_assignment(1 - ious, 0.5)   # IoU about 1: the same box
+                for i_detection, i_track in pairs:
+                    tracked.tracker_id[i_detection] = int(tracks[i_track].external_track_id)
+            return tracked.select(tracked.tracker_id != -1)
 
 
 @dataclass
@@ -77,10 +138,12 @@ class Tracker:
         # Boxes below this score only keep a track alive (ByteTrack's second association): they are often cut,
         # so they neither measure a height nor vote for the class.
         self.measure_min_conf = float(t["measure_min_conf"])
+        self.box_buffer = float(t.get("box_buffer", 0.0))
         with warnings.catch_warnings():
             # Known deprecation of sv.ByteTrack: the version is pinned, see the module docstring.
             warnings.simplefilter("ignore", FutureWarning)
-            self._bytetrack = sv.ByteTrack(
+            bytetrack = _ByteTrack if t.get("matched_box", True) else sv.ByteTrack
+            self._bytetrack = bytetrack(
                 track_activation_threshold=float(t["track_activation_threshold"]),
                 lost_track_buffer=self.lost_track_buffer,
                 minimum_matching_threshold=float(t["minimum_matching_threshold"]),
@@ -97,9 +160,11 @@ class Tracker:
         track are updated too.
         """
         self._frame += 1
-        tracked = self._bytetrack.update_with_detections(detections)
+        tracked = self._bytetrack.update_with_detections(self._buffered(detections))
         if tracked.tracker_id is None:
             return tracked
+        if "xyxy_real" in tracked.data:
+            tracked.xyxy = tracked.data.pop("xyxy_real")
         metric = geometry is not None and geometry.metric
         scores = tracked.confidence if tracked.confidence is not None else [1.0] * len(tracked)
         for xyxy, class_id, track_id, score in zip(tracked.xyxy, tracked.class_id, tracked.tracker_id, scores):
@@ -124,6 +189,18 @@ class Tracker:
                 state.class_votes[int(class_id)] += 1
         self._drop_stale()
         return tracked
+
+    def _buffered(self, detections: sv.Detections) -> sv.Detections:
+        """The detections with their boxes enlarged by box_buffer on each side; the real boxes ride along in
+        data["xyxy_real"] (sv.Detections keeps data aligned through ByteTrack's selection)."""
+        if self.box_buffer <= 0 or len(detections) == 0:
+            return detections
+        out = detections[:]
+        xyxy = detections.xyxy.astype(np.float32)
+        pad = np.stack([xyxy[:, 2] - xyxy[:, 0], xyxy[:, 3] - xyxy[:, 1]], axis=1) * self.box_buffer
+        out.xyxy = np.hstack([xyxy[:, :2] - pad, xyxy[:, 2:] + pad])
+        out.data = {**detections.data, "xyxy_real": xyxy.copy()}
+        return out
 
     def _measurable(self, xyxy, foot: tuple[float, float], geometry) -> bool:
         """False when the foot point cannot be trusted for a speed: box cut by the border, or too far."""
