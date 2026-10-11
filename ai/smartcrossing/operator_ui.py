@@ -327,8 +327,9 @@ function render(s) {
   // Vista
   const v = s.video;
   $("video").hidden = !v;
-  if (v) $("vname").textContent = `Video ${v.index} di ${v.total}: ${v.name}, ${mmss(v.pos_s)} su ${mmss(v.dur_s)}, ` +
-    (v.calib ? "calibrazione " + v.calib : "senza calibrazione") + `, salto di ${v.seek_s} s.`;
+  if (v) $("vname").textContent = `Video ${v.index} di ${v.total}: ${v.name}, ` +
+    (v.live ? "" : `${mmss(v.pos_s)} su ${mmss(v.dur_s)}, `) +
+    (v.calib ? "calibrazione " + v.calib : "senza calibrazione") + (v.live ? "." : `, salto di ${v.seek_s} s.`);
   $("images").textContent = s.images ? "Vista dal vivo, mai registrata." : "Immagini disattivate sulla scheda (operator.share_images).";
   if (tab() === "vista") setLive(s.images);
   renderCounts(s);
