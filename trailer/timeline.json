@@ -1,0 +1,694 @@
+{
+  "meta": {
+    "title": "MDGB — The time you need",
+    "subtitle": "The crossing that understands",
+    "event": "HackTurin 2026 · GOMA Smart Crossing Challenge",
+    "fps": 30,
+    "width": 1920,
+    "height": 1080,
+    "duration": 120,
+    "burnSubtitles": false,
+    "version": "PoC v1 — stock footage placeholders"
+  },
+  "voice": {
+    "engine": "kokoro",
+    "voice": "am_michael:0.65,am_onyx:0.35",
+    "speed": 0.9,
+    "lang": "en-us",
+    "lead": 0.35,
+    "gap": 0.3
+  },
+  "music": {
+    "media": "music_epic_trailer",
+    "note": "Track drop (src 19.0 s) lands on the logo reveal at 0:30. Second segment jumps to the track's ending hits for the title.",
+    "segments": [
+      {
+        "src_in": 0.0,
+        "src_out": 101.82,
+        "at": 11.0
+      },
+      {
+        "src_in": 104.0,
+        "src_out": 112.6,
+        "at": 112.82
+      }
+    ],
+    "gain_db": -4.5,
+    "duck_db": -11.0,
+    "fade_out": [
+      118.6,
+      120.0
+    ]
+  },
+  "sfx": [
+    {
+      "kind": "tick",
+      "from": 0.4,
+      "to": 11.6,
+      "every": 0.5457,
+      "gain_db": -16
+    },
+    {
+      "kind": "drone",
+      "at": 0.0,
+      "dur": 12.5,
+      "gain_db": -20
+    },
+    {
+      "kind": "whoosh",
+      "at": 6.0,
+      "gain_db": -14
+    },
+    {
+      "kind": "boom",
+      "gain_db": -8,
+      "after": "L02",
+      "offset": -0.12
+    },
+    {
+      "kind": "riser",
+      "at": 26.6,
+      "dur": 3.4,
+      "gain_db": -15
+    },
+    {
+      "kind": "blip",
+      "at": [
+        47.2,
+        47.9,
+        48.6,
+        49.4
+      ],
+      "gain_db": -22
+    },
+    {
+      "kind": "tick",
+      "from": 55.29,
+      "to": 58.9,
+      "every": 0.5457,
+      "gain_db": -20
+    },
+    {
+      "kind": "blip",
+      "at": [
+        62.15,
+        64.85,
+        67.4
+      ],
+      "gain_db": -20
+    },
+    {
+      "kind": "heartbeat",
+      "from": 78.4,
+      "to": 81.6,
+      "every": 0.1,
+      "gain_db": -27
+    },
+    {
+      "kind": "ping",
+      "at": [
+        88.4,
+        89.5,
+        90.6
+      ],
+      "gain_db": -19
+    },
+    {
+      "kind": "whoosh",
+      "at": 101.6,
+      "gain_db": -16
+    },
+    {
+      "kind": "tick",
+      "at": [
+        119.35
+      ],
+      "gain_db": -10
+    }
+  ],
+  "scenes": [
+    {
+      "id": "B01",
+      "act": "open",
+      "start": 0,
+      "dur": 6,
+      "name": "The duel",
+      "shots": [
+        {
+          "media": "c01_crosswalk_aerial_a",
+          "in": 0.0,
+          "dur": 6.0,
+          "grade": "night",
+          "zoom": [
+            1.0,
+            1.06
+          ],
+          "detections": "c01_crosswalk_aerial_a",
+          "detect": {
+            "model": "yolox_s",
+            "size": 640,
+            "conf": 0.3
+          }
+        }
+      ],
+      "vo": null,
+      "ost": {
+        "ped": "9.8 s",
+        "pedLabel": "TO CROSS",
+        "car": "4.3 s",
+        "carLabel": "UNTIL THE CAR ARRIVES"
+      }
+    },
+    {
+      "id": "B02",
+      "act": "open",
+      "start": 6,
+      "dur": 6,
+      "name": "The math",
+      "shots": [
+        {
+          "media": "c01_crosswalk_aerial_a",
+          "freeze": 5.95,
+          "dur": 6.0,
+          "grade": "night",
+          "zoom": [
+            1.06,
+            1.14
+          ]
+        }
+      ],
+      "vo": {
+        "id": "L02",
+        "text": "She needs ten seconds to cross. The car arrives in four. And the traffic light has no idea.",
+        "at": 6.2,
+        "speed": 0.95
+      },
+      "ost": {
+        "left": "4.3 s",
+        "right": "9.8 s",
+        "op": "<",
+        "leftLabel": "CAR ARRIVES",
+        "rightLabel": "SHE NEEDS"
+      }
+    },
+    {
+      "id": "B03",
+      "act": "problem",
+      "start": 12,
+      "dur": 8,
+      "name": "The data",
+      "shots": [
+        {
+          "media": "c03_feet",
+          "in": 0.3,
+          "dur": 0.55,
+          "grade": "night"
+        },
+        {
+          "media": "c04_cane",
+          "in": 0.5,
+          "dur": 1.1,
+          "grade": "night"
+        },
+        {
+          "media": "c05_headlights_rain",
+          "in": 1.0,
+          "dur": 1.1,
+          "grade": "night"
+        },
+        {
+          "media": "c06_tram_night",
+          "in": 0.2,
+          "dur": 1.1,
+          "grade": "night"
+        },
+        {
+          "media": "c07_button",
+          "in": 0.4,
+          "dur": 1.1,
+          "grade": "night"
+        },
+        {
+          "media": "c08_red_light_night",
+          "in": 1.0,
+          "dur": 1.0,
+          "grade": "night"
+        },
+        {
+          "media": "c09_crossing_lowangle",
+          "in": 0.3,
+          "dur": 1.0,
+          "grade": "night"
+        },
+        {
+          "media": "c10_night_traffic",
+          "in": 0.5,
+          "dur": 1.05,
+          "grade": "night"
+        }
+      ],
+      "vo": {
+        "id": "L03",
+        "text": "Detecting presence isn't enough. You have to understand the scene.",
+        "source": "Transcription.txt — GOMA brief"
+      },
+      "ost": {
+        "number": 470,
+        "line1": "pedestrians killed on Italian roads in 2024",
+        "line2": "More than one every single day.",
+        "source": "Source: ACI–ISTAT, road accidents 2024"
+      }
+    },
+    {
+      "id": "B04",
+      "act": "problem",
+      "start": 20,
+      "dur": 10,
+      "name": "Darkness",
+      "shots": [
+        {
+          "media": "c26_turin_aerial_alps",
+          "in": 0.0,
+          "dur": 5.0,
+          "grade": "dusk2night"
+        },
+        {
+          "media": "c12_night_crosswalk",
+          "in": 0.5,
+          "dur": 5.0,
+          "grade": "night"
+        }
+      ],
+      "vo": {
+        "id": "L04",
+        "text": "On October twenty-fifth, darkness falls at rush hour. And the green light lasts the same... for someone who's twenty, and for someone who's eighty.",
+        "at": 19.4
+      },
+      "ost": {
+        "date": "OCTOBER 25",
+        "line": "Clocks go back. Darkness at rush hour.",
+        "time": "17:30"
+      }
+    },
+    {
+      "id": "B05",
+      "act": "reveal",
+      "start": 30,
+      "dur": 8,
+      "name": "MDGB",
+      "shots": [
+        {
+          "media": "c13_lens",
+          "in": 0.5,
+          "dur": 2.6,
+          "grade": "neutralDark"
+        },
+        {
+          "media": "c14_pcb",
+          "in": 0.3,
+          "dur": 1.8,
+          "grade": "neutralDark"
+        }
+      ],
+      "vo": {
+        "id": "L05",
+        "text": "This is MDGB."
+      },
+      "ost": {
+        "wordmark": "MDGB",
+        "expansion": "Mobility Data & Guardian Beacon"
+      }
+    },
+    {
+      "id": "B06",
+      "act": "reveal",
+      "start": 38,
+      "dur": 8,
+      "name": "On the light that's already there",
+      "shots": [
+        {
+          "media": "c15_turin_mole",
+          "in": 0.0,
+          "dur": 4.4,
+          "speed": 1.5,
+          "grade": "dusk",
+          "tiltShift": true
+        },
+        {
+          "media": "c16_traffic_light_close",
+          "in": 0.4,
+          "dur": 3.6,
+          "grade": "dusk"
+        }
+      ],
+      "vo": {
+        "id": "L06",
+        "text": "Two hundred euros of hardware, on the traffic light that's already there. It sees who's coming — and asks for the time they need."
+      },
+      "ost": {
+        "tag": "MDGB NODE",
+        "lines": [
+          "~€200 in parts",
+          "Fits existing traffic lights"
+        ],
+        "city": "TURIN"
+      }
+    },
+    {
+      "id": "B07",
+      "act": "proof",
+      "start": 46,
+      "dur": 8,
+      "name": "It sees",
+      "shots": [
+        {
+          "media": "c17_pole_view",
+          "in": 0.0,
+          "dur": 8.0,
+          "grade": "neutral",
+          "detections": "c17_pole_view",
+          "detect": {
+            "model": "yolox_s",
+            "size": 640,
+            "conf": 0.3,
+            "line": "0.05,0.9,0.95,0.86"
+          }
+        }
+      ],
+      "vo": {
+        "id": "L07",
+        "text": "Pedestrians. Cyclists. Cars. Animals. All recognised on board. No internet."
+      },
+      "ost": {
+        "chips": [
+          "CAM 01",
+          "ON-BOARD AI",
+          "WI-FI OFF"
+        ],
+        "verb": "SEES"
+      }
+    },
+    {
+      "id": "B08",
+      "act": "proof",
+      "start": 54,
+      "dur": 8,
+      "name": "It measures",
+      "shots": [
+        {
+          "media": "c18_rain_crosswalk",
+          "in": 0.0,
+          "dur": 8.0,
+          "grade": "neutral"
+        }
+      ],
+      "vo": {
+        "id": "L08",
+        "text": "The stripes are its ruler: fifty centimetres, every time. That's how it measures real distance... and real speed."
+      },
+      "ost": {
+        "eq": "50 cm + 50 cm = 1 m",
+        "width": "W = 7.0 m",
+        "verb": "MEASURES"
+      }
+    },
+    {
+      "id": "B09",
+      "act": "proof",
+      "start": 62,
+      "dur": 8,
+      "name": "It understands",
+      "shots": [
+        {
+          "media": "c19_elderly_cane",
+          "in": 0.3,
+          "dur": 2.7,
+          "grade": "neutral",
+          "tag": {
+            "title": "SLOW PACE",
+            "value": "0.8 m/s",
+            "note": "green extended",
+            "x": 0.74,
+            "y": 0.38
+          },
+          "detections": "c19_elderly_cane",
+          "detect": {
+            "model": "yolox_s",
+            "size": 640,
+            "conf": 0.3
+          }
+        },
+        {
+          "media": "c20_child",
+          "in": 0.6,
+          "dur": 2.55,
+          "grade": "neutral",
+          "tag": {
+            "title": "CHILD",
+            "value": "< 1.30 m",
+            "note": "extra margin",
+            "x": 0.3,
+            "y": 0.42
+          },
+          "detections": "c20_child",
+          "detect": {
+            "model": "yolox_s",
+            "size": 640,
+            "conf": 0.3
+          }
+        },
+        {
+          "media": "c21_dog",
+          "in": 0.2,
+          "dur": 2.75,
+          "grade": "neutral",
+          "tag": {
+            "title": "DOG ON A LEASH",
+            "value": "no alarm",
+            "note": "loose dog → alert",
+            "x": 0.52,
+            "y": 0.34
+          },
+          "detections": "c21_dog",
+          "detect": {
+            "model": "yolox_s",
+            "size": 640,
+            "conf": 0.3
+          }
+        }
+      ],
+      "vo": {
+        "id": "L09",
+        "text": "It doesn't guess your age. It measures your pace. Walk slowly — and it waits for you."
+      },
+      "ost": {
+        "verb": "UNDERSTANDS"
+      }
+    },
+    {
+      "id": "B10",
+      "act": "proof",
+      "start": 70,
+      "dur": 8,
+      "name": "It decides and acts",
+      "shots": [
+        {
+          "media": "c05_headlights_rain",
+          "in": 2.4,
+          "dur": 3.6,
+          "grade": "night"
+        },
+        {
+          "media": "c22_ped_light_red",
+          "in": 0.5,
+          "dur": 4.4,
+          "grade": "night"
+        }
+      ],
+      "vo": {
+        "id": "L10",
+        "text": "Every decision follows a physical rule — written down, verifiable. It warns the driver. Holds the red. Extends the green."
+      },
+      "ost": {
+        "formula": [
+          "TTC = d / v = 4.3 s",
+          "T_need = W / v_ped + 1 = 9.8 s",
+          "4.3 s < 9.8 s  →  WARN_DRIVER"
+        ],
+        "lcd": [
+          "PEDESTRIAN  50 km/h",
+          "SLOW DOWN"
+        ],
+        "oled": [
+          "WAIT"
+        ],
+        "alarm": "BRAKE!",
+        "verb": "DECIDES"
+      }
+    },
+    {
+      "id": "B11",
+      "act": "proof",
+      "start": 78,
+      "dur": 8,
+      "name": "Fail-safe",
+      "shots": [
+        {
+          "media": "c23_lights_changing",
+          "in": 0.0,
+          "dur": 8.0,
+          "grade": "neutralDark"
+        }
+      ],
+      "vo": {
+        "id": "L11",
+        "text": "And if the AI goes dark? In half a second, the light is back exactly as it was."
+      },
+      "ost": {
+        "beat": "HEARTBEAT · 100 ms",
+        "lost": "VISION OFFLINE",
+        "safe": "FAIL-SAFE · 0.5 s",
+        "back": "BACK TO THE NORMAL CYCLE",
+        "verb": "FAILS SAFE"
+      }
+    },
+    {
+      "id": "B12",
+      "act": "proof",
+      "start": 86,
+      "dur": 8,
+      "name": "Loses nothing",
+      "shots": [
+        {
+          "media": "c24_network_cables",
+          "in": 0.0,
+          "dur": 8.0,
+          "grade": "neutralDark"
+        }
+      ],
+      "vo": {
+        "id": "L12",
+        "text": "If the network drops, it switches to Bluetooth. When it's back, it recovers everything. Events lost: zero."
+      },
+      "ost": {
+        "wifiDown": "WI-FI ✕",
+        "ble": "BLUETOOTH BEACON · 27 BYTES",
+        "wifiUp": "WI-FI ✓ · QUEUE FLUSHED",
+        "lost": "EVENTS LOST",
+        "verb": "LOSES NOTHING"
+      }
+    },
+    {
+      "id": "B13",
+      "act": "proof",
+      "start": 94,
+      "dur": 8,
+      "name": "No faces",
+      "shots": [
+        {
+          "media": "c25_topdown_crowd",
+          "in": 0.0,
+          "dur": 8.0,
+          "grade": "neutral",
+          "detections": "c25_topdown_crowd",
+          "detect": {
+            "model": "yolox_s",
+            "size": 640,
+            "conf": 0.18,
+            "tiles": "3x2",
+            "movingOnly": true
+          },
+          "blur": [
+            1.4,
+            2.6,
+            26
+          ]
+        }
+      ],
+      "vo": {
+        "id": "L13",
+        "text": "It never stores an image. Ever. Only anonymous numbers. At night, it senses heat — but recognises no one."
+      },
+      "ost": {
+        "badge": "0 FRAMES STORED · METADATA ONLY",
+        "verb": "SEES NO FACES"
+      }
+    },
+    {
+      "id": "B14",
+      "act": "vision",
+      "start": 102,
+      "dur": 10,
+      "name": "The city",
+      "shots": [
+        {
+          "media": "c26_turin_aerial_alps",
+          "in": 2.2,
+          "dur": 5.0,
+          "grade": "dusk"
+        }
+      ],
+      "vo": {
+        "id": "L14",
+        "text": "One crossing protects. A hundred crossings reveal a city — its flows, its weather, its air. And where more time will be needed.",
+        "speed": 0.92
+      },
+      "ost": {
+        "forecast": [
+          "TOMORROW · 18:00",
+          "RAIN · +38% FOOT TRAFFIC",
+          "12 CROSSINGS NEED MORE TIME"
+        ],
+        "label": "CONCEPT · SIMULATED DATA"
+      }
+    },
+    {
+      "id": "B15",
+      "act": "close",
+      "start": 112,
+      "dur": 8,
+      "name": "The time you need",
+      "shots": [
+        {
+          "media": "c02_crosswalk_aerial_b",
+          "in": 1.5,
+          "dur": 8.0,
+          "grade": "dawn",
+          "zoom": [
+            1.04,
+            1.0
+          ]
+        }
+      ],
+      "vo": {
+        "id": "L15",
+        "text": "MDGB. The time you need.",
+        "at": 113.2
+      },
+      "ost": {
+        "counter": "CROSSINGS TODAY",
+        "title": "MDGB",
+        "tagline": "The time you need.",
+        "event": "HackTurin 2026 · GOMA Smart Crossing Challenge",
+        "team": [
+          [
+            "Paolo Malugani",
+            "AI & vision"
+          ],
+          [
+            "Salvatore Gullotta",
+            "firmware"
+          ],
+          [
+            "Lorenzo Dragoni",
+            "network & control room"
+          ],
+          [
+            "Kuzey Bicher",
+            "electronics"
+          ]
+        ]
+      }
+    }
+  ]
+}

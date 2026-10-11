@@ -1,0 +1,13 @@
+# trailer/ toolchain (Python 3.11-3.13). Install: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+numpy==2.5.3
+scipy==1.18.1
+soundfile==0.14.0
+librosa==1.0.0            # beat tracking (audio-ducking-and-sync)
+kokoro-onnx==0.6.1        # offline English narrator (tts-audio-synthesizer)
+onnxruntime==1.29.0
+edge-tts==7.2.8           # optional online TTS engine
+requests==2.34.2          # Pexels / Pixabay / Wikimedia APIs, ElevenLabs / OpenAI TTS
+opencv-python-headless==5.0.0.93
+supervision==0.30.5       # same pin as ai/ (ByteTrack)
+PyYAML==6.0.3
+pillow==12.3.0

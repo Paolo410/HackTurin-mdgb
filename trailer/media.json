@@ -1,0 +1,291 @@
+{
+  "_readme": "Clip registry. To swap a stock clip for your own footage, change 'file' (path relative to trailer/) and, if needed, 'in' in timeline.json. Then run: python tools/build.py",
+  "clips": {
+    "c01_crosswalk_aerial_a": {
+      "file": "assets/b-roll/c01_crosswalk_aerial_a.mp4",
+      "source": "pexels",
+      "source_id": 37247586,
+      "author": "SHOX ART",
+      "title": "Aerial View of Pedestrians at Crosswalk in City",
+      "page": "https://www.pexels.com/video/37247586/",
+      "download": "https://videos.pexels.com/video-files/37247586/15779242_1920_1080_60fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 13
+    },
+    "c02_crosswalk_aerial_b": {
+      "file": "assets/b-roll/c02_crosswalk_aerial_b.mp4",
+      "source": "pexels",
+      "source_id": 37247585,
+      "author": "SHOX ART",
+      "title": "Aerial View of Busy Urban Crosswalk Scene",
+      "page": "https://www.pexels.com/video/37247585/",
+      "download": "https://videos.pexels.com/video-files/37247585/15779256_1920_1080_60fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 14
+    },
+    "c03_feet": {
+      "file": "assets/b-roll/c03_feet.mp4",
+      "source": "pexels",
+      "source_id": 5434539,
+      "author": "Everett Bumstead",
+      "title": "A Person Walking on the Street",
+      "page": "https://www.pexels.com/video/5434539/",
+      "download": "https://videos.pexels.com/video-files/5434539/5434539-hd_1920_1080_30fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 8
+    },
+    "c04_cane": {
+      "file": "assets/b-roll/c04_cane.mp4",
+      "source": "pexels",
+      "source_id": 7182230,
+      "author": "Eren Li",
+      "title": "A man with a cane walking on a bridge",
+      "page": "https://www.pexels.com/video/7182230/",
+      "download": "https://videos.pexels.com/video-files/7182230/7182230-hd_1920_1080_25fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 10
+    },
+    "c05_headlights_rain": {
+      "file": "assets/b-roll/c05_headlights_rain.mp4",
+      "source": "pexels",
+      "source_id": 16815342,
+      "author": "Erik Mclean",
+      "title": "Close up View of a Car with Lights on in the Pouring Rain",
+      "page": "https://www.pexels.com/video/16815342/",
+      "download": "https://videos.pexels.com/video-files/16815342/16815342-hd_2048_858_24fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 11
+    },
+    "c06_tram_night": {
+      "file": "assets/b-roll/c06_tram_night.mp4",
+      "source": "pexels",
+      "source_id": 11932228,
+      "author": "Evgenij Mikhailov",
+      "title": "Tram on City Street at Night",
+      "page": "https://www.pexels.com/video/11932228/",
+      "download": "https://videos.pexels.com/video-files/11932228/11932228-hd_1920_1080_50fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 23
+    },
+    "c07_button": {
+      "file": "assets/b-roll/c07_button.mp4",
+      "source": "pexels",
+      "source_id": 5665076,
+      "author": "Taryn Elliott",
+      "title": "Person Pressing a Button at Traffic Lights on Pedestrian Crossing",
+      "page": "https://www.pexels.com/video/5665076/",
+      "download": "https://videos.pexels.com/video-files/5665076/5665076-hd_1920_1080_25fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 5
+    },
+    "c08_red_light_night": {
+      "file": "assets/b-roll/c08_red_light_night.mp4",
+      "source": "pexels",
+      "source_id": 31989387,
+      "author": "setengah lima sore",
+      "title": "Jakarta Night Traffic Light Stop Scene",
+      "page": "https://www.pexels.com/video/31989387/",
+      "download": "https://videos.pexels.com/video-files/31989387/13632185_1920_1080_30fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 13
+    },
+    "c09_crossing_lowangle": {
+      "file": "assets/b-roll/c09_crossing_lowangle.mp4",
+      "source": "pexels",
+      "source_id": 4992551,
+      "author": "Ketut Subiyanto",
+      "title": "Person Crossing the Street",
+      "page": "https://www.pexels.com/video/4992551/",
+      "download": "https://videos.pexels.com/video-files/4992551/4992551-hd_1920_1080_30fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 8
+    },
+    "c10_night_traffic": {
+      "file": "assets/b-roll/c10_night_traffic.mp4",
+      "source": "pexels",
+      "source_id": 32161278,
+      "author": "Igor Vieira",
+      "title": "Bustling Night Traffic with City Lights",
+      "page": "https://www.pexels.com/video/32161278/",
+      "download": "https://videos.pexels.com/video-files/32161278/13713774_1920_1080_24fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 11
+    },
+    "c12_night_crosswalk": {
+      "file": "assets/b-roll/c12_night_crosswalk.mp4",
+      "source": "pexels",
+      "source_id": 39797044,
+      "author": "Matheus Bertelli",
+      "title": "Urban City Night Traffic at Crosswalk",
+      "page": "https://www.pexels.com/video/39797044/",
+      "download": "https://videos.pexels.com/video-files/39797044/16972603_2048_1080_30fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 21
+    },
+    "c13_lens": {
+      "file": "assets/b-roll/c13_lens.mp4",
+      "source": "pexels",
+      "source_id": 3752424,
+      "author": "Ricky Esquivel",
+      "title": "Close-Up Footage Of A Camera Lens",
+      "page": "https://www.pexels.com/video/3752424/",
+      "download": "https://videos.pexels.com/video-files/3752424/3752424-hd_1920_1080_24fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 14
+    },
+    "c14_pcb": {
+      "file": "assets/b-roll/c14_pcb.mp4",
+      "source": "pexels",
+      "source_id": 6754824,
+      "author": "Tima Miroshnichenko",
+      "title": "Close up Shot of a Printed Circuit Board",
+      "page": "https://www.pexels.com/video/6754824/",
+      "download": "https://videos.pexels.com/video-files/6754824/6754824-hd_1920_1080_25fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 19
+    },
+    "c15_turin_mole": {
+      "file": "assets/b-roll/c15_turin_mole.mp4",
+      "source": "pexels",
+      "source_id": 29808342,
+      "author": "Sergey Guk",
+      "title": "Aerial View of Turin's Historic Architecture",
+      "page": "https://www.pexels.com/video/29808342/",
+      "download": "https://videos.pexels.com/video-files/29808342/12805642_1280_720_60fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 19
+    },
+    "c16_traffic_light_close": {
+      "file": "assets/b-roll/c16_traffic_light_close.mp4",
+      "source": "pexels",
+      "source_id": 6415591,
+      "author": "Davlat Tursunov",
+      "title": "Close Up Shot of a Traffic Light",
+      "page": "https://www.pexels.com/video/6415591/",
+      "download": "https://videos.pexels.com/video-files/6415591/6415591-hd_1920_1080_25fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 16
+    },
+    "c17_pole_view": {
+      "file": "assets/b-roll/c17_pole_view.mp4",
+      "source": "pexels",
+      "source_id": 36330911,
+      "author": "SHOX ART",
+      "title": "Urban Crosswalk Scene with Pedestrians and Cyclists",
+      "page": "https://www.pexels.com/video/36330911/",
+      "download": "https://videos.pexels.com/video-files/36330911/15408969_1920_1080_24fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 34
+    },
+    "c18_rain_crosswalk": {
+      "file": "assets/b-roll/c18_rain_crosswalk.mp4",
+      "source": "pexels",
+      "source_id": 39488108,
+      "author": "Kamus Cheung",
+      "title": "Rainy Crosswalk with Colorful Umbrellas",
+      "page": "https://www.pexels.com/video/39488108/",
+      "download": "https://videos.pexels.com/video-files/39488108/16821065_1920_1080_30fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 26
+    },
+    "c19_elderly_cane": {
+      "file": "assets/b-roll/c19_elderly_cane.mp4",
+      "source": "pexels",
+      "source_id": 39630476,
+      "author": "Atilla Kurt",
+      "title": "Elderly Man Walking with Cane on Urban Street",
+      "page": "https://www.pexels.com/video/39630476/",
+      "download": "https://videos.pexels.com/video-files/39630476/16893694_1920_1080_25fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 11
+    },
+    "c20_child": {
+      "file": "assets/b-roll/c20_child.mp4",
+      "source": "pexels",
+      "source_id": 5089495,
+      "author": "Kamaji Ogino",
+      "title": "Cheerful Mother and Daughter Crossing the road",
+      "page": "https://www.pexels.com/video/5089495/",
+      "download": "https://videos.pexels.com/video-files/5089495/5089495-hd_1920_1080_30fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 11
+    },
+    "c21_dog": {
+      "file": "assets/b-roll/c21_dog.mp4",
+      "source": "pexels",
+      "source_id": 8499339,
+      "author": "Yaroslav Shuraev",
+      "title": "Person and Dogs wearing Raincoat while Crossing",
+      "page": "https://www.pexels.com/video/8499339/",
+      "download": "https://videos.pexels.com/video-files/8499339/8499339-hd_1920_1080_24fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 8
+    },
+    "c22_ped_light_red": {
+      "file": "assets/b-roll/c22_ped_light_red.mp4",
+      "source": "pexels",
+      "source_id": 32001464,
+      "author": "Dominik Zítka",
+      "title": "Urban Traffic Light Changes at Night",
+      "page": "https://www.pexels.com/video/32001464/",
+      "download": "https://videos.pexels.com/video-files/32001464/13638260_1920_1080_25fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 14
+    },
+    "c23_lights_changing": {
+      "file": "assets/b-roll/c23_lights_changing.mp4",
+      "source": "pexels",
+      "source_id": 5402446,
+      "author": "K",
+      "title": "Traffic Lights Changing From Red to Green",
+      "page": "https://www.pexels.com/video/5402446/",
+      "download": "https://videos.pexels.com/video-files/5402446/5402446-hd_1920_1080_24fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 20
+    },
+    "c24_network_cables": {
+      "file": "assets/b-roll/c24_network_cables.mp4",
+      "source": "pexels",
+      "source_id": 1085656,
+      "author": "Dima Krivoy",
+      "title": "Blue Colored Cables",
+      "page": "https://www.pexels.com/video/1085656/",
+      "download": "https://videos.pexels.com/video-files/1085656/1085656-hd_1920_1080_25fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 24
+    },
+    "c25_topdown_crowd": {
+      "file": "assets/b-roll/c25_topdown_crowd.mp4",
+      "source": "pexels",
+      "source_id": 30935166,
+      "author": "Usman AbdulrasheedGambo",
+      "title": "Aerial View of Urban Pedestrian Crossing",
+      "page": "https://www.pexels.com/video/30935166/",
+      "download": "https://videos.pexels.com/video-files/30935166/13227659_1920_1080_24fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 17
+    },
+    "c26_turin_aerial_alps": {
+      "file": "assets/b-roll/c26_turin_aerial_alps.mp4",
+      "source": "pexels",
+      "source_id": 29808354,
+      "author": "Sergey Guk",
+      "title": "Aerial Drone View of Historic Turin Cityscape",
+      "page": "https://www.pexels.com/video/29808354/",
+      "download": "https://videos.pexels.com/video-files/29808354/12805599_1920_1080_60fps.mp4",
+      "license": "Pexels License (free to use, attribution appreciated)",
+      "original_duration": 17
+    }
+  },
+  "audio": {
+    "music_epic_trailer": {
+      "file": "assets/music/epic-trailer_the-mountain_576568.mp3",
+      "source": "pixabay",
+      "source_id": 576568,
+      "author": "The_Mountain",
+      "title": "Epic Trailer",
+      "page": "https://pixabay.com/music/build-up-scenes-epic-trailer-576568/",
+      "license": "Pixabay Content License (free for commercial use, no attribution required)"
+    }
+  }
+}
