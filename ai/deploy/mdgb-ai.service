@@ -13,8 +13,8 @@ WorkingDirectory=/home/arduino/HackTurin-mdgb/ai
 Environment=MDGB_C3_DIR=/home/arduino/HackTurin-mdgb/logs/c3
 # The status lines reach journalctl -u mdgb-ai at once (run_vision.sh uses python -u for the same reason).
 Environment=PYTHONUNBUFFERED=1
-# libcamerify: the camera of the board is a CSI sensor read by libcamera; this makes OpenCV see it as /dev/video0.
-ExecStart=/usr/bin/libcamerify /home/arduino/venv/bin/python -m smartcrossing.app --source 0 --profile unoq --headless --actuator bridge --operator-port 8090
+# The camera, or a recorded video chosen with `run_vision.sh video ...` (ai/.vision_args): see vision_service.sh.
+ExecStart=/home/arduino/HackTurin-mdgb/ai/deploy/vision_service.sh
 Restart=always
 RestartSec=2
 # Stop like Ctrl+C: the vision closes the camera and the link cleanly. A camera left half open (SIGKILL) can stay

@@ -46,6 +46,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--night", action="store_true", help="force night mode (to try the thermal fusion in daylight)")
     p.add_argument("--max-fps", type=float, help="override source.max_fps")
     p.add_argument("--max-frames", type=int, default=0, help="stop after N frames (0 = until the source ends)")
+    p.add_argument("--loop", action="store_true", help="play a video file again and again, in real time as if it "
+                   "came from the camera (benchmark, live demo)")
     p.add_argument("--config", help="path to a config.yaml (default: ai/config.yaml)")
     p.add_argument("--calib", help="path to a calib.json (default: ai/calib.json, else ai/calib.example.json)")
     p.add_argument("--c3-dir", help="folder of the C3 event files (default: $MDGB_C3_DIR, else logs/c3 in the repo)")
@@ -79,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
         events_dir = args.c3_dir or c3_dir(cfg)
         mcu_files = C5FileTail(events_dir, cfg["mcu"]["applab_series"], mcu.on_line, cfg["mcu"]["poll_s"])
         operator = OperatorPage(args.operator_port, mcu, cfg) if args.operator_port is not None else None
-        source = FrameSource(args.source or default_source(cfg), cfg)
+        source = FrameSource(args.source or default_source(cfg), cfg, loop=args.loop)
         pipeline = Pipeline(cfg, source.fps, calib, actuator, site=args.site, thermal=thermal)
     except (FileNotFoundError, RuntimeError, TypeError, OSError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -126,6 +128,7 @@ def main(argv: list[str] | None = None) -> int:
                         pipeline.events.summary(), setup], cfg)
         draw_thermal(view, pipeline.thermal, cfg)
 
+    loops_seen, pass_frames, pass_t0, pass_dropped = 0, 0, perf_counter(), 0   # passes of a looped video
     pipeline.commander.start()   # heartbeat every 100 ms, only while this loop is alive
     mcu_files.start()
     try:
@@ -143,6 +146,13 @@ def main(argv: list[str] | None = None) -> int:
                 time.sleep(_NO_FRAME_SLEEP_S)
             else:
                 frame, t = item
+                if source.loops != loops_seen:   # a looped video started again: the numbers of the pass just ended
+                    loops_seen, span = source.loops, perf_counter() - pass_t0
+                    print(f"pass {loops_seen}: frames={pass_frames} in {span:.1f}s, FPS {max(pass_frames - 1, 0) / span:.1f}, "
+                          f"late frames skipped {source.dropped - pass_dropped}")
+                    print(stats.table(float(cfg["bench"]["percentile"])))
+                    stats, pass_frames, pass_t0, pass_dropped = LatencyStats(), 0, perf_counter(), source.dropped
+                pass_frames += 1
                 result = pipeline.step(frame, t)
                 command = result.command
                 stats.add(result.lat_ms)
@@ -233,6 +243,8 @@ def main(argv: list[str] | None = None) -> int:
     elapsed = last - first
     end_to_end = (frames - 1) / elapsed if frames > 1 and elapsed > 0 else 0.0
     print(f"\nframes={frames} elapsed={elapsed:.1f}s end-to-end FPS={end_to_end:.1f}")
+    if not source.is_live:
+        print(f"video  passes={source.loops + 1} late frames skipped={source.dropped}")
     print(stats.table(float(cfg["bench"]["percentile"])))
     print("counts  " + (pipeline.counter.summary() if pipeline.counter else "no counting lines"))
     print("events  " + pipeline.events.summary())

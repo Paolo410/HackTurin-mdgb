@@ -23,6 +23,7 @@ source:
   resize_width: 960               # frames wider than this are downscaled, keeping the aspect ratio; 0 = keep
   max_fps: 0                      # processing rate cap; 0 = unlimited
   file_realtime: true             # play video files at their own speed (false = as fast as possible)
+  file_drop_late: true            # in real time, skip the frames that are already late, as a camera drops them
   samples_dir: samples            # default video folder (git-ignored); if empty the webcam is used
   video_extensions: [.mp4, .mov, .avi, .mkv, .m4v]
 

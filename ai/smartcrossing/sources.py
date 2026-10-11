@@ -48,16 +48,23 @@ class FrameSource:
     Live sources (webcam, RTSP): t is time.monotonic() at capture.
     Video files: t follows the video timeline (frame index / fps), so speeds measured later do not
     depend on how fast the file is processed. When max_fps is lower than the file rate, frames are
-    skipped like a live camera would drop them.
+    skipped like a live camera would drop them. Played in real time (the vision on a recorded video, as
+    if it came from the camera), the frames that are already late are skipped too (source.file_drop_late):
+    a slow board then sees what it would see from the camera, not a slowed-down video. With loop the file
+    starts again at the end and the timeline goes on.
     """
 
-    def __init__(self, source: str, cfg: dict, realtime: bool | None = None):
+    def __init__(self, source: str, cfg: dict, realtime: bool | None = None, loop: bool = False):
         src = cfg["source"]
         self.name = str(source)
         self.resize_width = int(src["resize_width"])
         self.max_fps = float(src["max_fps"])
         self.is_live = self.name.isdigit() or "://" in self.name
         self.realtime = self.is_live or (src["file_realtime"] if realtime is None else realtime)
+        self.drop_late = bool(src["file_drop_late"])
+        self.loop = bool(loop) and not self.is_live
+        self.loops = 0        # times a looped file started again
+        self.dropped = 0      # late frames skipped
 
         if not self.is_live and not Path(self.name).is_file():
             raise FileNotFoundError(f"Video not found: {self.name}")
@@ -97,14 +104,18 @@ class FrameSource:
                 return None
             t = time.monotonic()
         else:
-            for _ in range(self._step - 1):
-                if not self._cap.grab():
-                    return None
-            ok, frame = self._cap.read()
-            if not ok:
-                return None
-            self._frame_idx += self._step
             fps = self.native_fps or 1.0
+            if self.realtime and self.drop_late and self._t0 is not None:
+                # Late: skip the frames a live camera would have dropped while we were busy.
+                late = int((time.monotonic() - self._t0) * fps) - (self._frame_idx + self._step)
+                for _ in range(max(0, late)):
+                    if not self._cap.grab():
+                        break             # end of the file: _read_file starts again or stops
+                    self._frame_idx += 1
+                    self.dropped += 1
+            frame = self._read_file()
+            if frame is None:
+                return None
             if self._t0 is None:
                 self._t0 = time.monotonic() - self._frame_idx / fps
             t = self._t0 + self._frame_idx / fps
@@ -113,6 +124,25 @@ class FrameSource:
                 if delay > 0:
                     time.sleep(delay)
         return self._resize(frame), t
+
+    def _read_file(self) -> np.ndarray | None:
+        """The next file frame, max_fps steps apart. With loop, at the end the file starts again."""
+        for _ in range(2):
+            ok = True
+            for _ in range(self._step - 1):
+                if not self._cap.grab():
+                    ok = False
+                    break
+            if ok:
+                ok, frame = self._cap.read()
+            if ok:
+                self._frame_idx += self._step
+                return frame
+            if not self.loop or self._frame_idx < 0:
+                return None
+            self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)    # the timeline (frame index) goes on
+            self.loops += 1
+        return None
 
     def _pace(self, min_period: float) -> None:
         now = time.monotonic()
