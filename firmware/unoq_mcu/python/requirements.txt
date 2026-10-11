@@ -1,0 +1,6 @@
+# Installed by App Lab in the container of the app (python-apps-base, Python 3.13).
+# numpy, opencv-python-headless and pyyaml already come with the container: not listed, so the camera keeps
+# the OpenCV build of the container. Same versions as ai/requirements.txt.
+onnxruntime==1.30.0
+# supervision does not depend on opencv-python (checked in the 0.30.5 wheel metadata).
+supervision==0.30.5
