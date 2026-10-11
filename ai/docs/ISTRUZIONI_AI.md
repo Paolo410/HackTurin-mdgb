@@ -150,7 +150,28 @@ python scripts/benchmark.py run riferimento --only <video> --force   # riferimen
 python scripts/benchmark.py reference                 # dopo un nuovo riferimento (conserva le revisioni)
 ```
 
+### Clip dalla camera della scheda
+
+```bash
+ssh arduino@MDGB.local
+cd ~/HackTurin-mdgb/ai
+deploy/run_vision.sh video samples/Torino_1.mp4 --calib samples/calib/torino_1.json   # libera la camera
+deploy/run_vision.sh record 120 incrocio_1     # 2 minuti in samples/clips/incrocio_1.mp4 + .json
+deploy/run_vision.sh camera                    # alla fine
+```
+
+- Il `.json` dice FPS reali, letture fallite e fotogrammi scuri: se ce ne sono, la clip non va usata per il
+  benchmark e va capito perché (punto 51 di `DECISIONS.md`).
+- Le clip si portano sul Mac con `scp` in `ai/samples/` (fuori da git), poi calibrazione, riga in
+  `benchmarks/videos.json`, riferimento, `review` e `judge` come per i video di Torino.
+- Esposizione e guadagno della camera si fissano all'avvio (`scripts/camera_exposure.py`): se la luce cambia
+  molto, `deploy/run_vision.sh restart`.
+
 ### Trappole note
+
+- **Fotogrammi scuri uno su tre con la camera:** era l'esposizione automatica di libcamera che non si assesta.
+  È spenta dalla taratura in `deploy/camera_tuning` (punto 51). Se ricompare, controlla che il servizio parta con
+  `LIBCAMERA_IPA_CONFIG_PATH` (`deploy/vision_service.sh`) e registra una clip di prova.
 
 - **Video di Torino illeggibili sul Mac** ("Operation not permitted", attributo `com.apple.macl` di macOS dall'11/10
   mattina). Le copie sulla scheda sono intatte: `scp arduino@MDGB.local:HackTurin-mdgb/ai/samples/Torino_1.mp4 <cartella>/`

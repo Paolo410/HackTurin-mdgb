@@ -619,4 +619,27 @@ con v_ped 0,3 → 25 s.
       Va deciso quale PC fa da centrale, oppure lo script va lanciato con `--broker mdgb-centrale.local`.
     - Limiti: una centrale alla volta; serve una rete che lasci passare mDNS (quella della sede lo fa); Mosquitto
       va installato a mano sul PC.
+51. **Fotogrammi scuri alternati a quelli buoni: esposizione automatica spenta (11/10, 12:30)**, segnalato dal team.
+    - Cosa si vedeva: con la camera, un fotogramma su tre molto più scuro. Misurato registrando 30 s a 10 FPS
+      (`scripts/record_clip.py`): la luminosità gira in un ciclo di tre fotogrammi, circa 60 / 140 / 210, senza
+      letture fallite. Nei fotogrammi scuri la scena è quella vera (somiglianza 0,98 con il fotogramma prima):
+      non sono immagini vecchie rimaste in un buffer, è l'esposizione che oscilla.
+    - Causa: l'esposizione automatica (`Agc`) dell'ISP software di libcamera, che per la IMX219 lavora senza
+      taratura (`uncalibrated.yaml`), non si assesta. Lo strato V4L2 non offre controlli per spegnerla.
+    - Rimedio: `deploy/camera_tuning/simple/imx219.yaml`, cioè la taratura di libcamera senza `Agc`, caricata con
+      `LIBCAMERA_IPA_CONFIG_PATH` (niente `sudo`); e `scripts/camera_exposure.py`, che prima di aprire la camera
+      misura la luminosità e imposta il guadagno del sensore (l'esposizione solo se il guadagno non basta, perché
+      un'esposizione lunga sfoca chi si muove). Lo lanciano `vision_service.sh` e `run_vision.sh`.
+    - Un valore cambiato a camera accesa viene sovrascritto subito (provato): si imposta solo prima dell'avvio.
+    - Misurato dopo: luminosità 81 → guadagno x3,7 → 127; 30 s senza nessun fotogramma scuro (da 80 a 135, solita 134).
+    - Limite: esposizione e guadagno restano fissi fino al prossimo avvio della camera. Se la luce cambia molto
+      (giorno e notte) serve `run_vision.sh restart`. Un controllo lento che riapre la camera quando la luminosità
+      esce dalla banda è il passo successivo, non fatto.
+    - Altre cose viste: appena aperta, la camera dà circa un secondo di fotogrammi neri; letta "più in fretta che
+      si può" lo strato V4L2 fallisce migliaia di letture; riaprirla due volte nello stesso processo può dare un
+      buffer malformato (`cv2.error`).
+52. **Clip dalla camera per il benchmark** (`scripts/record_clip.py`, `run_vision.sh record <secondi> [nome]`):
+    scrive solo in `ai/samples/clips/` (fuori da git) un `.mp4` e un `.json` con fotogrammi, FPS reali, letture
+    fallite e fotogrammi scuri con il momento in cui capitano. La camera ha un lettore alla volta: si registra
+    mentre la visione è su un video. La visione continua a non salvare mai fotogrammi.
 
