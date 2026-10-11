@@ -16,7 +16,8 @@ def default_source(cfg: dict) -> str:
     folder = resolve_path(src["samples_dir"])
     extensions = {e.lower() for e in src["video_extensions"]}
     if folder.is_dir():
-        videos = sorted(p for p in folder.iterdir() if p.suffix.lower() in extensions)
+        # By file name as text: the same first video on every system (see Playlist).
+        videos = sorted((p for p in folder.iterdir() if p.suffix.lower() in extensions), key=lambda p: p.name)
         if videos:
             return str(videos[0])
     return "0"

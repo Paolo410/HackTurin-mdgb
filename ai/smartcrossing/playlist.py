@@ -33,7 +33,9 @@ class Playlist:
 
     def __init__(self, first: str | Path, first_calib: str | Path | None = None):
         first = Path(first).resolve()
-        self.videos = sorted(p for p in first.parent.iterdir() if p.suffix.lower() in VIDEO_SUFFIXES and p.is_file())
+        # By file name as text, not as paths: Windows compares paths without case, and the order would change.
+        self.videos = sorted((p for p in first.parent.iterdir() if p.suffix.lower() in VIDEO_SUFFIXES and p.is_file()),
+                             key=lambda p: p.name)
         self.index = self.videos.index(first) if first in self.videos else 0
         if first not in self.videos:
             self.videos.insert(0, first)
