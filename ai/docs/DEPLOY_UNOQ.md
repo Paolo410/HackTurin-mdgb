@@ -186,8 +186,17 @@ ssh arduino@<scheda> 'journalctl -u mdgb-ai -f'
 - **Cicalino muto mentre c'è il tecnico:** dal badge al logout, o ai 2 minuti se non entra, il comando C1 porta
   `"tech": true` e lo sketch non suona (solo il bip di conferma del badge). Lo sketch tiene da solo i 2 minuti dal
   badge, anche senza visione; senza heartbeat il campo non vale più e il cicalino torna attivo.
-- **Cosa mostra:** stato, motivo, FPS, tempi, conteggi, sensori, ultimo urto; e la vista dal vivo della camera con
-  i riquadri della visione.
+- **Cosa mostra**, dopo l'accesso, in tre schede:
+  - **Stato:** una frase in cima ("Tutto funziona", "Una cosa da controllare"...), poi le parti da sistemare con il
+    "cosa fare" e una riga per ogni parte che funziona (`smartcrossing/health.py`): camera, riconoscimento,
+    collegamento con lo sketch, app di App Lab e sketch, temperatura e umidità, aria, luce, antifurto, lettore badge,
+    salvataggio eventi. A lato il semaforo (stato della regola e motivo) e i dettagli della visione;
+  - **Vista dal vivo:** la camera con i riquadri, i pulsanti dei video, i passaggi contati;
+  - **Registro:** gli ultimi 100 eventi in memoria (parti del nodo, traffico, accessi e allarmi), scaricabili in testo.
+  I sensori della scheda arrivano dalle righe `env` di `mdgb_link.py` ogni 10 s, che ripetono l'ultimo valore: da qui
+  si vede l'app di App Lab o lo sketch che si fermano e i valori impossibili, non un singolo sensore che si stacca.
+  Ogni cambio di stato di una parte va anche nel log del servizio (`journalctl -u mdgb-ai | grep diagnosi`).
+- **Logo:** il segnaposto di `docs/brand/` (simbolo dentro la pagina, nessun file in più da copiare).
 - **Interruttore delle immagini:** `operator.share_images: false` in `config.yaml` spegne la vista dal vivo e
   lascia solo le statistiche. È l'impostazione pensata per la produzione: nessuna immagine esce dal programma.
 - **Le immagini non vengono mai salvate**: esistono in memoria solo mentre un tecnico connesso sta guardando.
