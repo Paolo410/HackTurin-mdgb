@@ -1,7 +1,7 @@
 """Recorded videos as if from the camera: which video and calibration come next, commands of the page."""
 from pathlib import Path
 
-from smartcrossing.playlist import Playlist, calib_for
+from smartcrossing.playlist import Playlist, calib_for, is_camera, label
 
 
 def _folder(tmp_path):
@@ -37,3 +37,30 @@ def test_commands_of_the_page_reach_the_vision_loop_in_order(tmp_path):
     playlist = Playlist(_folder(tmp_path) / "Torino_1.mp4")
     assert playlist.request("fwd") and playlist.request("next") and not playlist.request("rm -rf")
     assert playlist.take() == ["fwd", "next"] and playlist.take() == []
+
+
+def test_entries_ahead_come_first_in_their_order_then_the_others_by_name(tmp_path):
+    folder = _folder(tmp_path)
+    names = sorted(p.name for p in folder.iterdir() if p.suffix == ".mp4")
+    ahead = [names[-1].upper(), "camera", "not_here.mp4", names[1]]          # case of the name does not matter
+    playlist = Playlist(folder / names[-1], ahead=ahead)
+    assert [label(v) for v in playlist.videos[:3]] == [names[-1], "camera dal vivo", names[1]]
+    assert [v.name for v in playlist.videos[3:]] == [n for n in names if n not in (names[-1], names[1])]
+    assert playlist.index == 0 and len(playlist.videos) == len(names) + 1
+
+
+def test_the_camera_is_an_entry_like_the_others(tmp_path):
+    folder = _folder(tmp_path)
+    first = sorted(p for p in folder.iterdir() if p.suffix == ".mp4")[0]
+    playlist = Playlist(first, "my_calib.json", ahead=[first.name, "camera"])
+    camera = playlist.move(1)
+    assert is_camera(camera) and str(camera) == "0"                          # what FrameSource opens as the camera
+    assert playlist.calib() is None                                          # the calibration of the node, not by name
+    assert playlist.move(-1) == first.resolve() and playlist.calib() == Path("my_calib.json")
+
+
+def test_without_entries_ahead_the_order_is_by_name_as_before(tmp_path):
+    folder = _folder(tmp_path)
+    first = sorted(p for p in folder.iterdir() if p.suffix == ".mp4")[0]
+    assert Playlist(first).videos == Playlist(first, ahead=[]).videos == sorted(
+        (p.resolve() for p in folder.iterdir() if p.suffix == ".mp4"), key=lambda p: p.name)

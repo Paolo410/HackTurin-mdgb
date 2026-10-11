@@ -104,7 +104,10 @@ class FrameSource:
         """Returns the next (frame, t), or None when the source ends or fails."""
         if self.is_live:
             self._pace(1.0 / self.max_fps if self.max_fps > 0 else 0.0)
-            ok, frame = self._cap.read()
+            try:
+                ok, frame = self._cap.read()
+            except cv2.error:     # malformed buffer, seen on the board after opening the camera again: a failed read
+                ok = False
             if not ok:
                 return None
             t = time.monotonic()

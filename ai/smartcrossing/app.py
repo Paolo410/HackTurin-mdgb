@@ -9,6 +9,7 @@ AI-M5: optional thermal camera for the night (--thermal).
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 import time
 from collections import deque
@@ -25,7 +26,7 @@ from .logger import C3Logger, c3_dir, flat_counts
 from .mcu import C5FileTail, McuState
 from .overlay import draw_hud, draw_lines, draw_state, draw_thermal, draw_tracks, draw_zones
 from .pipeline import PHASES, LatencyStats, Pipeline
-from .playlist import Playlist
+from .playlist import Playlist, is_camera, label
 from .sources import FrameSource, default_source
 from .status_page import OperatorPage
 from .thermal import ThermalFusion, make_thermal_source
@@ -34,6 +35,7 @@ _KEY_ESC = 27
 _MIN_DT = 1e-6  # avoids a division by zero in the instantaneous FPS
 _NO_FRAME_SLEEP_S = 0.05  # pause between two attempts when a live camera gives no frame
 _HEALTH_PERIOD_S = 1.0    # check of the parts of the node, for the technician's page and the log
+_CAMERA_SETUP_MARGIN_S = 10.0   # on top of the measures of scripts/camera_exposure.py, before giving up on it
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -59,6 +61,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--operator-port", type=int, help="page for the technician on this port: after the badge and "
                                                      "a login it shows the numbers and, if enabled, a live view")
     return p.parse_args(argv)
+
+
+def _prepare_camera(cfg: dict) -> None:
+    """Exposure and gain of the camera for the light of this moment, before the playlist opens it: the same step
+    deploy/vision_service.sh does when the service starts on the camera. The camera must be free while it runs.
+    On a PC the script finds no sensor and leaves everything as it is. Never stops the vision."""
+    script = Path(__file__).resolve().parent.parent / "scripts" / "camera_exposure.py"
+    cam = cfg["camera"]
+    limit = int(cam["attempts"]) * float(cam["measure_timeout_s"]) + _CAMERA_SETUP_MARGIN_S
+    try:
+        subprocess.run([sys.executable, str(script)], timeout=limit, check=False)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        print(f"camera exposure left as it is ({exc})")
 
 
 def _fmt_ms(value: float | None) -> str:
@@ -99,7 +114,7 @@ def main(argv: list[str] | None = None) -> int:
         pipeline = Pipeline(cfg, source.fps, calib, actuator, site=args.site, thermal=thermal)
         # A recorded video (tests, benchmarks): the technician's page can move to the previous / next video of
         # its folder or back / forward. Not with the camera.
-        playlist = None if source.is_live else Playlist(source.name, args.calib)
+        playlist = None if source.is_live else Playlist(source.name, args.calib, cfg["operator"]["playlist_first"])
         if operator is not None and playlist is not None:
             operator.video_control = playlist.request
     except (FileNotFoundError, RuntimeError, TypeError, OSError) as exc:
@@ -153,17 +168,25 @@ def main(argv: list[str] | None = None) -> int:
     pipeline.commander.start()   # heartbeat every 100 ms, only while this loop is alive
     mcu_files.start()
     def switch_video(step: int) -> None:
-        """The previous / next video of the playlist with its calibration. Detector, link to the sketch, page and
-        events stay; tracks, counts and rule start again for the new scene."""
+        """The previous / next entry of the playlist with its calibration. Detector, link to the sketch, page and
+        events stay; tracks, counts and rule start again for the new scene. An entry that does not open (a missing
+        file, the camera busy) is skipped; if none opens the vision stays where it is."""
         nonlocal source, pipeline, calib_path, setup, loops_seen, pass_frames, pass_t0, pass_dropped, stats
-        video = playlist.move(step)
-        try:
-            example = resolve_path(cfg["counting"]["example_calib_path"])   # counting lines only: no metres
-            new_calib, new_calib_path = load_calib(cfg, playlist.calib(video) or example)
-            new_source = FrameSource(str(video), cfg, loop=args.loop)
-        except (OSError, RuntimeError, ValueError) as exc:
-            print(f"video {video.name}: cannot open ({exc}), staying on {source.name}")
-            return
+        for _ in playlist.videos:
+            video = playlist.move(step)
+            try:
+                example = resolve_path(cfg["counting"]["example_calib_path"])   # counting lines only: no metres
+                if is_camera(video):   # the calibration of the node (calib.json), else the example
+                    new_calib, new_calib_path = load_calib(cfg)
+                    _prepare_camera(cfg)
+                else:
+                    new_calib, new_calib_path = load_calib(cfg, playlist.calib(video) or example)
+                new_source = FrameSource(str(video), cfg, loop=args.loop)
+                break
+            except (OSError, RuntimeError, ValueError) as exc:
+                print(f"video {label(video)}: cannot open ({exc}), skipped")
+        else:
+            return   # a whole round without one that opens: the list is back on the current entry
         new_pipeline = Pipeline(cfg, new_source.fps, new_calib, None, detector=pipeline.detector, site=args.site,
                                 thermal=thermal)
         new_pipeline.detector.set_roi(new_calib.get("roi"))
@@ -172,7 +195,7 @@ def main(argv: list[str] | None = None) -> int:
         source.release()
         setup = setup.replace(f"source={source.name}", f"source={new_source.name}")   # the line on the image
         source, pipeline, calib_path = new_source, new_pipeline, new_calib_path
-        print(f"video -> {video.name} ({playlist.index + 1}/{len(playlist.videos)}) calib={calib_path.name}")
+        print(f"video -> {label(video)} ({playlist.index + 1}/{len(playlist.videos)}) calib={calib_path.name}")
 
     seek_s = float(cfg["operator"]["video_seek_s"])
     example_calib = resolve_path(cfg["counting"]["example_calib_path"]).resolve()
@@ -277,9 +300,11 @@ def main(argv: list[str] | None = None) -> int:
                     "events": pipeline.events.summary(), "source": Path(source.name).name, "calib": calib_path.name,
                     "counts_sent": not example_lines(),
                     "video": None if playlist is None else {
-                        "name": playlist.current.name, "index": playlist.index + 1, "total": len(playlist.videos),
+                        "name": label(playlist.current), "index": playlist.index + 1, "total": len(playlist.videos),
+                        "live": is_camera(playlist.current),
                         "pos_s": round(source.position_s, 1), "dur_s": round(source.duration_s, 1),
-                        "calib": calib_path.name if calib_path.parent.name == "calib" else None, "seek_s": seek_s},
+                        "calib": calib_path.name if calib_path.parent.name == "calib"
+                        or (is_camera(playlist.current) and not example_lines()) else None, "seek_s": seek_s},
                     "link_failsafe": link_failsafe,
                     "lines": _lines(pipeline.counter),
                     "stats": {"yield_rate": pipeline.events.yield_rate, "near_miss": pipeline.events.near_misses,

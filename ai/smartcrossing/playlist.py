@@ -1,7 +1,9 @@
 """Recorded videos played as if they came from the camera: which video comes next, with which calibration, and the
 commands of the technician's page (previous / next video, back / forward a few seconds).
 
-Only for tests and benchmarks: with the camera there is no playlist and the page shows no video buttons.
+Only for tests, benchmarks and demos: started on the camera there is no playlist and the page shows no video
+buttons. Started on a video, the camera can be one of the entries (operator.playlist_first), to go from the
+recorded scenes to what the node sees now without restarting the vision.
 The commands arrive from the threads of the page and are carried out by the vision loop (take()), between two frames.
 """
 from __future__ import annotations
@@ -11,6 +13,17 @@ from pathlib import Path
 
 VIDEO_SUFFIXES = (".mp4", ".mov", ".avi", ".mkv")
 ACTIONS = ("prev", "next", "back", "fwd")
+CAMERA = Path("0")        # the camera of the node as an entry of the playlist: FrameSource opens "0"
+CAMERA_WORD = "camera"    # how it is written in operator.playlist_first
+
+
+def is_camera(entry: Path) -> bool:
+    return entry == CAMERA
+
+
+def label(entry: Path) -> str:
+    """The name of an entry as the technician reads it."""
+    return "camera dal vivo" if is_camera(entry) else entry.name
 
 
 def calib_for(video: Path) -> Path | None:
@@ -29,13 +42,23 @@ def calib_for(video: Path) -> Path | None:
 
 class Playlist:
     """The videos of the folder of the first one, in name order. The first keeps the calibration it was started
-    with (--calib); the others take theirs from calib_for()."""
+    with (--calib); the others take theirs from calib_for().
 
-    def __init__(self, first: str | Path, first_calib: str | Path | None = None):
+    ahead: file names that come before the others, in the order given (operator.playlist_first); "camera" among
+    them is the live camera. Names that are not in the folder are skipped."""
+
+    def __init__(self, first: str | Path, first_calib: str | Path | None = None, ahead: list[str] | tuple = ()):
         first = Path(first).resolve()
         # By file name as text, not as paths: Windows compares paths without case, and the order would change.
-        self.videos = sorted((p for p in first.parent.iterdir() if p.suffix.lower() in VIDEO_SUFFIXES and p.is_file()),
-                             key=lambda p: p.name)
+        videos = sorted((p for p in first.parent.iterdir() if p.suffix.lower() in VIDEO_SUFFIXES and p.is_file()),
+                        key=lambda p: p.name)
+        by_name = {p.name.lower(): p for p in videos}
+        head: list[Path] = []
+        for name in ahead:
+            entry = CAMERA if str(name).lower() == CAMERA_WORD else by_name.get(str(name).lower())
+            if entry is not None and entry not in head:
+                head.append(entry)
+        self.videos = head + [p for p in videos if p not in head]
         self.index = self.videos.index(first) if first in self.videos else 0
         if first not in self.videos:
             self.videos.insert(0, first)
@@ -49,6 +72,8 @@ class Playlist:
 
     def calib(self, video: Path | None = None) -> Path | None:
         video = video or self.current
+        if is_camera(video):
+            return None                 # the camera uses the calibration of the node, not one by file name
         if video == self._first and self._first_calib is not None:
             return self._first_calib
         return calib_for(video)

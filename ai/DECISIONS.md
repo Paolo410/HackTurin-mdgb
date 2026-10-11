@@ -643,3 +643,22 @@ con v_ped 0,3 → 25 s.
     fallite e fotogrammi scuri con il momento in cui capitano. La camera ha un lettore alla volta: si registra
     mentre la visione è su un video. La visione continua a non salvare mai fotogrammi.
 
+55. **Scaletta della demo nella pagina del tecnico (11/10, 16:30)**, chiesta da Paolo: prima Torino_2, poi
+    Torino_night_1, poi la camera dal vivo, poi gli altri video della cartella in ordine di nome come prima.
+    - `operator.playlist_first` in `config.yaml`: nomi di file che vengono prima degli altri, nell'ordine scritto;
+      `camera` fra questi è la camera dal vivo. Vuoto di default (nessun cambio sul PC); la scaletta della demo è
+      nel profilo `unoq`. I nomi che non sono nella cartella vengono saltati.
+    - La camera è una voce della scaletta: "Video dopo" da Torino_night_1 la apre senza riavviare la visione, e
+      prima di aprirla fissa esposizione e guadagno (`scripts/camera_exposure.py`, lo stesso passo dell'avvio
+      del servizio). Usa la calibrazione del nodo (`calib.json`); se manca, l'esempio: riquadri sì, regola e
+      conteggi alla centrale no.
+    - Una voce che non si apre (camera occupata, file sparito) viene saltata; prima la scaletta restava su un
+      nome sbagliato. Una lettura malformata della camera vale come lettura fallita, non ferma la visione.
+    - Provato: sul Mac tutto il giro dei pulsanti dalla pagina con una camera finta (che risponde, e occupata);
+      sulla scheda, in un processo a parte, video → camera → video → camera: 12 fotogrammi al secondo,
+      luminosità stabile (106), apertura in 10 s la prima volta e 4 s la seconda. Sulla scheda i pulsanti della
+      pagina non li ho premuti: serve il badge e il login.
+    - Durante i secondi in cui si fissa l'esposizione la visione non decide: se superano
+      `actuator.heartbeat_stale_s` lo sketch passa al ciclo normale e poi riprende.
+    - Per tornare indietro sulla scheda: `tar xzf ~/backup-mdgb-ai-20261011-152712.tgz -C ~/HackTurin-mdgb` e
+      `ai/deploy/run_vision.sh restart`.

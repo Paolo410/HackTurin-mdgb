@@ -239,6 +239,8 @@ operator:                         # page for the technician (--operator-port): b
   stream_width: 480               # width in pixels
   jpeg_quality: 70                # and JPEG quality
   video_seek_s: 10                # recorded videos only: how far the back / forward buttons of the page jump
+  playlist_first: []              # recorded videos only: file names shown before the others of the folder, in
+                                  # this order; "camera" among them is the live camera. Empty = name order only
 
 derive:
   rider_iou: 0.3                  # (spec) person/two-wheeler IoU above which the person is the rider
@@ -309,6 +311,8 @@ profiles:
     # (4.2 analysed per second). More vehicles and pedestrians counted (ai/docs/BENCHMARK.md)
     model: {input_size: 320, intra_op_num_threads: 3, detect_every_n: 1}
     source: {max_fps: 12, resize_width: 640}
+    # demo on the board: two recorded scenes, then what the node sees now, then the other videos of the folder
+    operator: {playlist_first: [Torino_2.mp4, Torino_night_1.mp4, camera]}
     tracking: {min_track_age: 2}
 
 # Applied on top of the profile by --emulate-unoq. (spec) 10 FPS, input 320, 4 onnxruntime threads.
