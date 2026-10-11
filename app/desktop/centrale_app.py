@@ -63,7 +63,9 @@ BLE_NODE=nodo01
 WEB_HOST=127.0.0.1
 WEB_PORT=8080
 
-# --- Mappa: chiave di Google Maps (Maps JavaScript API). Vuota = mappa senza chiave; senza Internet = schematica ---
+# --- Mappa: chiave di Google Maps (Maps JavaScript API). Vuota = mappa senza chiave; senza Internet = schematica.
+#     La stessa chiave, con "Places API (New)" e "Routes API" abilitate, aggiunge al flusso atteso orari e
+#     recensioni dei luoghi e il traffico (facoltativo: senza, il modello usa OpenStreetMap, ESA e il meteo) ---
 GOOGLE_MAPS_API_KEY=
 """
 
@@ -236,9 +238,11 @@ def selftest(url):
             break
         time.sleep(0.25)
     state = json.loads(get("/api/state"))
-    ok = info["mqtt"]["connected"] and bool(state["nodes"]) and b"Centrale MDGB" in get("/")
-    log.info("SELFTEST %s: mqtt=%s camere=%d mosquitto=%s", "OK" if ok else "FALLITO", info["mqtt"],
-             len(state["nodes"]), find_mosquitto())
+    forecast = json.loads(get("/api/forecast/nodo01"))  # il modello del flusso atteso è dentro l'app e risponde
+    ok = (info["mqtt"]["connected"] and bool(state["nodes"]) and b"Centrale MDGB" in get("/")
+          and forecast.get("available") is True)
+    log.info("SELFTEST %s: mqtt=%s camere=%d mosquitto=%s flusso atteso=%s", "OK" if ok else "FALLITO", info["mqtt"],
+             len(state["nodes"]), find_mosquitto(), forecast.get("available"))
     return ok
 
 

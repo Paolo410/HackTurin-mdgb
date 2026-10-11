@@ -81,6 +81,28 @@ def test_http_endpoints(store):
     assert {"nodo01", "nodo02"} == {n["node"] for n in api.get_json()["nodes"]}, "nodi con dati + app/nodes.json"
 
 
+def test_forecast_endpoint(store):
+    """Flusso atteso (ai/forecast): risponde subito, senza rete, anche per una camera che non ha mai mandato dati."""
+    from dashboard import load_forecaster
+    assert load_forecaster() is not None, "da sorgente il modello si trova in ai/forecast"
+    from forecast.context import Context
+    from forecast.service import Forecaster
+    offline = Forecaster(context=Context(None, {}, background=False))     # nessuna fonte esterna nei test
+    client = create_app(store, CONFIG, forecaster=offline).test_client()
+    f = client.get("/api/forecast/nodo01").get_json()
+    assert f["available"] and f["mode"] == "fused" and f["history_windows"] == 2, "le due finestre di conteggi del nodo"
+    assert set(f["estimate"]) == {"ped_in", "ped_out", "cyclist", "vehicles"} and len(f["next"]) == 12
+    g = client.get("/api/forecast/nodo09").get_json()
+    assert g["mode"] == "model_only" and g["sources"]["located"], "camera sulla mappa ma senza dati: solo il modello"
+    assert client.get("/api/forecast/mai-visto").get_json()["sources"]["located"] is False
+
+    class Broken:
+        def forecast(self, *a):
+            raise RuntimeError("boom")
+    broken = create_app(store, CONFIG, forecaster=Broken()).test_client().get("/api/forecast/nodo01")
+    assert broken.status_code == 200 and broken.get_json()["available"] is False, "la dashboard non si ferma"
+
+
 def test_repo_nodes_json_is_valid():
     from dashboard import node_config
     cams = node_config()

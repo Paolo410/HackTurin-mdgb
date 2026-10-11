@@ -3,6 +3,7 @@
     GET /            la pagina (app/dashboard.html, nessuna risorsa esterna: funziona senza Internet)
     GET /api/state   tutto quello che la pagina mostra, in JSON (aggiornato dalla pagina ogni 2 s)
     GET /api/info    stato della centrale stessa (MQTT, Bluetooth, cartella delle impostazioni)
+    GET /api/forecast/<nodo>   flusso atteso a quell'attraversamento (modello di ai/forecast, owner Paolo)
     POST /api/open/folder|config   apre la cartella delle impostazioni o il file di configurazione (app per il PC)
 
 Cosa mostra: mappa delle camere (posizioni in app/nodes.json; con Internet OpenStreetMap, senza una mappa schematica),
@@ -11,6 +12,7 @@ backup, traffico per finestra (esatto o provvisorio), sicurezza (precedenza, nea
 della rete (eventi persi, doppioni scartati). Nessuna immagine: la centrale riceve solo dati anonimi.
 """
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -163,6 +165,33 @@ def _vulnerable(ev):
     return ev.get("cls") == "pedestrian" and bool(a.get("child") or a.get("slow") or a.get("aid") not in (None, "normal"))
 
 
+def forecast_windows(store, node, n=96):
+    """Ultime n finestre di conteggi del nodo, dalla più vecchia: l'aggregato esatto (MQTT) dove c'è, altrimenti
+    quello provvisorio del backup. Sono i dati che il modello del flusso atteso confronta con la sua stima."""
+    with store.lock:
+        aggs = store.db.execute("SELECT window_start, source, data FROM aggregates WHERE node=? "
+                                "ORDER BY window_start DESC LIMIT ?", (node, 4 * n)).fetchall()
+    by_t0 = {}
+    for t0, source, data in aggs:
+        if t0 not in by_t0 or source == "mqtt":
+            by_t0[t0] = _window(json.loads(data), source)
+    return [by_t0[t] for t in sorted(by_t0)][-n:]
+
+
+def load_forecaster():
+    """Modello del flusso atteso: pacchetto `forecast` in ai/ (da sorgente) o dentro l'app impacchettata.
+    None se non si riesce a caricarlo: la dashboard funziona lo stesso, senza quel riquadro."""
+    ai = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "ai")
+    if os.path.isdir(os.path.join(ai, "forecast")) and ai not in sys.path:
+        sys.path.append(ai)
+    try:
+        from forecast.service import Forecaster
+        return Forecaster()
+    except Exception as e:
+        logging.getLogger("forecast").error("modello del flusso atteso non disponibile: %s", e)
+        return None
+
+
 def open_path(path, edit=False):
     """Apre una cartella o un file con l'app predefinita del sistema (Finder / TextEdit su macOS)."""
     if sys.platform == "darwin":
@@ -176,11 +205,12 @@ def open_path(path, edit=False):
         subprocess.Popen(["xdg-open", path])
 
 
-def create_app(store, config=None, info=None):
+def create_app(store, config=None, info=None, forecaster=None):
     from flask import Flask, Response, abort, jsonify
 
     app = Flask(__name__)
     page = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
+    models = {"forecast": forecaster}           # il modello si carica alla prima richiesta (False = non c'è)
 
     @app.get("/")
     def index():
@@ -194,6 +224,19 @@ def create_app(store, config=None, info=None):
     @app.get("/api/info")
     def api_info():
         return jsonify(info() if info else {})
+
+    @app.get("/api/forecast/<node>")
+    def api_forecast(node):
+        if models["forecast"] is None:
+            models["forecast"] = load_forecaster() or False
+        if not models["forecast"]:
+            return jsonify({"available": False})
+        cams = node_config() if config is None else config
+        try:
+            return jsonify(models["forecast"].forecast(cams.get(node, {"id": node}), forecast_windows(store, node)))
+        except Exception as e:                      # una stima mancata non deve mai fermare la dashboard
+            logging.getLogger("forecast").exception("stima del flusso per %s fallita", node)
+            return jsonify({"available": False, "error": str(e)})
 
     @app.post("/api/open/<what>")
     def api_open(what):

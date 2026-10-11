@@ -33,14 +33,18 @@ if not os.path.exists(MOSQ):
     raise SystemExit(f"Mosquitto non trovato ({MOSQ}): installalo prima della build (vedi build_mac.sh / build_windows.ps1)")
 
 hidden = ["central", "ingest", "dashboard", "decoder", "diagnosis", "ble_receiver"] + collect_submodules("bleak")
+# modello del flusso atteso (ai/forecast, owner Paolo): solo i moduli di runtime, che usano la libreria standard
+AI = os.path.join(os.path.dirname(APP), "ai")
+hidden += ["forecast." + m for m in ("service", "context", "sources", "features", "fusion", "model")] + ["certifi"]
 if WIN:
     hidden += ["clr"] + collect_submodules("winrt")   # finestra (pythonnet) e Bluetooth (WinRT) su Windows
 
 a = Analysis(
     [os.path.join(HERE, "centrale_app.py")],
-    pathex=[APP],
+    pathex=[APP, AI],
     binaries=[(os.path.realpath(MOSQ), "mosquitto")] + extra,
-    datas=[(os.path.join(APP, "dashboard.html"), "."), (os.path.join(APP, "nodes.json"), ".")],
+    datas=[(os.path.join(APP, "dashboard.html"), "."), (os.path.join(APP, "nodes.json"), "."),
+           (os.path.join(AI, "forecast", "model.json"), "forecast")],
     hiddenimports=hidden,
     excludes=["tkinter"],
 )

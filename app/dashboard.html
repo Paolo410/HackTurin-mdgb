@@ -104,6 +104,7 @@
   .cols { display: flex; align-items: flex-end; gap: 3px; height: 64px; margin-top: 12px; }
   .col { flex: 1; background: var(--bar); border-radius: 3px 3px 0 0; min-height: 3px; opacity: .85; }
   .col.prov { background: repeating-linear-gradient(45deg, var(--bar) 0 3px, transparent 3px 6px); border: 1px solid var(--bar); }
+  .col.fc { opacity: .45; } .col.fc.now { opacity: 1; }
   .envs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
   .envs span { font-size: 12px; background: var(--soft); border-radius: 999px; padding: 3px 9px; }
   .minis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -434,6 +435,63 @@ function trafficView(t) {
     ${env.length ? `<div class="envs">${env.map(x => `<span>${x}</span>`).join("")}</div>` : ""}`;
 }
 
+/* flusso atteso: modello di ai/forecast (gradient boosting su calendario, luoghi vicini, ESA WorldCover, meteo), corretto
+   con i conteggi della camera quando ci sono. Dati da /api/forecast/<nodo>, per la camera scelta, ogni 30 s. */
+let F = {}, fcNode = null, fcTimer = null;
+const r1 = v => v >= 10 ? Math.round(v) : Math.round(v * 10) / 10;
+const ANOMALY_IT = { normal: "nella norma", high: "più del solito", low: "meno del solito" };
+
+function forecastView(n) {
+  const f = F[n.node];
+  if (!f) return `<h3>Flusso atteso</h3><div class="empty">${ic("activity")} Calcolo della stima…</div>`;
+  if (!f.available) return "";
+  const perHour = 3600 / f.window_s, e = f.estimate, src = f.sources, inp = f.inputs;
+  const kinds = [["Pedoni in", "ped_in"], ["Pedoni out", "ped_out"], ["Ciclisti", "cyclist"], ["Veicoli", "vehicles"]];
+  const max = Math.max(1e-9, ...kinds.map(([, k]) => e[k].mean));
+  const rows = kinds.map(([name, k]) => `<span>${name}</span>
+    <div class="track" title="Tra ${num(r1(e[k].lo * perHour))} e ${num(r1(e[k].hi * perHour))} all'ora (intervallo all'80%). Dal solo contesto: ${num(r1(e[k].model * perHour))}">
+      <div class="fill" style="width:${(100 * e[k].mean / max).toFixed(1)}%"></div></div>
+    <span class="num">${num(r1(e[k].mean * perHour))}</span>`).join("");
+  const peds = w => w.ped_in + w.ped_out, cmax = Math.max(1e-9, ...f.next.map(peds));
+  const cols = f.next.map((w, i) => `<div class="col fc ${i ? "" : "now"}" style="height:${(100 * peds(w) / cmax).toFixed(1)}%"
+    title="${hhmm(w.t0)}–${hhmm(w.t1)}: ${num(r1(peds(w)))} pedoni attesi"></div>`).join("");
+  const how = f.mode === "fused"
+    ? `Stima del modello corretta con i conteggi della camera, che pesano per il ${Math.round(100 * e.ped_in.node_weight)}%.`
+    : "Solo modello: nessun conteggio recente da questa camera.";
+  const a = f.anomaly, mini = (k, v, tip) => `<div class="mini" title="${esc(tip)}"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  const check = a ? `<div class="minis" style="margin-top:10px">
+      ${mini("Pedoni contati", num(a.measured), "Pedoni contati dalla camera nell'ultima ora, nei due versi")}
+      ${mini("Attesi", num(a.expected), "Quanti ne aspettava il modello, al livello abituale di questo attraversamento")}
+      ${mini("Ultima ora", ANOMALY_IT[a.level], `Contati / attesi = ${a.ratio}`)}</div>` : "";
+  const chips = [];
+  if (!src.located) chips.push("camera senza coordinate: solo calendario");
+  if (src.places) chips.push(`${num(inp.poi_food)} locali · ${num(inp.poi_shop)} negozi · ${num(inp.poi_transit)} fermate (${src.places === "osm" ? "OpenStreetMap" : "Google"})`);
+  if (src.esa) chips.push(`ESA WorldCover: ${Math.round(100 * inp.esa_built)}% costruito, ${Math.round(100 * inp.esa_green)}% verde`);
+  if (inp.temp_c != null) chips.push(`${inp.temp_c} °C${inp.rain_mm != null ? ` · pioggia ${inp.rain_mm} mm/h` : ""}`);
+  if (src.google) chips.push("Google: orari e recensioni dei luoghi");
+  if (src.traffic) chips.push(`traffico Google ×${inp.traffic}`);
+  if (src.located && !src.google_key) chips.push("Google Maps: chiave non impostata");
+  if (src.pending) chips.push("fonti in aggiornamento…");
+  return `<h3>Flusso atteso · adesso, all'ora</h3><div class="bars">${rows}</div>
+    <div class="muted" style="margin-top:6px">${how}</div>${check}
+    <div class="cols">${cols}</div>
+    <div class="muted" style="margin-top:6px">Pedoni attesi per quarto d'ora, da adesso alle ${hhmm(f.next[f.next.length - 1].t1)}</div>
+    <div class="envs">${chips.map(x => `<span>${esc(x)}</span>`).join("")}</div>
+    <div class="muted" style="margin-top:8px">Gradient boosting addestrato su uno storico simulato: mostra il metodo, non misure reali.</div>`;
+}
+
+async function refreshForecast() {
+  const node = picked;
+  if (!node) return;
+  try {
+    const f = await (await fetch(`/api/forecast/${encodeURIComponent(node)}`, { cache: "no-store" })).json();
+    F[node] = f;
+    if (S && picked === node) render(S);
+    clearTimeout(fcTimer);
+    if (f.available && f.sources.pending) fcTimer = setTimeout(refreshForecast, 4000);   // le fonti stanno arrivando
+  } catch (e) { /* senza stima il resto della pagina funziona lo stesso */ }
+}
+
 function alarmRow(a, withNode, now) {
   const icon = a.severity === "info" ? "check" : "alert";
   return `<div class="alarm"><div class="aic ${a.severity}">${ic(icon)}</div><div>
@@ -452,7 +510,8 @@ function detailView(n, s) {
     <span class="badge ${c}">${esc(label(n))}</span></div>${links}`;
   if (n.diagnosis.code === "unknown") {
     return head + `<h3>Stato</h3><div class="empty">${ic("camera")}<div>Nessun dato ricevuto da questa camera.<br>`
-      + `<span class="muted">Si accende quando il nodo con <code>NODE_ID=${esc(n.node)}</code> si collega (Wi-Fi o Bluetooth).</span></div></div>`;
+      + `<span class="muted">Si accende quando il nodo con <code>NODE_ID=${esc(n.node)}</code> si collega (Wi-Fi o Bluetooth).</span></div></div>`
+      + forecastView(n);
   }
   const kv = (icon, k, v, tip = "", wide = false) =>
     `<div class="${wide ? "wide" : ""}" ${tip ? `title="${esc(tip)}"` : ""}><div class="k">${ic(icon)} ${k}</div><div class="v">${v}</div></div>`;
@@ -470,6 +529,7 @@ function detailView(n, s) {
   const mini = (k, v, tip) => `<div class="mini" title="${esc(tip)}"><div class="k">${k}</div><div class="v">${v}</div></div>`;
   return head + `<h3>Stato</h3><div class="kv">${items.join("")}</div>
     <h3>Traffico · ultima ora</h3>${trafficView(t)}
+    ${forecastView(n)}
     <h3>Sicurezza · oggi</h3><div class="minis">
       ${mini("Precedenza data", today.yield_rate == null ? "n.d." : Math.round(100 * today.yield_rate) + "%", "Veicoli che hanno rallentato con un pedone in attesa")}
       ${mini("Quasi incidenti", num(today.near_miss ?? 0), "Veicolo e pedone a meno di 1 secondo l'uno dall'altro")}
@@ -507,6 +567,7 @@ function render(s) {
   document.getElementById("err").style.display = "none";
   document.getElementById("updated").textContent = `Aggiornato alle ${new Date(s.now * 1000).toLocaleTimeString("it-IT")} · si aggiorna da solo ogni 2 secondi`;
   if (!s.nodes.some(n => n.node === picked)) picked = (s.nodes.find(n => PULSE.has(n.diagnosis.code)) || s.nodes.find(n => n.diagnosis.code !== "unknown") || s.nodes[0] || {}).node || null;
+  if (picked !== fcNode) { fcNode = picked; refreshForecast(); }
 
   // riepilogo
   const online = s.nodes.filter(n => n.diagnosis.code === "ok").length;
@@ -594,6 +655,7 @@ refresh();
 refreshInfo();
 setInterval(refresh, 2000);
 setInterval(refreshInfo, 5000);
+setInterval(refreshForecast, 30000);
 </script>
 </body>
 </html>
