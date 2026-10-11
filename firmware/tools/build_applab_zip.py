@@ -28,12 +28,15 @@ ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = ROOT / "firmware" / "unoq_mcu"
 PANEL_DIR = ROOT / "firmware" / "unoq_panel"
 PANEL_SHARED = (".gitignore", "sketch", "assets", "python/health.py")   # taken from unoq_mcu for --panel
+# The link of the App Lab app to the network (sensors, shock, badge, fail-safe to the central): one source, in comms/.
+MDGB_LINK = ROOT / "comms" / "applab" / "mdgb_link.py"
+SECRETS = APP_DIR / "sketch" / "arduino_secrets.h"   # code of the technician's badge: git-ignored, made by hand
 AI_DIR = ROOT / "ai"
 APP_NAME = "mdgb"                       # top folder of the zip = name of the app in App Lab
 REQUIRED_MODEL = "yolox_nano_dynamic.onnx"
 OPTIONAL_MODELS = ("aid_cls.onnx",)
 AI_FILES = ("config.yaml", "calib.json", "calib.example.json", "calib_thermal.json", "calib_thermal.example.json")
-SKIP_PARTS = {"__pycache__", ".cache", ".pytest_cache"}
+SKIP_PARTS = {"__pycache__", ".cache", ".pytest_cache", "host_test"}   # host_test: the sketch tested on a PC
 TEXT_SUFFIXES = {".py", ".ino", ".yaml", ".yml", ".js", ".html", ".css", ".md", ".json", ".txt", ".gitignore"}
 # README.md at the root of the app, as App Lab creates it (the README.md in the repo folders is for the team).
 APP_README = {
@@ -63,7 +66,8 @@ def panel_files() -> list[tuple[Path, str]]:
     files = _tree(PANEL_DIR)
     for rel in PANEL_SHARED:
         files += _tree(APP_DIR, rel)
-    return files
+    files.append((MDGB_LINK, "python/mdgb_link.py"))
+    return [(src, arc) for src, arc in files if not arc.endswith(".example")]
 
 
 def app_files(models_dir: Path) -> list[tuple[Path, str]]:
@@ -71,7 +75,7 @@ def app_files(models_dir: Path) -> list[tuple[Path, str]]:
     files = []
     for src in sorted(APP_DIR.rglob("*")):
         rel = src.relative_to(APP_DIR)
-        if src.is_file() and not SKIP_PARTS & set(rel.parts) and rel.name != "README.md":
+        if src.is_file() and not SKIP_PARTS & set(rel.parts) and rel.name != "README.md" and src.suffix != ".example":
             files.append((src, rel.as_posix()))
     for src in sorted((AI_DIR / "smartcrossing").glob("*.py")):
         files.append((src, f"python/smartcrossing/{src.name}"))
@@ -126,6 +130,10 @@ def main() -> int:
     args = p.parse_args()
     if args.out is None:
         args.out = ROOT / "firmware" / "dist" / (f"{APP_NAME}-pannello.zip" if args.panel else f"{APP_NAME}.zip")
+    if not SECRETS.is_file():
+        print(f"Error: {SECRETS.relative_to(ROOT)} missing: copy {SECRETS.name}.example next to it and write the code of "
+              "the technician's badge (never commit it)", file=sys.stderr)
+        return 1
     try:
         files = panel_files() if args.panel else app_files(args.models_dir)
     except FileNotFoundError as exc:

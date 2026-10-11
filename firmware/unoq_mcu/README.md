@@ -73,3 +73,13 @@ La camera la usa questa app: non avviare insieme `ai/deploy/run_vision.sh` o il 
   C1 e heartbeat verso lo sketch, eventi C3 scritti, pagina con i riquadri giusti.
 - Da verificare sulla scheda: installazione di `requirements.txt` nel container, ordine dei colori di
   `Camera.capture()` (atteso BGR), FPS reali.
+
+## Badge del tecnico e cicalino (11/10)
+
+- Il codice del badge autorizzato sta in `sketch/arduino_secrets.h` (`SECRET_TECH_BADGE`), ignorato da git; nel repo
+  c'è solo `sketch/arduino_secrets.h.example`.
+- Cicalino muto mentre c'è il tecnico: dal badge 2 minuti di silenzio, anche senza visione, poi finché la visione
+  manda `"tech": true` nel comando C1, cioè fino al logout dalla pagina. Resta il bip di conferma del badge.
+  Senza heartbeat il campo non vale più e l'antifurto torna a suonare (`ai/DECISIONS.md`, punto 36).
+- Prova su PC, con un badge finto: `firmware/unoq_mcu/host_test/run.sh`, che stampa "all checks passed".
+
