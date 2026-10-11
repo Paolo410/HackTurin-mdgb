@@ -10,14 +10,14 @@ Per avviare l'una o l'altra app (ne gira una sola alla volta, perché caricano l
 
 Ordine deciso dal team: **prima sketch + visione**, poi la rete verso la centrale (Lorenzo).
 
-**Com'è la scheda dall'11/10 notte** (`DECISIONS.md`, punto 37):
-- app `mdgb` con lo sketch del cicalino muto per il tecnico e `mdgb_link.py` di Lorenzo nel `main.py`;
-- visione con `run_vision.sh` (non ancora servizio) e rete come servizio `mdgb-comms` (broker sul PC di Lorenzo);
+**Com'è la scheda dall'11/10 notte** (`DECISIONS.md`, punti 37–42):
+- app `mdgb`, app predefinita di App Lab: sketch con il cicalino muto per il tecnico e `mdgb_link.py` di Lorenzo nel
+  `main.py`. Lo sketch non manda `mcu_event`: urto, badge e fail-safe passano da `mdgb_link.py`;
+- visione come servizio `mdgb-ai` e rete come servizio `mdgb-comms` (broker sul PC di Lorenzo): partono da soli;
 - tutti gli eventi in una cartella sola, `~/ArduinoApps/mdgb/data/c3`, scelta da
   `push_to_arduino.sh --bridge --applab mdgb`:
   - `c3-*.jsonl`: la visione;
-  - `applab-*.jsonl`: sensori, urto e badge, scritti da `mdgb_link.py`;
-  - `mcu-*.jsonl`: fail-safe dello sketch.
+  - `applab-*.jsonl`: sensori, urto, badge e fail-safe, scritti da `mdgb_link.py`.
 - Backup del vecchio sketch e del `main.py` in `~/HackTurin-mdgb/backups/`.
 
 ## Come è fatto il sistema sulla scheda
@@ -181,7 +181,8 @@ ssh arduino@<scheda> 'journalctl -u mdgb-ai -f'
 - [x] Sketch con `mdgb_line`: comandi e heartbeat ricevuti, rosso d'urgenza, fail-safe in circa mezzo secondo.
 - [x] Antifurto e sensori nella cartella degli eventi, scritti da `mdgb_link.py`; la rete li porta alla centrale.
 - [x] Rete verso la centrale: MQTT verso il PC di Lorenzo, heartbeat ogni 10 s con stato e FPS della visione.
-- [ ] Backup Bluetooth: `btmgmt` si blocca se lanciato senza input (servizio systemd). Correzione per Lorenzo.
+- [x] Backup Bluetooth: la centrale lo riceve (−41 dBm) quando la rete cade, 0 eventi persi (`btmgmt` corretto in `comms/`).
+- [x] Avvio automatico dopo un riavvio della scheda: visione, rete e app `mdgb`.
 - [ ] Badge → pagina → login dal telefono, con il cicalino muto fino all'uscita.
 - [ ] Pagina del tecnico dal telefono: login, costo della vista dal vivo sugli FPS, tempo del login.
 - [ ] Temperatura e rallentamenti dopo 10 minuti di funzionamento.
