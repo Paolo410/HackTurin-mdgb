@@ -109,5 +109,6 @@ python scripts/benchmark.py review scheda_nuova torino_1   # fogli dei disaccord
 python scripts/benchmark.py judge scheda_nuova torino_1 --add g3 --note "..."   # dopo averli guardati
 ```
 
-I video stanno in `ai/samples/` (fuori da git). Se macOS ne blocca la lettura ("Operation not permitted"), copiarli
+Un solo `judge` per video con tutte le decisioni, poi di nuovo `review`: dopo ogni `judge` i numeri `r…`/`g…` dei
+fogli cambiano. I video stanno in `ai/samples/` (fuori da git). Se macOS ne blocca la lettura ("Operation not permitted"), copiarli
 dalla scheda e indicare la cartella con `MDGB_VIDEOS=<cartella>`.

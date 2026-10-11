@@ -16,7 +16,9 @@ Il package `smartcrossing` gira sul lato Linux della UNO Q (e identico su PC). D
 
 Non salva mai frame su disco. Tutto funziona senza internet.
 
-Decisioni, numeri, interfacce e questioni aperte: [DECISIONS.md](DECISIONS.md).
+Decisioni, numeri, interfacce e questioni aperte: [DECISIONS.md](DECISIONS.md). Quanto conta bene, con il metodo
+per rifare le misure: [docs/BENCHMARK.md](docs/BENCHMARK.md). Per l'assistente AI che riprende il lavoro (lancio della
+demo e miglioramento del modello): [docs/ISTRUZIONI_AI.md](docs/ISTRUZIONI_AI.md).
 Specifica completa: [`PROMPT_SMART_CROSSING.md`](../PROMPT_SMART_CROSSING.md), §5.1.
 
 Accanto a `smartcrossing` c'è [`forecast/`](forecast/README.md): il modello del flusso atteso che la centrale mostra
@@ -31,7 +33,7 @@ per ogni camera (gradient boosting su calendario, luoghi vicini, ESA WorldCover 
 | AI-M3 | calibrazione, velocità, attributi, regole, `SimActuator` | fatto |
 | AI-M4 | eventi, animali, logger, output C3 | fatto |
 | AI-M5 | termocamera | fatto in simulazione, da provare con il sensore |
-| AI-M6 | profilo `unoq`, prova sulla scheda, benchmark | la visione gira sulla scheda con la camera vera a 9 FPS e comanda il semaforo dell'app `mdgb`; manca la calibrazione sull'incrocio. Guida in [docs/DEPLOY_UNOQ.md](docs/DEPLOY_UNOQ.md) |
+| AI-M6 | profilo `unoq`, prova sulla scheda, benchmark | la visione gira sulla scheda e comanda il semaforo dell'app `mdgb`; dall'11/10 detector su ogni fotogramma (5,9 FPS su video, da rimisurare con la camera). Conteggio verificato su 8 video a camera ferma: [docs/BENCHMARK.md](docs/BENCHMARK.md). Manca la calibrazione sull'incrocio. Guida in [docs/DEPLOY_UNOQ.md](docs/DEPLOY_UNOQ.md) |
 
 ## Come si avvia
 
@@ -60,6 +62,7 @@ python scripts/scenario.py elderly_fast_car                # pedone lento + auto
 python scripts/animal_probe.py cartella_di_foto            # come il detector vede animali non previsti da COCO
 python scripts/evaluate.py samples/video.mp4 --calib c.json  # numeri e fotogrammi annotati di un video di prova
 python scripts/bench.py samples/video.mp4                  # ms medi e p95 per fase
+python scripts/benchmark.py score scheda_prima scheda_nuova  # quanti passaggi conta, contro il riferimento (docs/BENCHMARK.md)
 pytest                                                     # test, senza hardware
 ```
 
@@ -265,14 +268,29 @@ Catena completa su un video di prova 720p con molta gente (`scripts/bench.py`):
 | 256 px, 3 thread | 95 ms | 19 ms | 114 ms | 8,8 |
 | **320 px, 3 thread, detector un frame su due (profilo `unoq`)** | 139 ms | 24 ms | 82 ms in media | **12,3** |
 
-Con la camera vera della scheda (IMX219 su CSI, scena vuota), profilo `unoq`: **9,2 FPS end-to-end**, detect 129 ms,
-track 1 ms. Obiettivo della specifica: almeno 8.
+Con la camera vera della scheda (IMX219 su CSI, scena vuota), profilo `unoq` di allora (detector un frame su due):
+**9,2 FPS end-to-end**, detect 129 ms, track 1 ms. Obiettivo della specifica: almeno 8.
 
-- **Perché un frame su due e non 256 px:** sul video di Torino, a parità di carico, 256 px conta 8 veicoli,
-  320 px con il detector un frame su due ne conta 16 (riferimento a 30 FPS e 512 px: 35).
+**Dall'11/10 il profilo `unoq` usa il detector su ogni frame** (`DECISIONS.md`, punto 47). Misurato sulla scheda con
+Torino_1 come sorgente, servizio `mdgb-ai` acceso:
+
+| Impostazione | FPS | analizzati al secondo | detect |
+|---|---|---|---|
+| 320 px, detector un frame su due (fino al 10/10) | 8,4 | 4,2 | 126 ms |
+| **320 px, detector su ogni frame (profilo `unoq` dall'11/10)** | **5,9** | **5,9** | 130 ms |
+| 416 px, detector su ogni frame | 3,8 | 3,8 | 205 ms |
+
+Gli FPS sono più bassi ma ogni frame è analizzato: con il tracking corretto dell'11/10 i passaggi contati su 8 video a
+camera ferma salgono da 9 a 13 su 23 pedoni e da 24 a 47 su 77 veicoli, sempre nel verso giusto
+([docs/BENCHMARK.md](docs/BENCHMARK.md)). Con la camera vera va rimisurato.
+
+- **Perché fino al 10/10 un frame su due e non 256 px:** sul video di Torino, a parità di carico, 256 px contava 8
+  veicoli, 320 px con il detector un frame su due 16 (riferimento a 30 FPS e 512 px: 35). Il tracker di allora
+  perdeva gli oggetti veloci tra due rilevamenti: corretto l'11/10, il frame su due non serve più.
 - **Tre thread e non quattro:** il quarto core serve a camera, tracker e al resto; con quattro va uguale o peggio.
 - **La camera costa** circa il 20% di un core a 10 letture al secondo.
-- **Con l'app di App Lab che tiene aperta la camera** (140% di CPU) il detector a ogni frame scendeva a 3,1 FPS.
+- **Con l'app di App Lab che tiene aperta la camera** (140% di CPU) il detector a ogni frame scendeva a 3,1 FPS:
+  l'app `mdgb` non apre la camera, ma un'app che la apre rallenta la visione.
 
 ### Su PC
 

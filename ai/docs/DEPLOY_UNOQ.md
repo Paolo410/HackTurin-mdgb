@@ -2,6 +2,8 @@
 
 **Provato sulla scheda il 10/10/2026:** copia, ambiente Python, camera vera, 9,2 FPS, e con l'app `mdgb` avviata
 il semaforo comandato attraverso il Bridge (rosso d'urgenza, fail-safe): vedi `DECISIONS.md`, punto 33.
+**Dall'11/10** il profilo `unoq` analizza ogni frame: 5,9 FPS misurati con un video come sorgente (prima 8,4 FPS con
+metà dei frame analizzati), più passaggi contati (`docs/BENCHMARK.md`). Con la camera vera da rimisurare.
 **Non ancora provato:** una richiesta nata da una scena vera (serve la calibrazione), la pagina del tecnico dal
 telefono, l'avvio automatico.
 
@@ -119,8 +121,9 @@ libcamerify ~/venv/bin/python -m smartcrossing.app --source 0 --profile unoq --h
 
 Cosa guardare:
 
-1. **FPS:** misurati 9,2 end-to-end con il profilo `unoq` (320 px, detector un frame su due). I numeri sono in
-   `ai/README.md`, "Prestazioni misurate".
+1. **FPS:** con il profilo `unoq` dall'11/10 (320 px, detector su ogni frame) circa 6, tutti analizzati; il 10/10,
+   con il detector un frame su due, 9,2 con la camera. Sotto 5 con la camera: qualcos'altro usa la CPU (un'app di
+   App Lab che apre la camera?). I numeri sono in `ai/README.md`, "Prestazioni misurate".
 2. **Semaforo:** fermando la visione (`Ctrl+C`) torna al ciclo normale entro mezzo secondo. Con un bambino non
    accompagnato o un animale libero scatta il rosso dopo un giallo breve; con chi cammina piano il rosso dei
    veicoli dura di più. Servono la calibrazione e lo sketch nuovo.
@@ -216,6 +219,7 @@ ssh arduino@<scheda> 'journalctl -u mdgb-ai -f'
 - [x] Avvio automatico dopo un riavvio della scheda: visione, rete e app `mdgb`.
 - [ ] Badge → pagina → login dal telefono, con il cicalino muto fino all'uscita.
 - [ ] Pagina del tecnico dal telefono: login, costo della vista dal vivo sugli FPS, tempo del login.
+- [ ] FPS con la camera e il detector su ogni frame (profilo `unoq` dall'11/10): atteso circa 6.
 - [ ] Temperatura e rallentamenti dopo 10 minuti di funzionamento.
 - [ ] Visione e app di App Lab insieme: carico della CPU e memoria.
 - [ ] Avvio automatico dopo un riavvio della scheda.
