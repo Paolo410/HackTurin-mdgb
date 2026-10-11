@@ -7,8 +7,8 @@ first, as built by app/dashboard.py ({"t0", "t1", "ped_in", "ped_out", "cyclist"
 for a camera that has never sent data. All rates are counts per 15-minute window.
 
 Three steps: the gradient boosting model turns calendar and surroundings into an expectation; the node's
-recent history says how much this crossing differs from it (calibration); the last windows are fused with the
-expectation into the estimate of the flow right now. The outlook (now, then the next 24 clock hours) starts
+history says how much this crossing differs from it (calibration: on average, and lately); the last windows are
+fused with the expectation into the estimate of the flow right now. The outlook (now, then the next 24 clock hours) starts
 from that estimate and goes back to the calibrated model as the hours pass.
 """
 import os
@@ -24,6 +24,11 @@ OUTLOOK_HOURS = 24              # forecast: the next 24 clock hours, after "now"
 PERSISTENCE_HALF_LIFE_H = 1.0   # what is unusual right now (a crowd, an empty street) fades by half every hour
 ANOMALY_MIN_EXPECTED = 20       # below this many expected pedestrians an "unusual" hour is just noise
 ANOMALY_LIMITS = (0.6, 1.6)
+EVIDENCE = 80.0                 # expected counts the estimate of now looks back for: a busy crossing is told by its
+                                # last window, a quiet one needs many of them
+QUALITY_WINDOWS = 48            # the estimate is checked on the last 48 measured windows...
+QUALITY_MIN_HISTORY = 12        # ...each predicted from at least 12 earlier ones
+QUALITY_MIN_WINDOWS = 8         # fewer checks than this say nothing
 
 
 def default_cache_file():
@@ -31,6 +36,63 @@ def default_cache_file():
     home = os.environ.get("MDGB_HOME") or os.path.join(tempfile.gettempdir(), "mdgb-forecast")
     os.makedirs(home, exist_ok=True)
     return os.path.join(home, "forecast-context.json")
+
+
+def nowcast(seen, mu_now, target, now):
+    """Rate of `target` at `now` (counts per 15 minutes) from the model and the windows measured before.
+
+    The prior is the model at the crossing's usual level (calibration), worth fusion.SHRINK counts. The recent
+    windows are observations of the present rate. How far back to look depends on how much there is to count:
+    windows are added, newest first, until they are expected to hold EVIDENCE counts, so a busy crossing
+    follows its last window and a quiet one averages many. (Tried and dropped: moving the old counts along the
+    model's daily rhythm. It helps when the crossing follows that rhythm and hurts more when it does not, and
+    the rhythm comes from simulated data.) seen: [(window, exposure, model expectation)] of the earlier
+    windows; mu_now: the model now.
+    """
+    usual = mu_now[target] * fusion.calibration(sum(w[target] for w, _, _ in seen),
+                                                sum(mu[target] * exposure for _, exposure, mu in seen))
+    usual = max(usual, fusion.MIN_RATE)
+    recent, wanted = [], EVIDENCE
+    for w, exposure, mu in reversed(seen):
+        age = now - w["t1"]
+        if age > 4 * fusion.HALF_LIFE_S or wanted <= 0:
+            break
+        recent.append((w[target], exposure, age))
+        wanted -= usual * exposure * 0.5 ** (max(age, 0.0) / fusion.HALF_LIFE_S)
+    return fusion.posterior(usual, recent, strength=fusion.SHRINK / usual)
+
+
+def quality(seen):
+    """How the estimate did on what the node measured afterwards (pedestrians, both directions, per window).
+
+    Every one of the last windows is predicted with the information available before it started (the model, the
+    calibration and the fusion on the earlier windows only) and compared with its count. Two yardsticks: repeating
+    the count of the window before ("persistence") and the model alone, without the node. seen: [(window,
+    exposure, model expectation)], oldest first. None while the node has measured too little.
+    """
+    start = max(QUALITY_MIN_HISTORY, len(seen) - QUALITY_WINDOWS)
+    if len(seen) - start < QUALITY_MIN_WINDOWS:
+        return None
+    err = {"estimate": 0.0, "persistence": 0.0, "model": 0.0}
+    predicted = counted = 0.0
+    for i in range(start, len(seen)):
+        w, exposure, mu = seen[i]
+        earlier, begins = seen[:i], w["t0"]
+        estimate = 0.0
+        for t in ("ped_in", "ped_out"):
+            estimate += nowcast(earlier, mu, t, begins)["mean"] * exposure
+        real = w["ped_in"] + w["ped_out"]
+        last = earlier[-1]
+        err["estimate"] += abs(estimate - real)
+        err["persistence"] += abs((last[0]["ped_in"] + last[0]["ped_out"]) * exposure / last[1] - real)
+        err["model"] += abs((mu["ped_in"] + mu["ped_out"]) * exposure - real)
+        predicted, counted = predicted + estimate, counted + real
+    n = len(seen) - start
+    return {"windows": n, "window_s": round(sum(x[0]["t1"] - x[0]["t0"] for x in seen[start:]) / n),
+            "mean_count": round(counted / n, 2),
+            "mae": round(err["estimate"] / n, 2), "mae_persistence": round(err["persistence"] / n, 2),
+            "mae_model": round(err["model"] / n, 2),
+            "bias": round(predicted / counted - 1, 3) if counted else None}
 
 
 class Forecaster:
@@ -68,8 +130,7 @@ class Forecaster:
         mu_now = expect(now)
         estimate = {}
         for t in features.TARGETS:
-            recent = [(w[t], exposure, now - w["t1"]) for w, exposure, _ in seen if now - w["t1"] <= 4 * fusion.HALF_LIFE_S]
-            post = fusion.posterior(mu_now[t] * cal[t], recent)
+            post = nowcast(seen, mu_now, t, now)
             estimate[t] = {"mean": round(post["mean"], 2), "lo": round(post["lo"], 2), "hi": round(post["hi"], 2),
                            "model": round(mu_now[t], 2), "node_weight": round(post["weight"], 2)}
 
@@ -105,6 +166,7 @@ class Forecaster:
             "mode": "fused" if any(now - w["t1"] <= 4 * fusion.HALF_LIFE_S for w, _, _ in seen) else "model_only",
             "estimate": estimate, "outlook": outlook, "anomaly": anomaly,
             "calibration": {t: round(c, 2) for t, c in cal.items()}, "history_windows": len(seen),
+            "quality": quality(seen),
             "inputs": {k: now_row[k] for k in features.FEATURES if k not in ("hour", "dow")},
             "sources": {"places": "osm" if ctx.get("poi") else "google" if ctx.get("google") else None,
                         "google": bool(ctx.get("google")), "esa": bool(ctx.get("esa")),

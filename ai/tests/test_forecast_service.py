@@ -19,7 +19,7 @@ from forecast_helpers import CENTRE, MONDAY_18, NODE, SUBURB, forecaster, local,
 
 FORECAST_DIR = os.path.dirname(MODEL_PATH)
 REPO = os.path.dirname(os.path.dirname(FORECAST_DIR))
-RUNTIME = ("features", "model", "fusion", "sources", "context", "service")      # what the app imports
+RUNTIME = ("features", "model", "fusion", "sources", "context", "service", "analytics")      # what the app imports
 TRAINING = ("simulate", "train")                                                # needs numpy and scikit-learn
 
 
@@ -214,7 +214,7 @@ def test_forecast_is_plain_data_with_stable_keys(model):
     out = forecaster(model).forecast(NODE, windows(MONDAY_18, 8, 900, ped_in=40, ped_out=35, vehicles=3))
     assert json.loads(json.dumps(out)) == out, "numbers, strings, lists and dicts: it goes to the page as JSON"
     assert set(out) == {"available", "node", "now", "window_s", "mode", "estimate", "outlook", "anomaly", "calibration",
-                        "history_windows", "inputs", "sources", "model"}, "the dashboard reads these"
+                        "history_windows", "quality", "inputs", "sources", "model"}, "the dashboard reads these"
     assert set(out["estimate"]["ped_in"]) == {"mean", "lo", "hi", "model", "node_weight"}
     assert set(out["anomaly"]) == {"ratio", "measured", "expected", "level"}
     assert set(out["sources"]) == {"places", "google", "esa", "weather", "traffic", "google_key", "located", "pending"}

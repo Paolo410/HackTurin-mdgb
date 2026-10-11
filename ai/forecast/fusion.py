@@ -1,12 +1,12 @@
 """Fusion of the model's expectation with the counts measured by the node. Standard library only.
 
-Gamma-Poisson: the model gives a prior on the rate (mean `mu` per 15-minute window, worth `strength` windows of
-evidence); every measured window is a Poisson count over an exposure (its length in 15-minute units), weighted
-down as it gets older. With no measurements the result is the model; with many it follows the node.
+Gamma-Poisson: a prior on a rate (mean `mu`, worth `strength` units of exposure); every measured window is a
+Poisson count over an exposure, weighted down as it gets older. With no measurements the result is the prior;
+with many it follows the node.
 """
 from statistics import NormalDist
 
-PRIOR_STRENGTH = 1.0        # the model weighs like one measured window (15 min of counts)
+PRIOR_STRENGTH = 1.0        # default weight of the prior: one unit of exposure
 HALF_LIFE_S = 1800.0        # a window 30 min old weighs half
 SHRINK = 10.0               # counts of evidence needed before the node's own level outweighs the model
 MIN_RATE = 1e-3
@@ -20,9 +20,9 @@ def gamma_quantile(shape, rate, p):
 
 
 def posterior(mu, observations, strength=PRIOR_STRENGTH, half_life_s=HALF_LIFE_S, level=0.8):
-    """Rate per 15-minute window after seeing the node's counts.
+    """Rate after seeing the node's counts.
 
-    observations: [(count, exposure, age_s)], exposure = window length / 900 s.
+    observations: [(count, exposure, age_s)]; the rate is in counts per unit of exposure.
     Returns {"mean", "lo", "hi", "weight"}; weight is the share of the estimate that comes from the node (0..1).
     """
     mu = max(mu, MIN_RATE)
@@ -41,3 +41,4 @@ def calibration(measured, expected, shrink=SHRINK, limits=(0.1, 10.0)):
     while the counts are few. The model cannot know it (road layout, a school gate, the side the camera looks at)."""
     c = (measured + shrink) / (expected + shrink)
     return min(max(c, limits[0]), limits[1])
+
