@@ -60,7 +60,7 @@ class Part:
 # ---------- judgements: (value, history) -> (status, detail, shown) ----------
 
 def _camera(v: dict, _):
-    shown = f"{v['w']}×{v['h']}" + (f" · luminosità {v['lum']:.0f}/255" if v.get("lum") is not None else "")
+    shown = f"{v['w']}×{v['h']}" + (f", luminosità {v['lum']:.0f} su 255" if v.get("lum") is not None else "")
     if v.get("fault") == "lens_covered":
         return WARN, "immagine senza dettagli: lente coperta, sporca o sfocata", shown
     if v.get("fault") == "glare":
@@ -69,14 +69,14 @@ def _camera(v: dict, _):
 
 
 def _ai(v: dict, _):
-    shown = f"{v['fps']:.1f} FPS" + (f" · rilevamento {v['detect_ms']:.0f} ms" if v.get("detect_ms") else "")
+    shown = f"{v['fps']:.1f} FPS" + (f", rilevamento in {v['detect_ms']:.0f} ms" if v.get("detect_ms") else "")
     if v["fps"] and v["fps"] < AI_MIN_FPS:
         return WARN, f"lenta: {v['fps']:.1f} FPS (servono almeno {AI_MIN_FPS:.0f})", shown
     return OK, "riconosce persone, veicoli e animali", shown
 
 
 def _link(v: dict, _):
-    shown = f"comandi {v['c1']} · heartbeat {v['c2']}"
+    shown = f"{v['c1']} comandi, {v['c2']} heartbeat"
     if v["failsafe"]:
         return FAULT, "lo sketch non accetta gli heartbeat: è in fail-safe (ciclo normale)", shown
     if v["rejected"]:
@@ -86,16 +86,16 @@ def _link(v: dict, _):
 
 def _c3_camera(v: dict, _):
     """Status line of the vision service (C3): it is written only while frames arrive."""
-    shown = f"stato {v.get('state', '?')}"
     if v.get("state") == "DEGRADED":
-        return WARN, "la visione si dichiara non affidabile: lente coperta, abbagliamento o guasto lampada", shown
-    return OK, "la visione riceve immagini", shown
+        return (WARN, "la visione si dichiara non affidabile: lente coperta, abbagliamento o guasto lampada",
+                "immagini non affidabili")
+    return OK, "la visione riceve immagini", "immagini regolari"
 
 
 def _c3_ai(v: dict, _):
     fps = float(v.get("fps") or 0.0)
     detect = (v.get("lat_ms") or {}).get("detect")
-    shown = f"{fps:.1f} FPS" + (f" · rilevamento {detect} ms" if detect is not None else "")
+    shown = f"{fps:.1f} FPS" + (f", rilevamento in {detect} ms" if detect is not None else "")
     if fps < AI_MIN_FPS:
         return WARN, f"lenta: {fps:.1f} FPS (servono almeno {AI_MIN_FPS:.0f})", shown
     return OK, "riconosce persone, veicoli e animali", shown
@@ -128,7 +128,7 @@ def _accel(v, _):
 
 def _env(v, _):
     t, rh = v
-    shown = f"{t:.1f} °C · {rh:.0f} %"
+    shown = f"{t:.1f} °C, umidità {rh:.0f}%"
     if t <= AHT20_ZERO_C:
         return FAULT, "letture a zero: il sensore non risponde", shown
     if not (-40 <= t <= 85 and 0 <= rh <= 100):
@@ -138,7 +138,7 @@ def _env(v, _):
 
 def _air(v, _):
     eco2, tvoc = v
-    shown = f"eCO₂ {eco2} ppm · TVOC {tvoc} ppb"
+    shown = f"CO₂ {eco2} ppm, VOC {tvoc} ppb"
     if eco2 == 400 and tvoc == 0:
         return OK, "valore di base: normale nei primi 15 s o in aria pulita", shown
     return OK, "valori plausibili", shown
@@ -226,7 +226,7 @@ def panel_parts() -> list[Part]:
              _VISION_SERVICE_HINT, _c3_ai,
              stale="nessuna notizia dalla visione da {age:.0f} s",
              never=(FAULT, "nessuna riga di stato in data/c3: visione spenta o eventi scritti altrove")),
-        Part("link", "Collegamento visione → sketch", "heartbeat via Bridge, visto dallo sketch", None,
+        Part("link", "Collegamento tra visione e sketch", "heartbeat via Bridge, visto dallo sketch", None,
              "Accendi la visione (run_vision.sh start). Intanto il semaforo fa il ciclo normale.", _sketch_link,
              never=(WARN, "lo sketch non ha ancora detto se la visione è collegata")),
         *_sketch_parts(),
@@ -284,8 +284,8 @@ class Health:
     def _judge(self, part: Part, now: float) -> tuple[str, str, str]:
         if part.last_t is None:
             if part.never[0] != UNTESTED and now - self._t0 < STARTUP_GRACE_S:
-                return WAITING, "in attesa del primo dato", "—"
-            return part.never[0], part.never[1], "—"
+                return WAITING, "in attesa del primo dato", ""
+            return part.never[0], part.never[1], ""
         age = now - part.last_t
         if part.timeout_s is not None and age > part.timeout_s:
             _, _, shown = self._value(part)
@@ -303,11 +303,11 @@ class Health:
         if part.status == WAITING and status in (OK, UNTESTED):
             return   # normal start: not worth a line
         if status in PROBLEMS:
-            self._report("warning", f"{part.name}: {_STATUS_WORDS[status]} — {detail}")
+            self._report("warning", f"{part.name} {_STATUS_WORDS[status]}: {detail}")
         elif part.status in PROBLEMS:
-            self._report("info", f"{part.name}: di nuovo a posto")
+            self._report("info", f"{part.name} di nuovo a posto")
         elif part.status == UNTESTED and status == OK:
-            self._report("info", f"{part.name}: provato, funziona")
+            self._report("info", f"{part.name} provato: funziona")
 
     def _report(self, level: str, text: str) -> None:
         if self._on_change is not None:

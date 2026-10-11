@@ -12,8 +12,17 @@ Owner: Salvatore Gullotta. Un'unica app di App Lab che fa tutto sulla UNO Q:
 
 ## Pannello del tecnico (porta 7000)
 
-In cima c'è il riepilogo: "Tutto funziona", "Da controllare" o "Qualcosa non funziona", con l'elenco dei problemi.
-Sotto, una scheda per ogni parte del nodo con stato, ultimo valore e, se non va, **cosa fare**:
+Pensato per un tecnico con il telefono, anche all'aperto: tema chiaro (scuro se il dispositivo lo chiede), colori
+della segnaletica, font di sistema (funziona senza internet). Tre schede:
+
+- **Stato**: una frase in cima ("Tutto funziona", "Una cosa da controllare", "2 cose da sistemare"), poi le parti
+  da sistemare con il **cosa fare**, poi una riga per ogni parte che funziona; a lato il semaforo e i dettagli
+  tecnici (richiudibili).
+- **Traffico**: vista dal vivo con i riquadri (nella versione pannello, il pulsante per la pagina della visione) e
+  i passaggi contati.
+- **Registro**: eventi in frasi, filtrabili (Sensori, Traffico, Sicurezza), scaricabili in un file di testo.
+
+Le parti controllate:
 
 | Parte | Come si controlla | Non funziona se |
 |---|---|---|

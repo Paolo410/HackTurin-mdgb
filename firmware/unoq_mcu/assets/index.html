@@ -3,176 +3,166 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MDGB · pannello tecnico</title>
-    <link rel="stylesheet" href="style.css" />
+    <title>Pannello del tecnico MDGB</title>
+    <link rel="stylesheet" href="style.css?v=__BUILD__" />
   </head>
   <body>
-    <header class="topbar">
+    <header class="bar">
       <div class="brand">
-        <span class="logo" aria-hidden="true">🚦</span>
+        <span class="mark" aria-hidden="true"><i></i><i></i><i></i></span>
         <div>
-          <h1>MDGB</h1>
-          <small>pannello del tecnico</small>
+          <strong>MDGB</strong>
+          <span>Pannello del tecnico</span>
         </div>
       </div>
-      <a href="#sec-health" id="overall" class="overall waiting" title="Stato complessivo del nodo">⏳ Avvio…</a>
-      <nav class="nav" aria-label="Sezioni">
-        <a href="#sec-overview">Panoramica</a>
-        <a href="#sec-health">Sensori</a>
-        <a href="#sec-live" id="nav-live">Vista dal vivo</a>
-        <a href="#sec-data">Traffico</a>
-        <a href="#sec-log">Registro</a>
-      </nav>
-      <span id="conn" class="conn off" title="Collegamento di questa pagina con la scheda">Non collegato</span>
+      <span id="conn" class="conn" role="status">Collegamento…</span>
     </header>
 
-    <main class="page">
-      <!-- 1. Overview: what the technician must know at a glance -->
-      <section id="sec-overview" class="overview">
-        <article class="card hero waiting" id="hero">
-          <div class="hero-icon" id="hero-icon" aria-hidden="true">⏳</div>
-          <div class="hero-body">
-            <h2 class="hero-title" id="hero-title">Avvio in corso</h2>
-            <p class="hero-text" id="hero-text">Aspetto i primi dati dalla scheda.</p>
-            <ul class="hero-list" id="hero-list"></ul>
-            <p class="hero-foot" id="hero-foot"></p>
-          </div>
-        </article>
+    <nav class="tabs" role="tablist" aria-label="Sezioni">
+      <a href="#stato" role="tab" data-view="stato">Stato <span class="badge-count" id="count-stato" hidden></span></a>
+      <a href="#traffico" role="tab" data-view="traffico">Traffico</a>
+      <a href="#registro" role="tab" data-view="registro">Registro</a>
+    </nav>
 
-        <article class="card light-card">
-          <div class="card-head"><h3>Semaforo</h3><span class="muted small" id="led" title="Comando LED della visione">—</span></div>
-          <div class="light-row">
-            <div class="lantern unknown" id="lantern" title="Lanterna dei veicoli come la accende lo sketch">
-              <span class="lamp red"></span>
-              <span class="lamp yellow"></span>
-              <span class="lamp green"></span>
-            </div>
-            <div class="rule">
-              <div class="state" id="state">—</div>
-              <p class="reason" id="reason">In attesa della visione…</p>
-              <div class="reqs app-only" id="reqs"></div>
-            </div>
-          </div>
-          <div class="displays app-only">
-            <div>
-              <small class="muted">Display conducenti (LCD)</small>
-              <pre class="lcd" id="lcd">                </pre>
-            </div>
-            <div>
-              <small class="muted">Display pedoni (OLED)</small>
-              <pre class="oled" id="oled"></pre>
-            </div>
-          </div>
-        </article>
-      </section>
+    <main>
+      <!-- STATO: is everything working, and if not, what to fix -->
+      <section id="view-stato" class="view" role="tabpanel">
+        <div class="status waiting" id="status">
+          <h1 id="status-title">Collegamento alla scheda</h1>
+          <p id="status-text">Apro la connessione con l'app.</p>
+        </div>
 
-      <!-- 2. Sensor check -->
-      <section id="sec-health" class="card">
-        <div class="card-head">
+        <div class="split">
           <div>
-            <h3>Controllo sensori</h3>
-            <p class="sub">Ogni parte del nodo viene controllata una volta al secondo.</p>
+            <section class="group" id="group-problems" hidden>
+              <h2>Da sistemare</h2>
+              <ul class="parts" id="problems"></ul>
+            </section>
+
+            <section class="group" id="group-ok" hidden>
+              <h2 id="ok-title">Funzionano</h2>
+              <ul class="parts compact" id="oks"></ul>
+            </section>
+
+            <section class="group" id="group-other" hidden>
+              <h2>In attesa o da provare</h2>
+              <ul class="parts compact" id="others"></ul>
+            </section>
           </div>
-          <div class="tally" id="tally"></div>
-        </div>
-        <div class="checks" id="checks">
-          <p class="muted">In attesa dei primi controlli…</p>
+
+          <aside>
+            <section class="group signal">
+              <h2>Semaforo</h2>
+              <div class="signal-body">
+                <div class="lantern unknown" id="lantern" title="Lanterna dei veicoli come la accende lo sketch">
+                  <span class="lamp red"></span><span class="lamp yellow"></span><span class="lamp green"></span>
+                </div>
+                <div>
+                  <p class="signal-state" id="state">In attesa</p>
+                  <p class="signal-reason" id="reason">Nessun dato dalla visione.</p>
+                </div>
+              </div>
+              <ul class="requests app-only" id="reqs"></ul>
+            </section>
+
+            <details class="group tech">
+              <summary>Dettagli tecnici</summary>
+              <dl class="facts">
+                <dt>Fotogrammi al secondo</dt><dd id="fps">–</dd>
+                <dt>Attiva da</dt><dd id="uptime">–</dd>
+                <dt class="app-only">Fotogrammi elaborati</dt><dd class="app-only" id="frames">–</dd>
+                <dt class="app-only">Comandi allo sketch</dt><dd class="app-only" id="c1">–</dd>
+                <dt class="app-only">Heartbeat accettati</dt><dd class="app-only" id="c2">–</dd>
+                <dt class="app-only">Righe rifiutate</dt><dd class="app-only" id="rej">–</dd>
+                <dt class="app-only">Profilo AI</dt><dd class="app-only" id="profile">–</dd>
+              </dl>
+              <h3>Tempo per fase</h3>
+              <div class="bars" id="bars"><p class="muted">Nessun dato.</p></div>
+              <div class="displays app-only">
+                <h3>Testi sui display</h3>
+                <p class="muted small">Conducenti (LCD)</p>
+                <pre class="lcd" id="lcd"></pre>
+                <p class="muted small">Pedoni (OLED)</p>
+                <pre class="oled" id="oled"></pre>
+              </div>
+            </details>
+          </aside>
         </div>
       </section>
 
-      <!-- 3. Live view -->
-      <!-- 3b. Panel without the vision (unoq_panel): the camera belongs to the vision service -->
-      <section id="sec-vision-page" class="card panel-only">
-        <div class="card-head">
-          <div>
-            <h3>Vista dal vivo</h3>
-            <p class="sub">In questa versione la camera la usa il servizio della visione: l'immagine con i riquadri è sulla sua pagina.</p>
+      <!-- TRAFFICO: what the camera sees and what it counted -->
+      <section id="view-traffico" class="view" role="tabpanel" hidden>
+        <div class="split">
+        <div>
+        <section class="group panel-only">
+          <h2>Vista dal vivo</h2>
+          <p>In questa versione la camera la usa il servizio della visione. L'immagine con i riquadri è sulla sua pagina, dopo il badge e il login.</p>
+          <a class="button primary" id="vision-link" href="#" target="_blank" rel="noopener">Apri la pagina della visione</a>
+        </section>
+
+        <section class="group app-only" id="live">
+          <div class="group-head">
+            <h2>Vista dal vivo</h2>
+            <div class="actions">
+              <button id="btn-pause" class="button" type="button" aria-pressed="false">Pausa</button>
+              <button id="btn-full" class="button" type="button">Schermo intero</button>
+            </div>
           </div>
+          <div class="stage" id="stage">
+            <canvas id="canvas" width="640" height="480" aria-label="Immagine della camera con i riquadri"></canvas>
+            <p class="stage-note" id="banner" hidden></p>
+          </div>
+          <div class="legend" id="filters">
+            <label class="g-person"><input type="checkbox" data-group="person" checked /> Pedoni <b data-count="person">0</b></label>
+            <label class="g-two_wheeler"><input type="checkbox" data-group="two_wheeler" checked /> Bici e moto <b data-count="two_wheeler">0</b></label>
+            <label class="g-vehicle"><input type="checkbox" data-group="vehicle" checked /> Veicoli <b data-count="vehicle">0</b></label>
+            <label class="g-animal"><input type="checkbox" data-group="animal" checked /> Animali <b data-count="animal">0</b></label>
+            <label class="g-pending"><input type="checkbox" data-group="pending" checked /> Non confermati <b data-count="pending">0</b></label>
+            <label class="plain"><input type="checkbox" data-opt="labels" checked /> Etichette</label>
+            <label class="plain"><input type="checkbox" data-opt="scene" checked /> Zone e linee</label>
+          </div>
+          <p class="muted small" id="privacy">Le immagini non vengono salvate: si producono solo mentre questa pagina è aperta.</p>
+        </section>
         </div>
-        <a class="btn primary" id="vision-link" href="#" target="_blank" rel="noopener">Apri la pagina della visione ↗</a>
-        <p class="sub">Serve il badge sul lettore, poi utente e password.</p>
+
+        <aside>
+        <section class="group">
+          <h2>Passaggi contati</h2>
+          <table class="counts">
+            <thead><tr><th scope="col">Chi</th><th scope="col" title="Nel verso IN della linea di conteggio">IN</th><th scope="col" title="Nel verso OUT della linea di conteggio">OUT</th></tr></thead>
+            <tbody id="counts"><tr><td colspan="3" class="muted">Nessun dato dalla visione.</td></tr></tbody>
+          </table>
+          <dl class="facts stats">
+            <dt>Veicoli che rallentano per i pedoni</dt><dd id="yield">–</dd>
+            <dt>Quasi incidenti</dt><dd id="nearmiss">0</dd>
+            <dt>Incidenti</dt><dd id="incidents">0</dd>
+          </dl>
+        </section>
+        </aside>
+        </div>
       </section>
 
-      <section id="sec-live" class="card app-only">
-        <div class="card-head">
-          <div>
-            <h3>Vista dal vivo</h3>
-            <p class="sub" id="privacy">Le immagini non vengono mai salvate: si producono solo mentre questa pagina è aperta.</p>
+      <!-- REGISTRO: what happened, newest first -->
+      <section id="view-registro" class="view" role="tabpanel" hidden>
+        <div class="group-head">
+          <div class="filter" role="group" aria-label="Mostra">
+            <button type="button" class="chip active" data-log="all">Tutto <b data-logcount="all">0</b></button>
+            <button type="button" class="chip" data-log="diag">Sensori <b data-logcount="diag">0</b></button>
+            <button type="button" class="chip" data-log="traffic">Traffico <b data-logcount="traffic">0</b></button>
+            <button type="button" class="chip" data-log="security">Sicurezza <b data-logcount="security">0</b></button>
           </div>
-          <div class="tools">
-            <button id="btn-pause" class="btn" type="button" aria-pressed="false">⏸ Pausa</button>
-            <button id="btn-full" class="btn" type="button">⛶ Schermo intero</button>
-          </div>
-        </div>
-        <div class="filters" id="filters">
-          <label class="chip g-person"><input type="checkbox" data-group="person" checked /> Pedoni <b data-count="person">0</b></label>
-          <label class="chip g-two_wheeler"><input type="checkbox" data-group="two_wheeler" checked /> Bici e moto <b data-count="two_wheeler">0</b></label>
-          <label class="chip g-vehicle"><input type="checkbox" data-group="vehicle" checked /> Veicoli <b data-count="vehicle">0</b></label>
-          <label class="chip g-animal"><input type="checkbox" data-group="animal" checked /> Animali <b data-count="animal">0</b></label>
-          <label class="chip g-pending"><input type="checkbox" data-group="pending" checked /> Non confermati <b data-count="pending">0</b></label>
-          <span class="sep"></span>
-          <label class="chip plain"><input type="checkbox" data-opt="labels" checked /> Etichette</label>
-          <label class="chip plain"><input type="checkbox" data-opt="scene" checked /> Zone e linee</label>
-        </div>
-        <div class="stage" id="stage">
-          <canvas id="canvas" width="640" height="480" aria-label="Immagine della camera con i riquadri"></canvas>
-          <div class="stage-banner" id="banner" hidden></div>
-        </div>
-      </section>
-
-      <!-- 4. Traffic data and technical details -->
-      <section id="sec-data" class="data">
-        <article class="card">
-          <div class="card-head"><h3>Traffico</h3></div>
-          <div id="lines" class="lines"><p class="muted">In attesa della visione…</p></div>
-          <div class="stats">
-            <div class="stat"><span id="yield">—</span><small>veicoli che rallentano per i pedoni</small></div>
-            <div class="stat"><span id="nearmiss">0</span><small>quasi incidenti</small></div>
-            <div class="stat"><span id="incidents">0</span><small>incidenti</small></div>
-          </div>
-        </article>
-
-        <article class="card">
-          <details class="tech">
-            <summary><h3>Dettagli tecnici</h3><span class="muted small">prestazioni e collegamento</span></summary>
-            <div class="bignum"><span id="fps">—</span><small>fotogrammi al secondo</small></div>
-            <div class="bars" id="bars"></div>
-            <dl class="kv">
-              <dt class="app-only">Fotogrammi elaborati</dt><dd class="app-only" id="frames">—</dd>
-              <dt class="app-only">Comandi allo sketch (C1)</dt><dd class="app-only" id="c1">—</dd>
-              <dt class="app-only">Heartbeat accettati (C2)</dt><dd class="app-only" id="c2">—</dd>
-              <dt class="app-only">Righe rifiutate</dt><dd class="app-only" id="rej">—</dd>
-              <dt class="app-only">Profilo / ingresso AI</dt><dd class="app-only" id="profile">—</dd>
-              <dt>Attiva da</dt><dd id="uptime">—</dd>
-            </dl>
-          </details>
-        </article>
-      </section>
-
-      <!-- 5. Log -->
-      <section id="sec-log" class="card">
-        <div class="card-head">
-          <div>
-            <h3>Registro</h3>
-            <p class="sub">Ultimi 100 eventi, solo in memoria. "Scarica" salva un file di testo sul tuo dispositivo.</p>
-          </div>
-          <div class="tools">
-            <button id="btn-download" class="btn" type="button">⬇ Scarica</button>
-            <button id="btn-clear" class="btn" type="button">Pulisci</button>
+          <div class="actions">
+            <button id="btn-download" class="button" type="button">Scarica</button>
+            <button id="btn-clear" class="button" type="button">Svuota</button>
           </div>
         </div>
-        <div class="tabs" role="tablist" id="tabs">
-          <button class="tab active" type="button" role="tab" data-tab="all">Tutto <b data-tabcount="all">0</b></button>
-          <button class="tab" type="button" role="tab" data-tab="diag">Sensori <b data-tabcount="diag">0</b></button>
-          <button class="tab" type="button" role="tab" data-tab="traffic">Traffico <b data-tabcount="traffic">0</b></button>
-          <button class="tab" type="button" role="tab" data-tab="security">Sicurezza <b data-tabcount="security">0</b></button>
-        </div>
-        <ol class="log" id="log"><li class="empty">Nessun evento.</li></ol>
+        <ol class="log" id="log"><li class="empty">Ancora nessun evento.</li></ol>
+        <p class="muted small">Gli ultimi 100 eventi restano solo in memoria. "Scarica" salva sul tuo dispositivo un file di testo con lo stato e gli eventi.</p>
       </section>
     </main>
 
     <script src="libs/socket.io.min.js"></script>
     <script src="libs/arduino.js"></script>
-    <script src="app.js"></script>
+    <script src="app.js?v=__BUILD__"></script>
   </body>
 </html>

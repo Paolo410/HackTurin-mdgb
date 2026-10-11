@@ -98,6 +98,8 @@ def write_zip(out: Path, files: list[tuple[Path, str]], readme: str) -> None:
         data = src.read_bytes()
         if src.suffix in TEXT_SUFFIXES or src.name in TEXT_SUFFIXES:
             data = data.replace(b"\r\n", b"\n")
+        if arc == "assets/index.html":   # new version in every zip: the browser must not keep the old CSS/JS
+            data = data.replace(b"__BUILD__", time.strftime("%Y%m%d%H%M%S").encode())
         entries[arc] = data
         parts = arc.split("/")[:-1]
         for i in range(1, len(parts) + 1):
