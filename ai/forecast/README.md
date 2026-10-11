@@ -1,22 +1,34 @@
 # ai/forecast/ — flusso atteso all'attraversamento
 
-**Owner:** Paolo Malugani (data scientist). Lo usa la centrale ([`app/`](../../app/README.md), owner Lorenzo), che mostra
-il riquadro **Flusso atteso** nel dettaglio di ogni camera. Specifica: `PROMPT_SMART_CROSSING.md` §5.3.
+**Owner:** Paolo Malugani (data scientist). Lo usa la centrale ([`app/`](../../app/README.md), owner Lorenzo), che lo
+mostra in due punti: gli **aloni** intorno alle camere sulla mappa e il riquadro **Flusso atteso** nel dettaglio di
+ogni camera. Specifica: `PROMPT_SMART_CROSSING.md` §5.3.
 
 ## Cosa fa
 
-Per ogni camera della mappa stima quanti **pedoni in, pedoni out, ciclisti e veicoli** passano adesso e nelle
-prossime 3 ore, per finestre di 15 minuti. Tre passi:
+Per ogni camera della mappa stima quanti **pedoni in, pedoni out, ciclisti e veicoli** passano all'ora, adesso e in
+ciascuna delle prossime 24 ore. Quattro passi:
 
 1. **Modello.** Un gradient boosting (uno per classe, loss di Poisson) trasforma calendario e contesto
-   dell'attraversamento in un conteggio atteso.
+   dell'attraversamento in un conteggio atteso per finestre di 15 minuti.
 2. **Calibrazione.** Lo storico del nodo dice quanto quell'attraversamento si scosta da ciò che il contesto fa
    prevedere (un fattore per classe, tra 0,1 e 10, che resta vicino a 1 finché i conteggi sono pochi).
 3. **Fusione.** Le ultime finestre contate dal nodo correggono la stima di adesso (Gamma-Poisson: il modello pesa
    quanto 15 minuti di conteggi, una finestra vecchia di 30 minuti pesa la metà).
+4. **Prossime ore.** La previsione parte dalla stima di adesso e torna al modello calibrato: ciò che adesso è
+   insolito (una folla, una strada vuota) si dimezza a ogni ora.
 
 Una camera che non manda dati (mai collegata, spenta, rete giù) ha comunque la stima del solo modello. Con i
 conteggi dell'ultima ora la centrale dice anche se il passaggio è nella norma, sopra o sotto il solito.
+
+## Nella centrale
+
+- **Cursore sopra la mappa** ("Affluenza pedoni attesa"): da adesso alle prossime 24 ore, un'ora per scatto.
+- **Alone** intorno a ogni camera: più pedoni attesi nell'ora scelta, alone più grande e più pieno (l'area cresce in
+  proporzione al flusso, fino a 600 pedoni all'ora). Il numero è scritto sotto la camera; la legenda è sulla mappa.
+  Il colore del pallino resta quello dello stato del nodo.
+- **Riquadro "Flusso atteso"**: i quattro numeri dell'ora scelta, il grafico dei pedoni attesi all'ora per le prossime
+  24 ore (passando sopra si leggono i valori, con un clic si sceglie l'ora), la tabella oraria e le fonti usate.
 
 ## Limiti, da dire nel pitch
 
@@ -27,25 +39,29 @@ conteggi dell'ultima ora la centrale dice anche se il passaggio è nella norma, 
 - La **direzione** (in/out) dipende da come è montata la camera: il modello parte da un profilo orario, la
   ripartizione vera arriva solo dai conteggi del nodo.
 - Le fonti Google sono scritte dalla documentazione ufficiale ma **non ancora provate con una chiave vera**.
+- Il meteo previsto copre 30 ore; il traffico di Google vale solo per l'ora in corso.
 
 ## Fonti
 
 Alle fonti esterne si mandano solo le coordinate della camera. Le risposte restano in una cache su disco
-(`forecast-context.json` nella cartella delle impostazioni dell'app) e si aggiornano in background: senza Internet il
-modello usa l'ultima risposta buona, e senza nessuna fonte usa solo il calendario.
+(`forecast-context.json` nella cartella delle impostazioni dell'app) e si aggiornano in background, una camera alla
+volta: senza Internet il modello usa l'ultima risposta buona, e senza nessuna fonte usa solo il calendario.
 
 | Fonte | Cosa dà | Chiave | Aggiornamento |
 |---|---|---|---|
-| [OpenStreetMap](https://wiki.openstreetmap.org/wiki/Overpass_API) (Overpass) | locali, negozi, fermate, scuole, luoghi di svago entro 300 m; classe della strada | no | 30 giorni |
+| [OpenStreetMap](https://wiki.openstreetmap.org/wiki/Overpass_API) | locali, negozi, fermate, scuole, luoghi di svago entro 300 m; classe della strada | no | 30 giorni |
 | [ESA WorldCover](https://registry.opendata.aws/esa-worldcover-vito/) 10 m, 2021 | quota di costruito, verde e acqua entro 300 m | no | 1 anno |
-| [Open-Meteo](https://open-meteo.com/en/docs) | temperatura e pioggia, ora e prossime ore | no | 30 minuti |
+| [Open-Meteo](https://open-meteo.com/en/docs) | temperatura e pioggia delle prossime 30 ore | no | 30 minuti |
 | [Google Places](https://developers.google.com/maps/documentation/places/web-service/nearby-search) | recensioni e orari di apertura dei 20 luoghi più noti per categoria | sì | 30 giorni |
 | [Google Routes](https://developers.google.com/maps/documentation/routes/reference/rest/v2/TopLevel/computeRoutes) | tempo di percorrenza con traffico diviso quello senza | sì | 30 minuti |
 | Nodo (contratto C4, `agg`) | conteggi e temperatura misurati | — | ogni finestra |
 
+OpenStreetMap si interroga con Overpass, che conta sul server. I server pubblici di Overpass sono spesso
+sovraccarichi (l'11/10/2026 non rispondevano): se la richiesta fallisce, gli stessi conteggi si calcolano qui dai dati
+grezzi dell'[API ufficiale](https://wiki.openstreetmap.org/wiki/API_v0.6) (1–2 MB per isolato, circa un secondo).
+
 ESA WorldCover è un file pubblico di 36000×36000 pixel per ogni riquadro di 3°: `sources.py` scarica solo
 l'intestazione e i riquadri interni intorno al punto (richieste HTTP parziali), senza librerie geografiche.
-Overpass è un servizio condiviso e a volte lento (fino a 45 s): la richiesta parte una volta al mese per camera.
 
 ### Chiave di Google Maps (facoltativa)
 
@@ -58,9 +74,9 @@ Senza chiave il modello funziona con le tre fonti gratuite. Con la chiave aggiun
 4. "Credenziali" → "Crea credenziali" → "Chiave API"; limitala a queste due API.
 5. Nell'app: pulsante **Impostazioni** → `GOOGLE_MAPS_API_KEY=...` → chiudi e riapri.
 
-Consumo: 5 richieste Places per camera al mese, una richiesta Routes ogni 30 minuti per la camera che si sta guardando.
-La stessa chiave accende anche la mappa di Google nella dashboard, se ha "Maps JavaScript API" abilitata; altrimenti
-la mappa resta quella senza chiave.
+Consumo, per ogni camera sulla mappa e solo ad app aperta: 5 richieste Places al mese, una richiesta Routes ogni 30
+minuti. La stessa chiave accende anche la mappa di Google nella dashboard, se ha "Maps JavaScript API" abilitata;
+altrimenti la mappa resta quella senza chiave.
 
 ## Come si prova
 
@@ -71,9 +87,14 @@ pip install -r app/desktop/requirements.txt
 python app/desktop/centrale_app.py
 ```
 
-Clic sulla camera: sotto "Traffico" compare **Flusso atteso**. Di solito entro mezzo minuto le etichette in basso
-mostrano le fonti arrivate (l'11/10/2026 per `nodo01`: 76 locali, 178 negozi, 14 fermate; ESA WorldCover 98% costruito). Senza nodo collegato
-la riga dice "Solo modello".
+Sopra la mappa compare il cursore "Affluenza pedoni attesa" e intorno alla camera l'alone con il numero di pedoni
+all'ora: spostando il cursore l'alone cambia. Clic sulla camera: sotto "Traffico" c'è **Flusso atteso**. Di solito
+entro mezzo minuto le etichette in basso mostrano le fonti arrivate (l'11/10/2026 per `nodo01`, corso Castelfidardo
+angolo corso Einaudi: 10 locali, 9 negozi, 18 fermate; ESA WorldCover 87% costruito). Senza nodo collegato la riga
+dice "Solo modello".
+
+Chi aveva già aperto l'app ha nelle impostazioni il `nodes.json` vecchio (camera in piazza San Carlo): al primo
+avvio viene sostituito con quello nuovo, a meno che non sia stato modificato a mano.
 
 Per vedere la correzione con i conteggi serve un nodo. Senza scheda, con l'app aperta, dalla cartella del repo (è il
 nodo simulato di [`app/README.md`](../../app/README.md#prova-sul-pc-senza-scheda-solo-sviluppatori), con gli aggregati
@@ -94,7 +115,7 @@ che `/api/forecast/nodo01` risponda.
 Test, senza rete:
 
 ```bash
-cd ai && python -m pytest tests/test_forecast.py -q        # 20 test
+cd ai && python -m pytest tests/test_forecast.py -q        # 21 test
 python -m pytest comms/tests/test_dashboard.py -q          # dalla root: endpoint della centrale
 ```
 
@@ -131,7 +152,7 @@ da ciò che nessuna fonte vede (nel simulatore `site_effect` e `in_bias`): è la
 | `context.py` | cache su disco del contesto, aggiornata in background | libreria standard |
 | `model.py` | legge `model.json` e calcola la stima | libreria standard |
 | `fusion.py` | calibrazione e fusione con i conteggi del nodo | libreria standard |
-| `service.py` | `Forecaster.forecast(camera, finestre)`: quello che la dashboard mostra | libreria standard |
+| `service.py` | `Forecaster.forecast(camera, finestre)`: stima di adesso e delle prossime 24 ore | libreria standard |
 | `simulate.py`, `train.py` | storico simulato e addestramento | numpy, scikit-learn |
 | `model.json` | gli alberi addestrati (214 KB di testo) | — |
 
