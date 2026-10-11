@@ -643,3 +643,16 @@ con v_ped 0,3 → 25 s.
     fallite e fotogrammi scuri con il momento in cui capitano. La camera ha un lettore alla volta: si registra
     mentre la visione è su un video. La visione continua a non salvare mai fotogrammi.
 
+54. **Clip per il trailer (11/10, 13:15)**, chieste da Paolo: cosa vede la telecamera, la centrale che si
+    aggiorna sullo stesso video, l'accesso del tecnico.
+    - `scripts/trailer_clip.py`: il video con sopra solo i riconoscimenti (niente riquadro di stato né fascia in
+      basso), disegnati sul fotogramma già ingrandito così restano nitidi. Scrive solo in `ai/samples/trailer/`.
+    - Due versioni rese su Torino_2: detector come sulla scheda (320 px, zona della calibrazione) e detector a
+      640 px su tutta l'inquadratura (più riconoscimenti, velocità che la scheda non ha). La scelta è di chi
+      monta il trailer, ma va dichiarata.
+    - Dashboard e pagina del tecnico: registrate da un Chrome senza finestra su una copia isolata sul Mac
+      (visione su Torino_2 a 6 FPS come la scheda, nodo, centrale su porte a parte). Lì sono simulati: lo sketch,
+      il badge, i sensori ambientali; le credenziali sono di prova; il nodo manda i conteggi ogni 10 s invece
+      di 15 min. I tempi per fase mostrati sono quelli del Mac. Lo strumento di registrazione non è nel repo.
+    - Visto: il video dal vivo dentro la dashboard funziona solo se lo stesso browser ha la sessione del tecnico
+      (lo stream della visione chiede il login). Per la centrale vera serve un accesso suo: da decidere con Lorenzo.
