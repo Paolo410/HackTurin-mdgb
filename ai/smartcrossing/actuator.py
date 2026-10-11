@@ -8,6 +8,7 @@ The real transports (serial, Bridge) belong to comms/ (comms/actuators.py). Here
 """
 from __future__ import annotations
 
+import json
 import sys
 import threading
 import time
@@ -16,6 +17,38 @@ from typing import Callable
 from .config import AI_DIR
 
 C1_VERSION = 1
+# Fields of C1 the sketch does not need to act, dropped in this order when the line is too long for the link.
+# What the traffic light must do (state, req, tech) and v/seq always stay.
+_DROP_WHEN_LONG = ("reason", "oled", "lcd", "led", "green_s", "t_ms")
+_MIN_REASON = 20                       # a reason shorter than this says nothing: it is dropped instead
+
+
+def _size(line: dict) -> int:
+    """Bytes of the line on the link: the same compact UTF-8 JSON as comms/actuators.py."""
+    return len(json.dumps(line, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
+
+
+def fit_line(line: dict, max_bytes: int) -> dict:
+    """The C1 line as it goes to the firmware: at most max_bytes once encoded.
+
+    On the UNO Q the arduino-router refuses longer mdgb_line calls ("message size exceeds the limit"),
+    measured 238 bytes on 11/10: such a command never reached the sketch. First the reason is shortened,
+    then the fields of _DROP_WHEN_LONG go, in order. The full command stays for logs, overlay and page."""
+    if max_bytes <= 0 or _size(line) <= max_bytes:
+        return line
+    out = dict(line)
+    reason = out.get("reason")
+    if isinstance(reason, str):
+        while len(reason) >= _MIN_REASON and _size(out) > max_bytes:
+            reason = reason[:len(reason) - max(1, _size(out) - max_bytes)]
+            out["reason"] = reason.rstrip() + "..."
+        if _size(out) <= max_bytes:
+            return out
+    for key in _DROP_WHEN_LONG:
+        out.pop(key, None)
+        if _size(out) <= max_bytes:
+            return out
+    return out                         # still too long: comms/actuators.py logs the link error
 
 
 class SimActuator:
@@ -73,6 +106,7 @@ class Commander:
         self.hb_period = float(a["heartbeat_period_s"])
         self.hb_stale = float(a["heartbeat_stale_s"])
         self.repeat_s = float(a["c1_repeat_s"])
+        self.max_line_bytes = int(a["max_line_bytes"])
         self._wall_clock, self._monotonic = wall_clock, monotonic
         self.seq = 0
         self.last_line: dict | None = None
@@ -104,7 +138,7 @@ class Commander:
         with self._lock:
             self.seq += 1
             line = {"v": C1_VERSION, "seq": self.seq, "t_ms": int(self._wall_clock() * 1000), **fields}
-            self.actuator.send(line)
+            self.actuator.send(fit_line(line, self.max_line_bytes))
         self.last_line, self._last_fields, self._last_sent_t = line, acts, now
         return True
 

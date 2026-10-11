@@ -434,3 +434,48 @@ con v_ped 0,3 → 25 s.
       che di sera suonava di continuo;
     - `tech` è un campo nuovo del contratto C1, come `req.veh_red_now` (punto 31): da far scrivere a Lorenzo in
       `docs/CONTRACTS.md`. Chi non lo conosce lo ignora.
+38. **Comandi C1 troppo lunghi per il Bridge (11/10, 01:30)**, trovato provando tutto sulla scheda:
+    - `arduino-router` rifiuta le chiamate `mdgb_line` oltre **238 byte** ("message size exceeds the limit").
+      Misurato sulla scheda con righe di prova che lo sketch scarta. Il contratto C1 dice 512, e
+      `comms/actuators.py` accorcia solo sopra 512;
+    - nelle scene di prova i comandi arrivavano a 361 byte: PRESENCE, avvisi, rosso subito per animale o
+      bambino, DEGRADED. **Nessuno arrivava allo sketch**; passavano solo IDLE e gli heartbeat. La prova del
+      punto 33 usava righe corte;
+    - ora `Commander` manda una riga che sta nel limite (`actuator.max_line_bytes: 238`). Prima accorcia `reason`,
+      poi toglie `oled`, `lcd`, `led`, `green_s`, `t_ms`. Restano sempre `v`, `seq`, `state`, `req` e `tech`, cioè
+      quello che lo sketch usa. Il comando completo resta per log, overlay e pagina del tecnico;
+    - per Lorenzo: in CONTRACTS il limite del Bridge è 238, non 512.
+39. **Camera ferma alle 01:11 dell'11/10.** Il flusso si è fermato senza errori del software; allo stop il kernel ha
+    scritto `imx219 ... disabling streaming failed (-6)`: il sensore non risponde più sull'I2C (cavo CSI
+    mosso o staccato durante il montaggio). Da lì il driver `qcom_camss` resta in "sta già registrando" e
+    nessun programma apre la camera (`Failed to start streaming: Operation already in progress`), nemmeno
+    `cam`. Si sblocca solo controllando il cavo e riavviando la scheda. La visione intanto era in DEGRADED
+    ("video assente").
+40. **Prova di tutto sulla scheda (11/10, 01:30-01:40)**, dopo il riavvio che ha sbloccato la camera (punto 39):
+    - **avvio automatico:** visione come servizio `mdgb-ai` (si ferma con SIGINT come Ctrl+C, righe di stato in
+      `journalctl`), rete `mdgb-comms`, app `mdgb` come app predefinita di App Lab. Provato con un riavvio: tutto
+      riparte da solo. Al primo avvio la camera non è ancora pronta: systemd riavvia la visione dopo 2 s;
+    - **comandi accorciati** (punto 38) provati sul Bridge: la riga completa da 366 byte viene rifiutata, quella
+      accorciata da 234 byte arriva e lo sketch la accetta;
+    - **visione interrotta:** fail-safe del semaforo dopo 485 ms; systemd la riavvia in 3,8 s; la camera si
+      riapre; lo sketch torna "visione collegata" dopo 7,5 s;
+    - **rete tagliata 100 s:** la centrale passa a "rete giù, nodo sano" via Bluetooth (−41 dBm). Alla
+      riapertura torna su Wi-Fi in 18 s, con coda 0, 0 eventi persi e 0 doppioni;
+    - **da sistemare in centrale (Lorenzo):**
+      - all'inizio del taglio, per circa 5 s, compare "nodo distrutto": il Last Will MQTT arriva prima del
+        primo beacon;
+      - il fail-safe dello sketch non arriva in centrale quando la visione è spenta: `mcu_event` non ha più
+        chi lo riceve;
+    - **non ancora provati:** badge, login e cicalino muto dal telefono (serve qualcuno con il badge);
+      calibrazione e richieste nate da una scena vera.
+41. **Correzioni in centrale concordate con Lorenzo (11/10, 01:50)**, in PR #13 (area sua):
+    - **"Nodo distrutto" per 5 s:** per 20 s da quando MQTT è perso la centrale mostra "Wi-Fi perso, attendo il
+      Bluetooth" (giallo), poi decide. Lorenzo trovava troppi 40 s. Vale dopo la ricostruzione dell'app sul
+      suo PC;
+    - **fail-safe in centrale anche a visione spenta:** lo scrive `mdgb_link.py` dal messaggio `led_status`
+      "FAIL-SAFE" dello sketch. Lo sketch dell'app `mdgb` non manda più nessun `mcu_event`: urto, badge e
+      fail-safe passano tutti da `mdgb_link.py`, una volta sola. App aggiornata sulla scheda (backup in
+      `~/HackTurin-mdgb/backups/`) e zip per Salvatore aggiornato;
+    - **provato:** visione interrotta → riga di fail-safe dopo circa 0,7 s → la centrale mostra "nodo guasto
+      (semaforo in fail-safe)" → con la visione ripartita da sola torna "nodo OK" dopo 12 s.
+

@@ -184,6 +184,8 @@ actuator:
   heartbeat_period_s: 0.1         # (spec) C2 every 100 ms
   heartbeat_stale_s: 0.4          # no heartbeat if the vision loop has been silent for this long
   c1_repeat_s: 1.0                # the last C1 is repeated at least this often (CONTRACTS draft)
+  max_line_bytes: 238             # longest C1 line the link takes: the arduino-router of the UNO Q refuses longer
+                                  # calls (measured 11/10; CONTRACTS says 512). Reason, then texts are cut first
   failsafe_timeout_s: 0.5         # (spec) the firmware falls back after 500 ms without heartbeat
 
 mcu:                              # what the microcontroller tells the vision (C5 lines of CONTRACTS.md)
