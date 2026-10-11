@@ -9,6 +9,9 @@ legge quella cartella (MDGB_C3_DIR in comms/.env). Solo libreria standard: in Ap
     sensor_env/light/air (ogni 300 ms)  -> una riga "env" ogni 10 s con gli ultimi valori
     alarm_status (tentato furto)        -> "tamper" code 1 (urto), al massimo una ogni 10 s
     rfid_status "ACCESSO CONSENTITO"    -> "tamper" code 3 (badge del tecnico: informazione, non allarme)
+    led_status "FAIL-SAFE: ..."         -> "failsafe" (semaforo nel ciclo normale: la visione non risponde). Passa da qui
+                                           perché il fail-safe scatta proprio quando la visione, che riceve gli
+                                           mcu_event dello sketch, è ferma
     il resto (LED, accelerazioni, codice del badge) resta nel log di App Lab: non serve alla centrale
 """
 import functools
@@ -96,6 +99,13 @@ def _alarm(kind, **fields):
 def theft_alarm(msg=""):
     """alarm_status: accelerazione anomala -> manomissione, urto (code 1)."""
     _alarm("shock", type="tamper", code=1)
+
+
+@_safe
+def led_status(msg):
+    """led_status: solo il fail-safe dello sketch va alla centrale (C5 failsafe, reason hb_timeout)."""
+    if "FAIL-SAFE" in str(msg).upper():
+        _alarm("failsafe", type="failsafe", reason="hb_timeout")
 
 
 @_safe

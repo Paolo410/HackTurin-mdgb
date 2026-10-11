@@ -184,7 +184,11 @@ def test_diagnosis_table():
     assert diagnose(now, hb_ok, now - 100, [(now - 10, "ble", bhb())]) == \
         {"code": "network_down", "text": "rete giù, nodo sano", "via": "ble", "last_contact": now - 10}
     assert diagnose(now, hb_ok, now - 5, [(now - 1, "ble", bhb("failsafe"))])["code"] == "faulty"
-    assert diagnose(now, {"online": False}, now - 1)["code"] == "destroyed", "Last Will senza preavviso"
+    assert diagnose(now, {"online": False}, now - 1)["code"] == "checking", "Last Will: si aspetta il backup"
+    assert diagnose(now, {"online": False}, now - 21)["code"] == "destroyed", "Last Will e niente backup in 20 s"
+    assert diagnose(now, hb_ok, now - 45)["code"] == "checking", "MQTT muto da 45 s: backup atteso fino a 50"
+    assert diagnose(now, hb_ok, now - 51)["code"] == "destroyed"
+    assert diagnose(now, {"online": False}, now - 15, [(now - 3, "ble", bhb())])["code"] == "network_down"
     old = now - 2000
     assert diagnose(now, hb_ok, old, [(old, "lorawan", alarm("dead"))])["code"] == "linux_hung"
     assert diagnose(now, hb_ok, old, [(old - 60, "ble", alarm("tamper", 2))])["code"] == "tampered"

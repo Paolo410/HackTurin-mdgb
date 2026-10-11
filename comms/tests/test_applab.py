@@ -63,9 +63,13 @@ def test_main_py_forwards_the_sketch_notifications(tmp_path, monkeypatch):
     provided["rfid_status"]("ACCESSO NEGATO (Errore 1/3)")
     provided["rfid_status"]("ACCESSO CONSENTITO (Granted)")
     provided["sensor_env"](24.0, 50.0)              # > 10 s after the first env line: a second one
+    provided["led_status"]("FAIL-SAFE: visione assente, ciclo normale")   # the vision stopped
+    provided["led_status"]("VISIONE collegata: semaforo adattivo")
+    provided["led_status"]("FAIL-SAFE: visione assente, ciclo normale")   # again within 10 s: not repeated
 
     out = lines(c3)
-    assert [o["type"] for o in out] == ["env", "tamper", "tamper", "env"], out
+    assert [o["type"] for o in out] == ["env", "tamper", "tamper", "env", "failsafe"], out
+    assert out[4]["reason"] == "hb_timeout", "the fail-safe reaches the central even with the vision off"
     assert out[0] == {"v": 1, "src": "mcu", "ts": 1000.0, "type": "env", "t_c": 23.5, "rh": 45.0}
     assert (out[1]["code"], out[2]["code"]) == (1, 3), "theft alarm once (code 1), then the technician badge (code 3)"
     assert out[3]["t_c"] == 24.0 and out[3]["light"] == 512 and out[3]["eco2_ppm"] == 400
