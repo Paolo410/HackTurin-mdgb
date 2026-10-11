@@ -434,6 +434,26 @@ con v_ped 0,3 → 25 s.
       che di sera suonava di continuo;
     - `tech` è un campo nuovo del contratto C1, come `req.veh_red_now` (punto 31): da far scrivere a Lorenzo in
       `docs/CONTRACTS.md`. Chi non lo conosce lo ignora.
+37. **Visione, sketch e rete insieme sulla scheda (11/10, 01:00)**, dopo il merge delle PR #9, #11 e #10:
+    - **cartella unica degli eventi** (punto 30): `~/ArduinoApps/mdgb/data/c3`, che il container di App Lab vede
+      come `/app/data/c3`. La visione ci arriva con `push_to_arduino.sh --applab mdgb` (file `ai/.c3_dir`, letto da
+      `run_vision.sh`), la rete con lo stesso `--applab` del suo script;
+    - **urto e badge una volta sola** (punto 30): li scrive solo `mdgb_link.py`, da `alarm_status` e
+      `rfid_status`. Lo sketch non li manda più come `mcu_event` (resta solo il fail-safe). Così arrivano anche a
+      visione spenta, e la visione li legge dagli stessi file (`C5FileTail`, ogni 0,5 s);
+    - **app `mdgb` aggiornata** con l'ok di Paolo:
+      - sketch del punto 36, sopra la versione di Salvatore delle 00:23 (soglia dell'urto 1,15 g);
+      - `main.py` di adesso, senza camera, con le 5 righe di `mdgb_link`;
+      - pacchetto e prova su PC in `mdgb-app-tecnico.zip`, consegnato a Salvatore;
+    - **`~/venv` con il suo `pip`** (`python3 -m pip --python ~/venv/bin/python install pip`, senza sudo): lo
+      script di Lorenzo usa `~/venv/bin/pip`, che mancava;
+    - **rete:** servizio `mdgb-comms`, broker sul PC di Lorenzo (192.168.169.12:1883). Al broker arrivano
+      `hb` ogni 10 s (stato IDLE, 8,7 FPS) e `agg` ogni 60 s (temperatura, umidità);
+    - **Bluetooth di backup non attivo:** con BlueZ 5.82 `btmgmt` resta fermo se l'input è `/dev/null`, come
+      sotto systemd: "power on" va in timeout dopo 5 s. Provato sulla scheda: con `input="\n"` in
+      `subprocess.run` (`comms/node/backup_link.py`) risponde subito. Correzione per Lorenzo;
+    - **vista dal vivo nell'app di Lorenzo:** non funziona per scelta. Lo stream della visione è solo per il
+      tecnico con badge e login (punto 29).
 38. **Comandi C1 troppo lunghi per il Bridge (11/10, 01:30)**, trovato provando tutto sulla scheda:
     - `arduino-router` rifiuta le chiamate `mdgb_line` oltre **238 byte** ("message size exceeds the limit").
       Misurato sulla scheda con righe di prova che lo sketch scarta. Il contratto C1 dice 512, e
