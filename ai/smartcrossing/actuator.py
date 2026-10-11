@@ -95,6 +95,10 @@ def make_actuator(kind: str, cfg: dict, **kwargs):
         from comms.actuators import make_actuator as comms_make_actuator
     except ImportError as exc:
         raise RuntimeError(f"--actuator {kind} needs comms/actuators.py, which is not in this checkout ({exc})") from exc
+    if kind == "bridge":
+        # The App Lab app of the sketch already writes the lines of the MCU for the central (mdgb_link.py,
+        # applab-*.jsonl), also with the vision off: a second copy here would reach the central twice.
+        kwargs.setdefault("mcu_log", bool(cfg["mcu"]["save_bridge_lines"]))
     return comms_make_actuator(kind, **kwargs)
 
 
