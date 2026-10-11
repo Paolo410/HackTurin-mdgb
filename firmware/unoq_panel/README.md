@@ -18,6 +18,14 @@ Il pannello non apre la camera e non parla con la visione:
 
 Non registra `mcu_event` sul Bridge: quelle righe le riceve già la visione e il router ne accetta uno solo.
 
+**Verso la centrale** (aggiunto da Paolo l'11/10, con l'ok del team): `main.py` passa i valori anche a
+`mdgb_link.py` di Lorenzo (preso da `comms/applab/` quando si crea lo zip). Scrive sensori, urto, badge e fail-safe in
+`data/c3/applab-*.jsonl`, che la rete porta alla centrale anche a visione spenta. La visione non ne fa una seconda
+copia (`mcu.save_bridge_lines: false` in `ai/config.yaml`).
+
+**Badge del tecnico:** il codice non è più nello sketch. Sta in `../unoq_mcu/sketch/arduino_secrets.h`, ignorato da
+git: si crea da `arduino_secrets.h.example`. Senza quel file `build_applab_zip.py` si ferma e lo dice.
+
 ## Creare lo zip e avviare
 
 ```bash

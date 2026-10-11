@@ -59,7 +59,7 @@ def test_main_py_forwards_the_sketch_notifications(tmp_path, monkeypatch):
     for _ in range(5):                              # the theft alarm repeats at every sample
         provided["alarm_status"]("ALLARME: TENTATO FURTO! Accelerazione anomala rilevata!")
         t[0] += 0.3
-    provided["rfid_data"]("430052353713")
+    provided["rfid_data"]("TEST00000001")
     provided["rfid_status"]("ACCESSO NEGATO (Errore 1/3)")
     provided["rfid_status"]("ACCESSO CONSENTITO (Granted)")
     provided["sensor_env"](24.0, 50.0)              # > 10 s after the first env line: a second one
@@ -73,7 +73,7 @@ def test_main_py_forwards_the_sketch_notifications(tmp_path, monkeypatch):
     assert out[0] == {"v": 1, "src": "mcu", "ts": 1000.0, "type": "env", "t_c": 23.5, "rh": 45.0}
     assert (out[1]["code"], out[2]["code"]) == (1, 3), "theft alarm once (code 1), then the technician badge (code 3)"
     assert out[3]["t_c"] == 24.0 and out[3]["light"] == 512 and out[3]["eco2_ppm"] == 400
-    assert "430052353713" not in json.dumps(out), "the badge code never leaves the board"
+    assert "TEST00000001" not in json.dumps(out), "the badge code never leaves the board"
 
 
 def test_node_reads_the_app_lab_lines(tmp_path, monkeypatch):

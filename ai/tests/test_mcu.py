@@ -395,3 +395,33 @@ def test_the_app_reads_the_files_of_the_sketch_app_and_serves_the_page(tmp_path,
     out = capsys.readouterr().out
     assert code == 0
     assert f"mcu_files={tmp_path}/applab-*.jsonl" in out and "operator_page=:" in out and "images=on" in out
+
+
+def test_with_the_example_calibration_crossings_stay_on_the_screen(tmp_path, capsys, monkeypatch):
+    """The counting lines of the example are not on the stripes of the real scene: their crossings must not reach
+    the central as real ones. With the calibration of the view they do."""
+    from smartcrossing.config import resolve_path
+    video = str(tmp_path / "texture.avi")
+    writer = cv2.VideoWriter(video, cv2.VideoWriter_fourcc(*"MJPG"), 10.0, (320, 240))
+    rng = np.random.default_rng(1)
+    for _ in range(8):
+        writer.write(rng.integers(0, 255, (240, 320, 3), dtype=np.uint8))
+    writer.release()
+    real_step = app.Pipeline.step
+
+    def step(self, frame, t):                         # one crossing on every frame
+        result = real_step(self, frame, t)
+        result.events.append({"type": "crossing", "track_id": 1, "cls": "pedestrian", "dir": "in", "line": "ped"})
+        return result
+
+    monkeypatch.setattr(app.Pipeline, "step", step)
+    example = resolve_path(CFG["counting"]["example_calib_path"])
+    own = tmp_path / "calib_of_this_view.json"
+    own.write_text(example.read_text())
+    for calib, expected in ((example, 0), (own, 8)):
+        c3 = tmp_path / f"c3_{expected}"
+        assert app.main(["--source", video, "--headless", "--c3-dir", str(c3), "--calib", str(calib),
+                         "--max-frames", "8"]) == 0
+        lines = [json.loads(line) for f in c3.glob("c3-*.jsonl") for line in f.read_text().splitlines()]
+        assert sum(line["type"] == "crossing" for line in lines) == expected
+    assert "NOT sent to the central" in capsys.readouterr().out

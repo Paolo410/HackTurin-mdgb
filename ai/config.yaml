@@ -198,6 +198,8 @@ mcu:                              # what the microcontroller tells the vision (C
                                   # sketch (comms/applab/mdgb_link.py), when that part is on the board
   poll_s: 0.5                     # how often those files are read
   lamp_fault_hold_s: 5            # DEGRADED while the firmware keeps reporting a lamp fault this often
+  save_bridge_lines: false        # true = the vision also writes the MCU lines it gets on the Bridge (mcu-*.jsonl)
+                                  # for the central. False with the App Lab app and mdgb_link.py: no duplicates
 
 operator:                         # page for the technician (--operator-port): badge first, then login
   login_s: 120                    # after the badge: time to log in. Logging in or out uses the badge up

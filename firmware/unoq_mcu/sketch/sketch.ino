@@ -10,7 +10,10 @@
 // Cosa cambia rispetto all'originale: LEGGIMI.md della proposta (mdgb-app-proposta.zip).
 
 // =========================================================================
-String AUTHORIZED_TAG = "430052353713"; // Tag RFID autorizzato
+// Codice del badge del tecnico autorizzato: in arduino_secrets.h, che NON va nel repo (.gitignore).
+// Si crea copiando arduino_secrets.h.example e scrivendo il codice del badge.
+#include "arduino_secrets.h"
+String AUTHORIZED_TAG = SECRET_TECH_BADGE;
 // =========================================================================
 
 ModulinoMovement movement;
@@ -54,6 +57,7 @@ const unsigned long VEH_RED_MS = 20000UL;        // rosso veicoli (verde pedonal
 const unsigned long PED_EXTEND_MAX_MS = 15000UL; // estensione massima del verde pedonale
 const unsigned long RED_HOLD_MAX_MS = 20000UL;   // rosso veicoli trattenuto al massimo cosi' a lungo oltre il normale
 const unsigned long HB_TIMEOUT_MS = 500UL;       // senza heartbeat piu' a lungo: fail-safe (ciclo normale)
+const unsigned long TECH_LOGIN_MS = 120000UL;    // dopo il badge: 2 minuti di cicalino muto per il login (anche senza visione)
 
 enum Phase { VEH_GREEN, VEH_YELLOW, VEH_RED };
 Phase phase = VEH_GREEN;
@@ -68,6 +72,15 @@ bool reqRedHold = false;          // req.veh_red_hold: chi ha bisogno di tempo e
 bool reqRedNow = false;           // req.veh_red_now: bambino non accompagnato o animale libero -> rosso subito
 bool urgentYellow = false;        // il giallo in corso e' quello breve
 
+// TECNICO AL NODO: dal badge al logout il cicalino non suona (C1 "tech", ai/DECISIONS.md punto 36).
+bool techBadge = false;           // badge accettato: muto per TECH_LOGIN_MS, il tempo per il login
+unsigned long techBadgeMs = 0;
+bool reqTech = false;             // C1 "tech": il tecnico e' ancora collegato alla pagina (vale solo con gli heartbeat)
+
+bool buzzerMuted(unsigned long now) {
+  return (techBadge && now - techBadgeMs < TECH_LOGIN_MS) || (visionAlive && reqTech);
+}
+
 // =========================================================================
 // BUZZER senza delay(): mentre suona, semaforo e Bridge continuano a girare.
 // =========================================================================
@@ -76,14 +89,22 @@ int beepOnMs = 0;
 int beepOffMs = 0;
 int beepsLeft = 0;
 unsigned long beepNextMs = 0;
+bool beepForce = false;           // la serie in corso suona anche con il tecnico al nodo (conferma del badge)
 
-// CICALINO SPENTO PER ORA (chiesto da Paolo l'11/10): per riaccenderlo mettere 1. Tutti i suoni passano da qui:
-// badge, errore, blocco, antifurto, sensore di luce coperto. Messaggi e semaforo non cambiano.
+// CICALINO: 1 = acceso (riacceso da Salvatore l'11/10), 0 = spento. Tutti i suoni passano da qui: badge, errore,
+// blocco, antifurto. Con il tecnico al nodo (buzzerMuted) restano muti. Messaggi e semaforo non cambiano.
 #ifndef BUZZER_ENABLED
 #define BUZZER_ENABLED 1
 #endif
 
 void playBeep(int frequency, int durationMs) {
+  if (BUZZER_ENABLED && !buzzerMuted(millis())) {
+    tone(BUZZER_PIN, frequency, durationMs);
+  }
+}
+
+// Solo per la conferma del badge: suona anche con il tecnico al nodo.
+void playBeepAlways(int frequency, int durationMs) {
   if (BUZZER_ENABLED) {
     tone(BUZZER_PIN, frequency, durationMs);
   }
@@ -96,11 +117,16 @@ void startBeeps(int frequency, int onMs, int offMs, int count) {
   beepOffMs = offMs;
   beepsLeft = count;
   beepNextMs = millis();
+  beepForce = false;
 }
 
 void updateBeeps(unsigned long now) {
   if (beepsLeft > 0 && (long)(now - beepNextMs) >= 0) {
-    playBeep(beepFreq, beepOnMs);
+    if (beepForce) {
+      playBeepAlways(beepFreq, beepOnMs);
+    } else {
+      playBeep(beepFreq, beepOnMs);
+    }
     beepNextMs = now + beepOnMs + beepOffMs;
     beepsLeft--;
   }
@@ -253,6 +279,11 @@ bool mdgb_line(String line) {
   }
   reqRedHold = (jsonValue(line, "veh_red_hold") == "true");
   reqRedNow = (jsonValue(line, "veh_red_now") == "true");
+  bool tech = (jsonValue(line, "tech") == "true");
+  if (reqTech && !tech) {
+    techBadge = false;            // logout (o login non fatto in tempo): il cicalino torna subito attivo
+  }
+  reqTech = tech;
   return true;
 }
 
@@ -268,6 +299,7 @@ void updateVisionLink(unsigned long now) {
     reqExtendMs = 0;
     reqRedHold = false;
     reqRedNow = false;
+    reqTech = false;              // senza visione vale solo il silenzio dei 2 minuti dal badge
     Bridge.notify("led_status", "FAIL-SAFE: visione assente, ciclo normale");
     Bridge.notify("mcu_event", "{\"v\":1,\"src\":\"mcu\",\"type\":\"failsafe\",\"reason\":\"hb_timeout\"}");
   }
@@ -326,7 +358,10 @@ void loop() {
         Bridge.notify("rfid_status", "ACCESSO CONSENTITO (Granted)");
         // Badge del tecnico verso la visione (riga C5: tamper, code 3): apre la pagina del tecnico.
         Bridge.notify("mcu_event", "{\"v\":1,\"src\":\"mcu\",\"type\":\"tamper\",\"code\":3}");
+        techBadge = true;           // tecnico al nodo: cicalino muto fino al logout (o 2 minuti senza login)
+        techBadgeMs = millis();
         startBeeps(2500, 120, 30, 2);
+        beepForce = true;           // la conferma del badge si sente
       } else {
         failedAttempts++;
 

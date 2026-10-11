@@ -98,7 +98,9 @@ def test_c4b_node_and_central_agree():
            + [{"type": "crossing", "cls": "cyclist", "dir": "in"}] * 6
            + [{"type": "crossing", "cls": "car", "dir": "in"}] * 50 + [{"type": "crossing", "cls": "bus", "dir": "out"}] * 2
            + [{"type": "crossing", "cls": "animal", "dir": "in", "coco": "dog"}, {"type": "near_miss"}]
-           + [{"type": "yield", "yielded": True}] * 2 + [{"type": "yield", "yielded": False}] * 3)
+           + [{"type": "yield", "yielded": True}] * 2 + [{"type": "yield", "yielded": False}] * 3
+           # a pedestrian over the vehicle line (walking along the road) is not a crossing of the stripes
+           + [{"type": "crossing", "cls": "pedestrian", "dir": "in", "line": "veh", "attrs": {"slow": True}}] * 4)
     agg = p.summarize(evs, 1739011500, 1739012400, "nodo07", env={"t_c": 14.2, "rh": 81, "lux": 120}, queue=7)
     assert agg["counts"]["pedestrian"] == {"in": 3, "out": 11} and agg["vulnerable"] == 3
     assert agg["yield_rate"] == 0.4 and agg["near_miss"] == 1

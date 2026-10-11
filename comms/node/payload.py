@@ -46,6 +46,10 @@ def summarize(events, t0, t1, node_id, env=None, queue=0):
     for ev in events:
         t = ev.get("type")
         if t == "crossing":
+            # "Pedoni in/out" are the crossings of the pedestrian line: a pedestrian over the vehicle line (walking
+            # along the road) is not a crossing of the stripes and must not move those numbers.
+            if ev.get("cls") == "pedestrian" and ev.get("line", "ped") != "ped":
+                continue
             c = counts.setdefault(ev.get("cls", "unknown"), {"in": 0, "out": 0})
             if ev.get("dir") in c:
                 c[ev["dir"]] += 1
