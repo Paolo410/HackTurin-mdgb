@@ -533,4 +533,17 @@ con v_ped 0,3 → 25 s.
     - **prima prova:** Torino_1 sulla scheda a 8,4–8,6 FPS, auto contate e arrivate in centrale, 0 eventi persi,
       nessun comando rifiutato dal Bridge;
     - 21 video e le calibrazioni copiati in `~/HackTurin-mdgb/ai/samples/` sulla scheda (246 MB, fuori da git).
+44. **Comandi del video nella pagina del tecnico (11/10, 04:00)**, chiesti da Paolo per il benchmark dal vivo:
+    - pulsanti video prima / dopo e indietro / avanti di 10 s, solo con badge e login e solo quando la sorgente è un
+      video; la pagina li manda alla visione (`POST /video`), che li esegue tra due fotogrammi (`playlist.py`);
+    - cambiare video non riavvia il processo, altrimenti si perderebbe la sessione del tecnico e servirebbe un
+      altro badge. Restano il detector, il collegamento con lo sketch, la pagina e gli eventi; tracce, conteggi e
+      regola ripartono con la calibrazione del video nuovo. Senza calibrazione propria vale quella d'esempio
+      (solo linee di conteggio);
+    - la calibrazione si trova dal nome: `Torino_1` → `torino_1.json`, `01_…` → `01.json`, `mdgb_mixkit_4194` →
+      `4194.json`. Il confronto non tiene conto delle maiuscole, così il risultato è lo stesso su macOS e sulla
+      scheda;
+    - il salto nel video non riporta indietro il tempo della visione: è come un taglio nella scena;
+    - provato nel browser sul Mac con un badge simulato e credenziali di prova: i quattro pulsanti cambiano video
+      e posizione, e la vista dal vivo e la scritta sull'immagine seguono.
 

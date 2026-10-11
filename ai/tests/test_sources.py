@@ -102,3 +102,17 @@ def test_in_real_time_a_slow_reader_gets_the_frames_a_camera_would_give(video, m
         clock.now += clock.cost
     assert len(times) <= N_FRAMES // 3 + 1 and source.dropped >= N_FRAMES // 2
     assert times[-1] - times[0] == pytest.approx(clock.now - clock.cost - 1000.0, abs=2 / FPS)  # video time = wall time
+
+
+def test_back_and_forward_in_a_video_without_going_back_in_time(video):
+    source = FrameSource(str(video), load_config(), realtime=False)
+    assert source.duration_s == pytest.approx(N_FRAMES / FPS)
+    for _ in range(10):
+        _, t_before = source.read()
+    assert source.position_s == pytest.approx(9 / FPS)
+    source.seek(-1.0)                                   # back past the start: the first frame
+    frame, t = source.read()
+    assert source.position_s == 0 and frame.mean() == pytest.approx(0, abs=4) and t > t_before
+    source.seek(0.5)
+    frame, _ = source.read()
+    assert source.position_s == pytest.approx(15 / FPS) and frame.mean() == pytest.approx(15 * 8, abs=4)

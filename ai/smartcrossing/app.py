@@ -12,17 +12,19 @@ import argparse
 import sys
 import time
 from collections import deque
+from pathlib import Path
 from time import perf_counter
 
 import cv2
 
 from .actuator import make_actuator
-from .config import load_config
+from .config import load_config, resolve_path
 from .geometry import load_calib
 from .logger import C3Logger, c3_dir, flat_counts
 from .mcu import C5FileTail, McuState
 from .overlay import draw_hud, draw_lines, draw_state, draw_thermal, draw_tracks, draw_zones
 from .pipeline import PHASES, LatencyStats, Pipeline
+from .playlist import Playlist
 from .sources import FrameSource, default_source
 from .status_page import OperatorPage
 from .thermal import ThermalFusion, make_thermal_source
@@ -83,6 +85,11 @@ def main(argv: list[str] | None = None) -> int:
         operator = OperatorPage(args.operator_port, mcu, cfg) if args.operator_port is not None else None
         source = FrameSource(args.source or default_source(cfg), cfg, loop=args.loop)
         pipeline = Pipeline(cfg, source.fps, calib, actuator, site=args.site, thermal=thermal)
+        # A recorded video (tests, benchmarks): the technician's page can move to the previous / next video of
+        # its folder or back / forward. Not with the camera.
+        playlist = None if source.is_live else Playlist(source.name, args.calib)
+        if operator is not None and playlist is not None:
+            operator.video_control = playlist.request
     except (FileNotFoundError, RuntimeError, TypeError, OSError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
@@ -131,8 +138,35 @@ def main(argv: list[str] | None = None) -> int:
     loops_seen, pass_frames, pass_t0, pass_dropped = 0, 0, perf_counter(), 0   # passes of a looped video
     pipeline.commander.start()   # heartbeat every 100 ms, only while this loop is alive
     mcu_files.start()
+    def switch_video(step: int) -> None:
+        """The previous / next video of the playlist with its calibration. Detector, link to the sketch, page and
+        events stay; tracks, counts and rule start again for the new scene."""
+        nonlocal source, pipeline, calib_path, setup
+        video = playlist.move(step)
+        try:
+            example = resolve_path(cfg["counting"]["example_calib_path"])   # counting lines only: no metres
+            new_calib, new_calib_path = load_calib(cfg, playlist.calib(video) or example)
+            new_source = FrameSource(str(video), cfg, loop=args.loop)
+        except (OSError, RuntimeError, ValueError) as exc:
+            print(f"video {video.name}: cannot open ({exc}), staying on {source.name}")
+            return
+        new_pipeline = Pipeline(cfg, new_source.fps, new_calib, None, detector=pipeline.detector, site=args.site,
+                                thermal=thermal)
+        new_pipeline.detector.set_roi(new_calib.get("roi"))
+        new_pipeline.commander = pipeline.commander          # the same heartbeat thread and link to the sketch
+        source.release()
+        setup = setup.replace(f"source={source.name}", f"source={new_source.name}")   # the line on the image
+        source, pipeline, calib_path = new_source, new_pipeline, new_calib_path
+        print(f"video -> {video.name} ({playlist.index + 1}/{len(playlist.videos)}) calib={calib_path.name}")
+
+    seek_s = float(cfg["operator"]["video_seek_s"])
     try:
         while True:
+            for action in playlist.take() if playlist is not None else []:   # commands of the technician's page
+                if action in ("back", "fwd"):
+                    source.seek(seek_s if action == "fwd" else -seek_s)
+                else:
+                    switch_video(1 if action == "next" else -1)
             pipeline.external_fault = mcu.fault()   # shock or lamp fault reported by the microcontroller
             # Technician at the node, from the badge to the logout: the sketch keeps the buzzer quiet.
             pipeline.technician = operator.technician_present() if operator is not None else mcu.unlocked()
@@ -197,7 +231,11 @@ def main(argv: list[str] | None = None) -> int:
                     "state": command["state"], "led": command["led"], "reason": command["reason"],
                     "green_s": command["green_s"], "fps": round(fps, 1), "tracks": n_valid, "counts": counts,
                     "lat_ms": page_lat,
-                    "events": pipeline.events.summary(), "source": source.name, "calib": calib_path.name,
+                    "events": pipeline.events.summary(), "source": Path(source.name).name, "calib": calib_path.name,
+                    "video": None if playlist is None else {
+                        "name": playlist.current.name, "index": playlist.index + 1, "total": len(playlist.videos),
+                        "pos_s": round(source.position_s, 1), "dur_s": round(source.duration_s, 1),
+                        "calib": calib_path.name if calib_path.parent.name == "calib" else None, "seek_s": seek_s},
                     "link_failsafe": getattr(actuator, "connected", None) is False
                                      or bool(getattr(actuator, "failsafe", False)),
                 })
