@@ -90,7 +90,9 @@ async function tick() {
     let h = row("Lampada richiesta", s.led) + row("Verde pedonale richiesto", s.green_s + " s");
     h += row("Semaforo (firmware)", s.link_failsafe ? "ciclo normale: nessun collegamento" : "collegato alla visione");
     h += row("Fotogrammi al secondo", s.fps) + row("Tempi (ms)", "detect " + l.detect + " / track " + l.track + " / regole " + l.rules);
-    h += row("Tracce valide", s.tracks) + row("Conteggi", s.counts) + row("Eventi", s.events);
+    h += row("Tracce valide", s.tracks) + row("Conteggi da quando &egrave; partita la visione o il video", s.counts);
+    if (s.counts_sent === false) h += row("Conteggi verso la centrale", "<span class='warn'>non inviati: manca la calibrazione di questa inquadratura</span>");
+    h += row("Eventi", s.events);
     h += row("Temperatura", e.t_c === undefined ? null : e.t_c + " &deg;C") + row("Umidit&agrave;", e.rh === undefined ? null : e.rh + " %");
     h += row("Luce (0-1023)", e.light) + row("eCO2", e.eco2_ppm === undefined ? null : e.eco2_ppm + " ppm");
     h += row("Antifurto: ultimo urto", m.shock_s_ago === null ? "nessuno" : "<span class='warn'>" + m.shock_s_ago + " s fa</span>");

@@ -141,7 +141,7 @@ def main(argv: list[str] | None = None) -> int:
     def switch_video(step: int) -> None:
         """The previous / next video of the playlist with its calibration. Detector, link to the sketch, page and
         events stay; tracks, counts and rule start again for the new scene."""
-        nonlocal source, pipeline, calib_path, setup
+        nonlocal source, pipeline, calib_path, setup, loops_seen, pass_frames, pass_t0, pass_dropped, stats
         video = playlist.move(step)
         try:
             example = resolve_path(cfg["counting"]["example_calib_path"])   # counting lines only: no metres
@@ -154,12 +154,21 @@ def main(argv: list[str] | None = None) -> int:
                                 thermal=thermal)
         new_pipeline.detector.set_roi(new_calib.get("roi"))
         new_pipeline.commander = pipeline.commander          # the same heartbeat thread and link to the sketch
+        loops_seen, pass_frames, pass_t0, pass_dropped, stats = 0, 0, perf_counter(), 0, LatencyStats()
         source.release()
         setup = setup.replace(f"source={source.name}", f"source={new_source.name}")   # the line on the image
         source, pipeline, calib_path = new_source, new_pipeline, new_calib_path
         print(f"video -> {video.name} ({playlist.index + 1}/{len(playlist.videos)}) calib={calib_path.name}")
 
     seek_s = float(cfg["operator"]["video_seek_s"])
+    example_calib = resolve_path(cfg["counting"]["example_calib_path"]).resolve()
+
+    def example_lines() -> bool:
+        """True while the counting lines are those of the example calibration (no calibration for this view)."""
+        return calib_path.resolve() == example_calib
+
+    if example_lines():
+        print("counting lines of the example calibration: crossings shown, NOT sent to the central (run calibrate.py)")
     try:
         while True:
             for action in playlist.take() if playlist is not None else []:   # commands of the technician's page
@@ -208,7 +217,9 @@ def main(argv: list[str] | None = None) -> int:
                     else:
                         details = " ".join(f"{k}={v}" for k, v in event.items() if k != "type")
                         print(f"t={now - first:6.1f}s {event['type']} {details}")
-                    if log:
+                    # With the example calibration the counting lines are not on the stripes of this scene: the
+                    # crossings would reach the central as real ones. They stay on the screen only.
+                    if log and not (event["type"] == "crossing" and example_lines()):
                         log.write(event)
                 for animal in pipeline.animals.new_sightings(pipeline.scene.animals):
                     print(f"t={now - first:6.1f}s animal track=#{animal.track_id} coco={animal.coco} size={animal.size} "
@@ -232,6 +243,7 @@ def main(argv: list[str] | None = None) -> int:
                     "green_s": command["green_s"], "fps": round(fps, 1), "tracks": n_valid, "counts": counts,
                     "lat_ms": page_lat,
                     "events": pipeline.events.summary(), "source": Path(source.name).name, "calib": calib_path.name,
+                    "counts_sent": not example_lines(),
                     "video": None if playlist is None else {
                         "name": playlist.current.name, "index": playlist.index + 1, "total": len(playlist.videos),
                         "pos_s": round(source.position_s, 1), "dur_s": round(source.duration_s, 1),
