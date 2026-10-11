@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 import zipfile
 from pathlib import Path
 
@@ -33,6 +34,16 @@ REQUIRED_MODEL = "yolox_nano_dynamic.onnx"
 OPTIONAL_MODELS = ("aid_cls.onnx",)
 AI_FILES = ("config.yaml", "calib.json", "calib.example.json", "calib_thermal.json", "calib_thermal.example.json")
 SKIP_PARTS = {"__pycache__", ".cache", ".pytest_cache"}
+TEXT_SUFFIXES = {".py", ".ino", ".yaml", ".yml", ".js", ".html", ".css", ".md", ".json", ".txt", ".gitignore"}
+# README.md at the root of the app, as App Lab creates it (the README.md in the repo folders is for the team).
+APP_README = {
+    "app": "# 🚦 mdgb\n\nMDGB con la visione dentro l'app: camera, riconoscimento, semaforo e pannello del tecnico "
+           "(porta 7000). Sorgenti nel repo HackTurin-mdgb, firmware/unoq_mcu.\n",
+    "panel": "# 🚦 mdgb\n\nLo sketch dell'app `test` di Salvatore con in più il semaforo comandato dalla visione "
+             "(`mdgb_line`), il fail-safe e l'antifurto, più il pannello del tecnico (porta 7000). La camera non si apre "
+             "qui: la usa la visione, che gira accanto a questa app (`~/HackTurin-mdgb/ai`). Sorgenti nel repo "
+             "HackTurin-mdgb, firmware/unoq_panel.\n",
+}
 
 
 def _tree(base: Path, rel: str = "") -> list[tuple[Path, str]]:
@@ -77,6 +88,34 @@ def app_files(models_dir: Path) -> list[tuple[Path, str]]:
     return files
 
 
+def write_zip(out: Path, files: list[tuple[Path, str]], readme: str) -> None:
+    """Zip laid out like the ones App Lab exports (code1.zip): Unix entries with permissions, one entry per folder
+    before its files, LF line endings in the text files. A zip made on Windows has none of this, and App Lab
+    did not show its files."""
+    stamp = time.localtime()[:6]
+    entries: dict[str, bytes | None] = {"README.md": readme.encode("utf-8")}   # None = folder
+    for src, arc in files:
+        data = src.read_bytes()
+        if src.suffix in TEXT_SUFFIXES or src.name in TEXT_SUFFIXES:
+            data = data.replace(b"\r\n", b"\n")
+        entries[arc] = data
+        parts = arc.split("/")[:-1]
+        for i in range(1, len(parts) + 1):
+            entries.setdefault("/".join(parts[:i]) + "/", None)
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+        for arc in sorted(entries):
+            info = zipfile.ZipInfo(f"{APP_NAME}/{arc}", date_time=stamp)
+            info.create_system = 3                                  # Unix
+            data = entries[arc]
+            if data is None:
+                info.external_attr = (0o40755 << 16) | 0x10         # drwxr-xr-x + MS-DOS directory flag
+                zf.writestr(info, b"")
+            else:
+                info.external_attr = 0o100644 << 16                # -rw-r--r--
+                info.compress_type = zipfile.ZIP_DEFLATED
+                zf.writestr(info, data)
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--models-dir", type=Path, default=AI_DIR / "models", help="folder with the ONNX models")
@@ -91,9 +130,7 @@ def main() -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
     args.out.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(args.out, "w", zipfile.ZIP_DEFLATED) as zf:
-        for src, arc in files:
-            zf.write(src, f"{APP_NAME}/{arc}")
+    write_zip(args.out, files, APP_README["panel" if args.panel else "app"])
     size = args.out.stat().st_size / 1e6
     print(f"{args.out} ({len(files)} files, {size:.1f} MB)")
     if args.panel:

@@ -43,6 +43,7 @@ const LOG_TABS = {
 };
 const PHASE_SCALE_MS = 120;   // full bar
 const STALE_MS = 3000;        // no message for longer: something is not running
+const NO_DATA_MS = 6000;      // connected, or trying to, for this long without any data: say why
 
 const $ = (id) => document.getElementById(id);
 const canvas = $("canvas");
@@ -56,13 +57,15 @@ let lastMsg = null;       // last "vision" message drawn
 let lastHealth = null;    // last "health" message
 let visionSeen = 0;
 let healthSeen = 0;
+const pageStart = Date.now();
+let connectedAt = 0;
 let clearedBefore = 0;    // log lines older than this are hidden ("Pulisci")
 let logTab = "all";
 let logKey = "";
 
 // ---------- connection ----------
 const ui = new WebUI();
-ui.on_connect(() => { connected = true; showConn(); });
+ui.on_connect(() => { connected = true; connectedAt = Date.now(); showConn(); showHero(); });
 ui.on_disconnect(() => { connected = false; showConn(); showHero(); });
 ui.on_message("config", (cfg) => {
   // "panel": app without the vision inside; the live view is on the page of the vision service.
@@ -148,14 +151,23 @@ function showHero() {
   const hero = $("hero");
   const overall = $("overall");
   const h = lastHealth;
-  const silent = !connected || !healthSeen || Date.now() - healthSeen > STALE_MS;
+  const now = Date.now();
+  // Why the page may have nothing to show: not connected, connected but the Python sends nothing, data stopped.
+  const notConnected = !connected && (healthSeen || now - pageStart > NO_DATA_MS);
+  const pythonMute = connected && !healthSeen && now - connectedAt > NO_DATA_MS;
+  const stopped = connected && healthSeen && now - healthSeen > STALE_MS;
+  const silent = notConnected || pythonMute || stopped;
   let level, icon, title, text, items = [];
-  if (silent && (healthSeen || !connected)) {
+  if (silent) {
     level = "fault"; icon = "📡"; title = "La scheda non risponde";
-    text = connected ? "La pagina è collegata ma non arrivano dati: l'app si sta riavviando o è ferma. Guarda i log in App Lab."
-                     : "Questa pagina non è collegata alla scheda: controlla che l'app sia avviata in App Lab e di essere sulla stessa rete.";
+    text = notConnected
+      ? "Questa pagina non è collegata alla scheda: controlla che l'app sia avviata in App Lab e di essere sulla stessa rete."
+      : pythonMute
+        ? "La pagina è collegata, ma il Python dell'app non manda dati. Apri la console dell'app in App Lab e cerca un errore (la parola Traceback)."
+        : `Da ${Math.round((now - healthSeen) / 1000)} s non arrivano dati: l'app si sta riavviando o si è fermata. Guarda la console in App Lab.`;
   } else if (!h) {
-    level = "waiting"; icon = "⏳"; title = "Avvio in corso"; text = "Aspetto i primi dati dalla scheda.";
+    level = "waiting"; icon = "⏳"; title = connected ? "Avvio in corso" : "Collegamento alla scheda…";
+    text = connected ? "Aspetto i primi dati dalla scheda." : "Apro la connessione con l'app.";
   } else {
     const s = h.summary;
     const problems = h.checks.filter((c) => c.status === "fault").concat(h.checks.filter((c) => c.status === "warn"));
@@ -190,7 +202,7 @@ function showHero() {
   const labels = { ok: "✅ Tutto OK", warn: "⚠️ Da controllare", fault: "❌ Problemi", waiting: "⏳ Avvio…" };
   const n = h && !silent ? h.summary.fault + h.summary.warn : 0;
   overall.className = "overall " + level;
-  overall.textContent = silent && (healthSeen || !connected) ? "📡 Scheda muta"
+  overall.textContent = silent ? "📡 Scheda muta"
     : labels[level] + (n && level !== "ok" ? ` (${n})` : "");
 }
 

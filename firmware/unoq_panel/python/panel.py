@@ -18,6 +18,7 @@ import json
 import os
 import threading
 import time
+import traceback
 from collections import deque
 
 from arduino.app_utils import Logger
@@ -162,6 +163,8 @@ class Panel:
         logger.info(f"technician's panel on, vision events read from {C3_DIR}/{C3_PATTERN}")
 
     def _on_connect(self, sid: str) -> None:
+        if not self._viewers:
+            logger.info("technician's panel: page opened")
         self._viewers.add(sid)
         self.ui.send_message("config", {"mode": "panel", "live": False, "vision_port": VISION_PAGE_PORT})
 
@@ -171,21 +174,32 @@ class Panel:
 
     def _loop(self) -> None:
         next_health = 0.0
+        last_error = 0.0
         while True:
+            # Any error is logged and the loop goes on: a silent dead thread would leave the page empty.
             try:
-                for line in self._reader.poll():
-                    self._on_c3(line)
-            except OSError as exc:
-                logger.warning(f"C3 files not readable in {C3_DIR}: {exc}")
-            now = time.monotonic()
-            if now >= next_health:
-                next_health = now + HEALTH_PERIOD_S
-                report = self.health.evaluate()   # also when nobody watches: the changes go in the log
-                if self._viewers:
-                    self._publish("health", {**report, "log": list(self.log),
-                                             "uptime_s": round(time.time() - self._started)})
-                    self._publish("vision", self._vision(report))
+                self._step(next_health)
+                if time.monotonic() >= next_health:
+                    next_health = time.monotonic() + HEALTH_PERIOD_S
+            except Exception:
+                if time.monotonic() - last_error >= 10.0:
+                    last_error = time.monotonic()
+                    logger.error("technician's panel: error, going on\n" + traceback.format_exc())
             time.sleep(POLL_S)
+
+    def _step(self, next_health: float) -> None:
+        try:
+            for line in self._reader.poll():
+                self._on_c3(line)
+        except OSError as exc:
+            logger.warning(f"C3 files not readable in {C3_DIR}: {exc}")
+        if time.monotonic() < next_health:
+            return
+        report = self.health.evaluate()   # also when nobody watches: the changes go in the log
+        if self._viewers:
+            self._publish("health", {**report, "log": list(self.log),
+                                     "uptime_s": round(time.time() - self._started)})
+            self._publish("vision", self._vision(report))
 
     def _on_c3(self, line: dict) -> None:
         kind = line.get("type")

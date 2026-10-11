@@ -215,10 +215,13 @@ class VisionService:
 
     def _health_loop(self) -> None:
         while not self._stop.wait(HEALTH_PERIOD_S):
-            report = self.health.evaluate()   # also when nobody watches: the changes go in the log
-            if self._viewers:
-                self._publish("health", {**report, "mcu": self.mcu.snapshot(), "log": list(self.log),
-                                         "uptime_s": round(time.time() - self._started)})
+            try:   # any error is logged and the loop goes on: a silent dead thread would leave the page empty
+                report = self.health.evaluate()   # also when nobody watches: the changes go in the log
+                if self._viewers:
+                    self._publish("health", {**report, "mcu": self.mcu.snapshot(), "log": list(self.log),
+                                             "uptime_s": round(time.time() - self._started)})
+            except Exception:
+                logger.error("sensor check: error, going on\n" + traceback.format_exc())
 
     def _on_connect(self, sid: str) -> None:
         self._viewers.add(sid)
