@@ -68,6 +68,8 @@ def test_default_source_prefers_samples_then_webcam(tmp_path):
     (tmp_path / "a.mov").touch()
     (tmp_path / "notes.txt").touch()
     assert default_source(cfg).endswith("a.mov")
+    (tmp_path / "Z.mp4").touch()
+    assert default_source(cfg).endswith("Z.mp4")          # name order as text: the same on every system
 
 
 def test_a_looped_file_starts_again_and_its_timeline_goes_on(video):
