@@ -7,7 +7,9 @@ model:
   input_size: 320                 # (spec) 320, 416 optional. Must be a multiple of the largest stride.
   match_aspect: true              # same number of pixels as input_size squared, shaped like the image:
                                   # no input wasted on padding, objects seen larger at the same cost
-  conf: 0.30                      # minimum score (objectness * class probability)
+  conf: 0.10                      # minimum score (objectness * class probability) handed to the tracker. Boxes
+                                  # between 0.1 and tracking.track_activation_threshold only keep existing tracks
+                                  # alive (ByteTrack): with 0.30 tracks broke every second at 10 FPS and at night
   nms: 0.45                       # IoU threshold of the per-class NMS
   nms_cross_class: 0.85           # boxes of different classes above this IoU are one object: keep the best
   intra_op_num_threads: 0         # 0 = let onnxruntime decide
@@ -27,9 +29,11 @@ source:
 tracking:
   track_activation_threshold: 0.30
   lost_track_buffer: 30           # frames a lost track is kept before its ID is dropped
-  minimum_matching_threshold: 0.8
+  minimum_matching_threshold: 0.9 # 1 - IoU allowed between a track and its box: at 5-6 detections per second
+                                  # (board) an object moves more between two of them. Was 0.8
   minimum_consecutive_frames: 1
   min_track_age: 5                # (spec) frames before a track is considered valid
+  measure_min_conf: 0.30          # boxes below this score keep a track alive but measure no height, cast no class vote
   history_len: 150                # positions kept per track (5 s at 30 frames per second)
   default_frame_rate: 30          # rate given to ByteTrack when the source does not report one
 
