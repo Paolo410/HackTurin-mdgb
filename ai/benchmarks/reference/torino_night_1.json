@@ -1,0 +1,89 @@
+{
+ "video": "Torino_night_1.mp4",
+ "calib": "torino_night_1.json",
+ "made_with": {
+  "emulate_unoq": false,
+  "input_px": "960",
+  "threads": 0,
+  "conf": 0.1,
+  "frames_processed": 4321,
+  "processed_fps": 15.0,
+  "calib": "torino_night_1.json",
+  "metric": true,
+  "site": "urbano",
+  "overrides": [
+   "model.path=\"models/yolox_l_960.onnx\"",
+   "model.input_size=960",
+   "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+   "model.detect_every_n=1",
+   "source.max_fps=15",
+   "counting.minimum_crossing_threshold=8",
+   "tracking.min_track_age=5"
+  ],
+  "camera": {
+   "height_m": 21.3,
+   "focal_px": 2037
+  },
+  "stabilized": false,
+  "max_camera_shift_px": null
+ },
+ "overrides": [
+  "model.path=\"models/yolox_l_960.onnx\"",
+  "model.input_size=960",
+  "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+  "model.detect_every_n=1",
+  "source.max_fps=15",
+  "counting.minimum_crossing_threshold=8",
+  "tracking.min_track_age=5"
+ ],
+ "crossings": [
+  {
+   "t": 22.8,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 2,
+   "x": 296.0,
+   "y": 469.0,
+   "t_count": 23.27
+  },
+  {
+   "t": 23.57,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 1,
+   "x": 269.6,
+   "y": 469.0,
+   "t_count": 24.07
+  },
+  {
+   "t": 213.82,
+   "line": "ped",
+   "dir": "out",
+   "cls": "pedestrian",
+   "track_id": 7,
+   "x": 248.0,
+   "y": 469.0,
+   "t_count": 214.32
+  }
+ ],
+ "review": {
+  "removed": [],
+  "added": [
+   {
+    "t": 100.81,
+    "line": "ped",
+    "dir": "in",
+    "cls": "pedestrian",
+    "track_id": 6,
+    "x": 212.7,
+    "y": 469.0,
+    "source": "scheda_nuova"
+   }
+  ],
+  "notes": [
+   "g2 (100,8 s): persona con la bici che sale lungo le strisce oltre la linea, passaggio vero perso dal riferimento (visto il 11/10)"
+  ]
+ }
+}

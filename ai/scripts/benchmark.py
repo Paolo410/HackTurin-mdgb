@@ -14,11 +14,13 @@ Usage (from ai/):
                                     # after looking: r3 was not a crossing (out of the reference), g7 was (in it)
 
 Development tool: `run` and `review` write frames to samples/report (not in git), the product never does.
+MDGB_VIDEOS=<folder>: where to read the videos that samples/ cannot give (e.g. a copy taken back from the board).
 """
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -34,6 +36,18 @@ RUNS = SAMPLES / "report" / "bench"
 REVIEW = SAMPLES / "report" / "review"
 WINDOW_S = 2.0          # a counted crossing this close in time to the reference one is the same crossing
 MAX_PX = 120.0          # ... and this close in the image (bottom centre of the box), when both positions are known
+
+
+def video_path(v: dict) -> Path:
+    """The video file in samples/, or in $MDGB_VIDEOS when the one in samples/ cannot be read."""
+    path = SAMPLES / v["video"]
+    try:
+        with open(path, "rb") as fh:
+            fh.read(1)
+        return path
+    except OSError:
+        other = os.environ.get("MDGB_VIDEOS")
+        return Path(other) / Path(v["video"]).name if other else path
 
 
 def videos() -> list[dict]:
@@ -99,7 +113,7 @@ def cmd_run(args) -> int:
         target = out / f"{v['name']}.json"
         if target.is_file() and not args.force:
             continue
-        cmd = [sys.executable, str(AI / "scripts" / "evaluate.py"), str(SAMPLES / v["video"]),
+        cmd = [sys.executable, str(AI / "scripts" / "evaluate.py"), str(video_path(v)),
                "--calib", str(SAMPLES / "calib" / v["calib"]), "--name", v["name"], "--out", str(out),
                "--snapshots", "0", "--max-event-snapshots", "0", *spec["args"]]
         done = subprocess.run(cmd, cwd=AI, capture_output=True, text=True)
@@ -108,9 +122,13 @@ def cmd_run(args) -> int:
     return 0
 
 
-def score_variant(variant: str) -> tuple[dict, dict]:
+def score_variant(variant: str, moving: bool = False) -> tuple[dict, dict]:
+    """Numbers of a variant against the reference. Videos with a moving camera (fixed: false in videos.json) are left
+    out unless moving=True: a counting line drawn on the image does not stay on the road when the camera moves."""
     per_video = {}
     for v in videos():
+        if not moving and not v.get("fixed", True):
+            continue
         ref = reference_of(v["name"])
         run = RUNS / variant / f"{v['name']}.json"
         if ref is None or not run.is_file():
@@ -125,7 +143,7 @@ def score_variant(variant: str) -> tuple[dict, dict]:
 def cmd_score(args) -> int:
     (BENCH / "results").mkdir(parents=True, exist_ok=True)
     for variant in args.variants:
-        per_video, total = score_variant(variant)
+        per_video, total = score_variant(variant, args.moving)
         print(f"\n=== {variant}: {variants()[variant]['what']} ({len(per_video)} videos)")
         print(f"{'video':16s} {'kind':10s} {'ref':>4s} {'counted':>8s} {'ok %':>6s} {'dir ok':>7s} {'kind ok':>8s} "
               f"{'missed':>7s} {'extra':>6s}")
@@ -173,7 +191,7 @@ def cmd_review(args) -> int:
     cfg = load_config()
     calib, _ = load_calib(cfg, SAMPLES / "calib" / v["calib"])
     width_cap = int(cfg["source"]["resize_width"])
-    cap = cv2.VideoCapture(str(SAMPLES / v["video"]))
+    cap = cv2.VideoCapture(str(video_path(v)))
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
     tiles = []
     for label, e in sorted(cases, key=lambda c: c[1]["t"]):
@@ -257,6 +275,7 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--force", action="store_true")
     r = sub.add_parser("score")
     r.add_argument("variants", nargs="+")
+    r.add_argument("--moving", action="store_true", help="also the videos with a moving camera")
     r = sub.add_parser("review")
     r.add_argument("variant")
     r.add_argument("name")

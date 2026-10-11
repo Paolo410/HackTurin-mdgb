@@ -547,3 +547,42 @@ con v_ped 0,3 → 25 s.
     - provato nel browser sul Mac con un badge simulato e credenziali di prova: i quattro pulsanti cambiano video
       e posizione, e la vista dal vivo e la scritta sull'immagine seguono.
 
+45. **Modello a 8 bit (INT8): provato, non usato (11/10, mattina).** `scripts/quantize_model.py` quantizza YOLOX-nano
+    dopo l'addestramento (onnxruntime, formato QDQ, pesi per canale), con la scala delle attivazioni presa da
+    fotogrammi dei video di prova tagliati come fa il detector:
+    - tutto a 8 bit gli oggetti trovati crollavano (114 su 983); tenendo in float le prime 4 convoluzioni (vedono i
+      pixel grezzi) e la testa, trova gli stessi oggetti del modello float (395/395 su 65 fotogrammi);
+    - **ma sulla UNO Q è più lento:** 283 ms contro 208–230 ms. La CPU (Cortex-A53, `/proc/cpuinfo`: niente
+      `asimddp`) non ha istruzioni per il prodotto scalare a 8 bit, e onnxruntime 1.30 sulla scheda ha solo il
+      provider CPU (niente XNNPACK). Da riprovare su una scheda con Cortex-A55 o A76.
+46. **PP-PicoDet-S al posto di YOLOX-nano: provato, non usato (11/10, mattina).** Detector leggero più recente
+    (PaddleDetection, Apache-2.0), integrato con `model.family: picodet` e `scripts/get_picodet.py`:
+    - su 39 fotogrammi di prova trova più persone (183 contro 135 di YOLOX-nano, +36%) e più veicoli (162 contro 93);
+      YOLOX-l a 960 px ne trova 322 e 168;
+    - **ma sulla scheda è 2,2 volte più lento** (486 ms contro 225 ms a 320 px, misurati con la visione accesa):
+      darebbe meno di 3 rilevamenti al secondo, troppo pochi per seguire chi attraversa. Il codice resta, spento.
+47. **Tracking corretto e detector su ogni fotogramma (11/10, mattina)**, numeri in `docs/BENCHMARK.md`:
+    - **auto seguite ma mai contate:** `sv.ByteTrack` restituiva una traccia solo se la sua posizione filtrata copriva
+      il box per più del 50%; a 4–6 rilevamenti al secondo per le auto veloci non succedeva (è la causa dei "0 veicoli
+      nel verso lontano" del punto 42). Ora ogni traccia esce con il box con cui è stata associata (`_ByteTrack` in
+      `tracking.py`, che avvolge due metodi di supervision 0.30.5: coperto dai test);
+    - **box allargati del 50% per l'associazione** (`tracking.box_buffer`, buffered IoU del tracker C-BIoU) e **lato
+      della linea ricordato per 30 rilevamenti** (`counting.side_memory`; supervision lo dimenticava dopo 4);
+    - **detector su ogni fotogramma sulla scheda** (`profiles.unoq.model.detect_every_n: 1`): misurato sulla scheda
+      con Torino_1, 5,9 FPS tutti analizzati contro 8,4 FPS di cui 4,2 analizzati. A 416 px: 3,8 FPS;
+    - **risultato** (8 video a camera ferma): pedoni 9 → 13 su 23, ciclisti 0 → 2 su 4, veicoli 24 → 47 su 77;
+      verso giusto 100%, nessun conteggio in più, prima e dopo;
+    - provati e lasciati spenti: tracce nuove da 0,30, conferma dopo 2 rilevamenti, ricucitura delle tracce
+      attraverso la linea (`counting.stitch_s`, nel codice con i test).
+48. **Benchmark del conteggio con un riferimento controllato a vista (11/10, mattina)** (`scripts/benchmark.py`,
+    `benchmarks/`, `docs/BENCHMARK.md`):
+    - riferimento: YOLOX-l a 960 px su ogni fotogramma a 15 FPS, conferma dopo 0,5 s come la scheda; i disaccordi
+      si guardano (`review`) e si annotano (`judge`). Finora 2 passaggi veri aggiunti, nessuno tolto;
+    - la scheda si emula agli FPS misurati sulla scheda vera, anche frazionari (`sources.py`: 8,4 su 30 non è più 7,5);
+    - si confronta il punto in cui l'oggetto supera la linea, non quello della conferma;
+    - contano solo i video a camera ferma: NYC, Shibuya e due Mixkit sono time-lapse o ripresi a mano;
+    - da fare: calibrare Torino_4 e Torino_7 (inquadrature diverse da Torino_3 e 1) e rifare tutto con la camera
+      della scheda montata;
+    - **i video `Torino_*.mp4` sul Mac sono diventati illeggibili alle 7 circa dell'11/10** ("Operation not
+      permitted": macOS li protegge, attributo `com.apple.macl`, forse dopo un'apertura da un'app). Le copie sulla
+      scheda sono intatte; per il benchmark `MDGB_VIDEOS=<cartella con le copie>`.

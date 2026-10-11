@@ -1,0 +1,566 @@
+{
+ "video": "Torino_1.mp4",
+ "calib": "torino_1.json",
+ "made_with": {
+  "emulate_unoq": false,
+  "input_px": "960",
+  "threads": 0,
+  "conf": 0.1,
+  "frames_processed": 1200,
+  "processed_fps": 15.0,
+  "calib": "torino_1.json",
+  "metric": true,
+  "site": "urbano",
+  "overrides": [
+   "model.path=\"models/yolox_l_960.onnx\"",
+   "model.input_size=960",
+   "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+   "model.detect_every_n=1",
+   "source.max_fps=15",
+   "counting.minimum_crossing_threshold=8",
+   "tracking.min_track_age=5"
+  ],
+  "camera": {
+   "height_m": 14.4,
+   "focal_px": 1388
+  },
+  "stabilized": false,
+  "max_camera_shift_px": null
+ },
+ "overrides": [
+  "model.path=\"models/yolox_l_960.onnx\"",
+  "model.input_size=960",
+  "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+  "model.detect_every_n=1",
+  "source.max_fps=15",
+  "counting.minimum_crossing_threshold=8",
+  "tracking.min_track_age=5"
+ ],
+ "crossings": [
+  {
+   "t": 2.79,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 2,
+   "x": 280.1,
+   "y": 208.8,
+   "t_count": 3.26
+  },
+  {
+   "t": 3.22,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 5,
+   "x": 318.4,
+   "y": 174.6,
+   "t_count": 3.72
+  },
+  {
+   "t": 3.35,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 3,
+   "x": 352.6,
+   "y": 144.1,
+   "t_count": 3.86
+  },
+  {
+   "t": 3.94,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 7,
+   "x": 434.3,
+   "y": 71.3,
+   "t_count": 4.45
+  },
+  {
+   "t": 5.56,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 9,
+   "x": 313.1,
+   "y": 179.3,
+   "t_count": 6.05
+  },
+  {
+   "t": 5.9,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 8,
+   "x": 257.2,
+   "y": 229.2,
+   "t_count": 6.38
+  },
+  {
+   "t": 7.36,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 12,
+   "x": 201.0,
+   "y": 279.3,
+   "t_count": 7.84
+  },
+  {
+   "t": 8.25,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 13,
+   "x": 303.3,
+   "y": 188.1,
+   "t_count": 8.77
+  },
+  {
+   "t": 8.33,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 15,
+   "x": 262.8,
+   "y": 224.3,
+   "t_count": 8.84
+  },
+  {
+   "t": 9.04,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 8,
+   "x": 206.3,
+   "y": 274.6,
+   "t_count": 9.57
+  },
+  {
+   "t": 9.51,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 19,
+   "x": 144.7,
+   "y": 329.6,
+   "t_count": 10.04
+  },
+  {
+   "t": 10.14,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 18,
+   "x": 292.4,
+   "y": 197.8,
+   "t_count": 10.63
+  },
+  {
+   "t": 10.11,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 21,
+   "x": 209.5,
+   "y": 271.7,
+   "t_count": 10.77
+  },
+  {
+   "t": 11.27,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 20,
+   "x": 253.0,
+   "y": 233.0,
+   "t_count": 11.76
+  },
+  {
+   "t": 11.4,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 27,
+   "x": 139.8,
+   "y": 333.9,
+   "t_count": 11.9
+  },
+  {
+   "t": 12.11,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 24,
+   "x": 290.3,
+   "y": 199.7,
+   "t_count": 12.63
+  },
+  {
+   "t": 12.82,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 32,
+   "x": 145.5,
+   "y": 328.8,
+   "t_count": 13.29
+  },
+  {
+   "t": 13.44,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 34,
+   "x": 190.9,
+   "y": 288.4,
+   "t_count": 13.96
+  },
+  {
+   "t": 13.73,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 31,
+   "x": 290.3,
+   "y": 199.7,
+   "t_count": 14.22
+  },
+  {
+   "t": 14.58,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 30,
+   "x": 240.4,
+   "y": 244.2,
+   "t_count": 15.09
+  },
+  {
+   "t": 14.72,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 37,
+   "x": 132.8,
+   "y": 340.2,
+   "t_count": 15.22
+  },
+  {
+   "t": 15.57,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 40,
+   "x": 179.0,
+   "y": 299.0,
+   "t_count": 16.09
+  },
+  {
+   "t": 15.8,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 39,
+   "x": 275.9,
+   "y": 212.6,
+   "t_count": 16.28
+  },
+  {
+   "t": 17.6,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 41,
+   "x": 239.8,
+   "y": 244.7,
+   "t_count": 18.08
+  },
+  {
+   "t": 17.91,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 45,
+   "x": 132.5,
+   "y": 340.5,
+   "t_count": 18.41
+  },
+  {
+   "t": 18.58,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 43,
+   "x": 271.9,
+   "y": 216.1,
+   "t_count": 19.08
+  },
+  {
+   "t": 19.03,
+   "line": "veh",
+   "dir": "in",
+   "cls": "bus",
+   "track_id": 46,
+   "x": 303.0,
+   "y": 188.4,
+   "t_count": 19.54
+  },
+  {
+   "t": 20.99,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 49,
+   "x": 278.6,
+   "y": 210.1,
+   "t_count": 21.47
+  },
+  {
+   "t": 22.63,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 55,
+   "x": 264.4,
+   "y": 222.8,
+   "t_count": 23.13
+  },
+  {
+   "t": 23.07,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 56,
+   "x": 119.8,
+   "y": 351.8,
+   "t_count": 23.6
+  },
+  {
+   "t": 24.64,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 60,
+   "x": 175.1,
+   "y": 302.5,
+   "t_count": 25.12
+  },
+  {
+   "t": 25.06,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 57,
+   "x": 270.0,
+   "y": 217.9,
+   "t_count": 25.59
+  },
+  {
+   "t": 26.35,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 62,
+   "x": 253.4,
+   "y": 232.6,
+   "t_count": 26.85
+  },
+  {
+   "t": 26.79,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 64,
+   "x": 220.0,
+   "y": 262.4,
+   "t_count": 27.25
+  },
+  {
+   "t": 28.7,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 67,
+   "x": 251.8,
+   "y": 234.1,
+   "t_count": 29.18
+  },
+  {
+   "t": 29.86,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 69,
+   "x": 109.0,
+   "y": 361.4,
+   "t_count": 30.38
+  },
+  {
+   "t": 30.38,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 68,
+   "x": 252.1,
+   "y": 233.8,
+   "t_count": 30.91
+  },
+  {
+   "t": 31.59,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 70,
+   "x": 113.2,
+   "y": 357.7,
+   "t_count": 32.1
+  },
+  {
+   "t": 32.81,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 73,
+   "x": 109.6,
+   "y": 360.9,
+   "t_count": 33.3
+  },
+  {
+   "t": 33.04,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 72,
+   "x": 252.1,
+   "y": 233.8,
+   "t_count": 33.57
+  },
+  {
+   "t": 37.13,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 77,
+   "x": 116.9,
+   "y": 354.4,
+   "t_count": 37.62
+  },
+  {
+   "t": 40.27,
+   "line": "veh",
+   "dir": "in",
+   "cls": "car",
+   "track_id": 81,
+   "x": 249.4,
+   "y": 236.2,
+   "t_count": 40.74
+  },
+  {
+   "t": 41.47,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 82,
+   "x": 167.5,
+   "y": 309.2,
+   "t_count": 41.94
+  },
+  {
+   "t": 42.49,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 83,
+   "x": 170.1,
+   "y": 306.9,
+   "t_count": 43.0
+  },
+  {
+   "t": 46.52,
+   "line": "ped",
+   "dir": "out",
+   "cls": "pedestrian",
+   "track_id": 91,
+   "x": 361.3,
+   "y": 211.9,
+   "t_count": 47.06
+  },
+  {
+   "t": 46.87,
+   "line": "ped",
+   "dir": "out",
+   "cls": "pedestrian",
+   "track_id": 65,
+   "x": 457.4,
+   "y": 222.9,
+   "t_count": 47.46
+  },
+  {
+   "t": 47.75,
+   "line": "ped",
+   "dir": "out",
+   "cls": "pedestrian",
+   "track_id": 53,
+   "x": 319.8,
+   "y": 207.1,
+   "t_count": 48.26
+  },
+  {
+   "t": 47.87,
+   "line": "ped",
+   "dir": "out",
+   "cls": "pedestrian",
+   "track_id": 86,
+   "x": 436.0,
+   "y": 220.4,
+   "t_count": 48.39
+  },
+  {
+   "t": 51.51,
+   "line": "ped",
+   "dir": "out",
+   "cls": "cyclist",
+   "track_id": 99,
+   "x": 333.9,
+   "y": 208.7,
+   "t_count": 52.04
+  },
+  {
+   "t": 54.46,
+   "line": "ped",
+   "dir": "out",
+   "cls": "pedestrian",
+   "track_id": 104,
+   "x": 323.3,
+   "y": 207.5,
+   "t_count": 54.97
+  },
+  {
+   "t": 55.1,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 96,
+   "x": 377.8,
+   "y": 213.8,
+   "t_count": 55.63
+  },
+  {
+   "t": 70.77,
+   "line": "ped",
+   "dir": "in",
+   "cls": "cyclist",
+   "track_id": 130,
+   "x": 332.9,
+   "y": 208.6,
+   "t_count": 71.25
+  }
+ ],
+ "review": {
+  "removed": [],
+  "added": [],
+  "notes": []
+ }
+}

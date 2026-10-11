@@ -57,15 +57,15 @@
    ]
   },
   "scheda_416": {
-   "what": "416 px, 6 FPS stimati, detector un fotogramma su due (3 al secondo), tracking corretto",
+   "what": "416 px, 3,8 FPS, detector su ogni fotogramma (3,8 al secondo, misurato sulla scheda), tracking corretto",
    "args": [
     "--emulate-unoq",
     "--set",
     "model.input_size=416",
     "--set",
-    "model.detect_every_n=2",
+    "model.detect_every_n=1",
     "--set",
-    "source.max_fps=6"
+    "source.max_fps=3.8"
    ]
   },
   "scheda_attivazione_020": {
@@ -114,6 +114,60 @@
     "source.max_fps=5.9",
     "--set",
     "tracking.track_activation_threshold=0.2"
+   ]
+  },
+  "ogni_frame_ricucitura": {
+   "what": "come scheda_ogni_frame, con le tracce ricucite attraverso la linea (entro 1,5 s)",
+   "args": [
+    "--emulate-unoq",
+    "--set",
+    "model.detect_every_n=1",
+    "--set",
+    "source.max_fps=5.9",
+    "--set",
+    "counting.stitch_s=1.5"
+   ]
+  },
+  "ogni_frame_combinata": {
+   "what": "come scheda_ogni_frame, con box allargati del 50%, tracce nuove da 0.30 e ricucitura attraverso la linea",
+   "args": [
+    "--emulate-unoq",
+    "--set",
+    "model.detect_every_n=1",
+    "--set",
+    "source.max_fps=5.9",
+    "--set",
+    "tracking.box_buffer=0.5",
+    "--set",
+    "tracking.track_activation_threshold=0.2",
+    "--set",
+    "counting.stitch_s=1.5"
+   ]
+  },
+  "ogni_frame_buffer05_ricucitura": {
+   "what": "come scheda_ogni_frame, con box allargati del 50% e ricucitura attraverso la linea",
+   "args": [
+    "--emulate-unoq",
+    "--set",
+    "model.detect_every_n=1",
+    "--set",
+    "source.max_fps=5.9",
+    "--set",
+    "tracking.box_buffer=0.5",
+    "--set",
+    "counting.stitch_s=1.5"
+   ]
+  },
+  "scheda_nuova": {
+   "what": "la scheda dall'11/10: 320 px, detector su ogni fotogramma (5,9 al secondo, misurato), box allargati del 50%",
+   "args": [
+    "--emulate-unoq",
+    "--set",
+    "model.detect_every_n=1",
+    "--set",
+    "source.max_fps=5.9",
+    "--set",
+    "tracking.box_buffer=0.5"
    ]
   }
  }

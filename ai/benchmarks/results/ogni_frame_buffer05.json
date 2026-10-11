@@ -1,0 +1,204 @@
+{
+ "variant": "ogni_frame_buffer05",
+ "what": "come scheda_ogni_frame, box allargati del 50% invece del 30% per l'associazione",
+ "total": {
+  "pedestrian": {
+   "reference": 23,
+   "counted": 15,
+   "matched": 13,
+   "same_dir": 13,
+   "same_kind": 13,
+   "missed": 10,
+   "extra": 0
+  },
+  "vehicle": {
+   "reference": 77,
+   "counted": 47,
+   "matched": 47,
+   "same_dir": 47,
+   "same_kind": 47,
+   "missed": 30,
+   "extra": 0
+  },
+  "cyclist": {
+   "reference": 4,
+   "counted": 0,
+   "matched": 2,
+   "same_dir": 2,
+   "same_kind": 0,
+   "missed": 2,
+   "extra": 0
+  }
+ },
+ "sentences": [
+  "Pedoni: su 23 passaggi la scheda ne ha contati 13 (57%), 13 nel verso giusto (100%).",
+  "Veicoli: su 77 passaggi la scheda ne ha contati 47 (61%), 47 nel verso giusto (100%).",
+  "Ciclisti: su 4 passaggi la scheda ne ha contati 2 (50%), 2 nel verso giusto (100%)."
+ ],
+ "per_video": {
+  "torino_1": {
+   "fps": 48.5,
+   "detect_ms": 18.51,
+   "kinds": {
+    "pedestrian": {
+     "reference": 6,
+     "counted": 4,
+     "matched": 3,
+     "same_dir": 3,
+     "same_kind": 3,
+     "missed": 3,
+     "extra": 0
+    },
+    "vehicle": {
+     "reference": 44,
+     "counted": 29,
+     "matched": 29,
+     "same_dir": 29,
+     "same_kind": 29,
+     "missed": 15,
+     "extra": 0
+    },
+    "cyclist": {
+     "reference": 2,
+     "counted": 0,
+     "matched": 1,
+     "same_dir": 1,
+     "same_kind": 0,
+     "missed": 1,
+     "extra": 0
+    }
+   }
+  },
+  "torino_2": {
+   "fps": 40.7,
+   "detect_ms": 22.86,
+   "kinds": {
+    "pedestrian": {
+     "reference": 6,
+     "counted": 3,
+     "matched": 2,
+     "same_dir": 2,
+     "same_kind": 2,
+     "missed": 4,
+     "extra": 0
+    },
+    "vehicle": {
+     "reference": 5,
+     "counted": 0,
+     "matched": 0,
+     "same_dir": 0,
+     "same_kind": 0,
+     "missed": 5,
+     "extra": 0
+    },
+    "cyclist": {
+     "reference": 2,
+     "counted": 0,
+     "matched": 1,
+     "same_dir": 1,
+     "same_kind": 0,
+     "missed": 1,
+     "extra": 0
+    }
+   }
+  },
+  "torino_3": {
+   "fps": 48.8,
+   "detect_ms": 18.87,
+   "kinds": {
+    "pedestrian": {
+     "reference": 3,
+     "counted": 0,
+     "matched": 0,
+     "same_dir": 0,
+     "same_kind": 0,
+     "missed": 3,
+     "extra": 0
+    },
+    "vehicle": {
+     "reference": 19,
+     "counted": 9,
+     "matched": 9,
+     "same_dir": 9,
+     "same_kind": 9,
+     "missed": 10,
+     "extra": 0
+    }
+   }
+  },
+  "torino_night_1": {
+   "fps": 55.5,
+   "detect_ms": 17.53,
+   "kinds": {
+    "pedestrian": {
+     "reference": 4,
+     "counted": 4,
+     "matched": 4,
+     "same_dir": 4,
+     "same_kind": 4,
+     "missed": 0,
+     "extra": 0
+    }
+   }
+  },
+  "zona_pedonale": {
+   "fps": 43.4,
+   "detect_ms": 18.83,
+   "kinds": {
+    "pedestrian": {
+     "reference": 3,
+     "counted": 3,
+     "matched": 3,
+     "same_dir": 3,
+     "same_kind": 3,
+     "missed": 0,
+     "extra": 0
+    }
+   }
+  },
+  "piazzale": {
+   "fps": 57.0,
+   "detect_ms": 16.86,
+   "kinds": {
+    "pedestrian": {
+     "reference": 1,
+     "counted": 1,
+     "matched": 1,
+     "same_dir": 1,
+     "same_kind": 1,
+     "missed": 0,
+     "extra": 0
+    },
+    "vehicle": {
+     "reference": 2,
+     "counted": 2,
+     "matched": 2,
+     "same_dir": 2,
+     "same_kind": 2,
+     "missed": 0,
+     "extra": 0
+    }
+   }
+  },
+  "strada_auto": {
+   "fps": 42.4,
+   "detect_ms": 20.62,
+   "kinds": {
+    "vehicle": {
+     "reference": 7,
+     "counted": 7,
+     "matched": 7,
+     "same_dir": 7,
+     "same_kind": 7,
+     "missed": 0,
+     "extra": 0
+    }
+   }
+  },
+  "mixkit_61": {
+   "fps": 52.8,
+   "detect_ms": 18.17,
+   "kinds": {}
+  }
+ }
+}

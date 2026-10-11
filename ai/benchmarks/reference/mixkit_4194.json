@@ -1,0 +1,83 @@
+{
+ "video": "mdgb_mixkit_4194.mp4",
+ "calib": "4194.json",
+ "made_with": {
+  "emulate_unoq": false,
+  "input_px": "960",
+  "threads": 0,
+  "conf": 0.1,
+  "frames_processed": 151,
+  "processed_fps": 15.0,
+  "calib": "4194.json",
+  "metric": false,
+  "site": "urbano",
+  "overrides": [
+   "model.path=\"models/yolox_l_960.onnx\"",
+   "model.input_size=960",
+   "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+   "model.detect_every_n=1",
+   "source.max_fps=15",
+   "counting.minimum_crossing_threshold=8",
+   "tracking.min_track_age=5"
+  ],
+  "camera": null,
+  "stabilized": false,
+  "max_camera_shift_px": null
+ },
+ "overrides": [
+  "model.path=\"models/yolox_l_960.onnx\"",
+  "model.input_size=960",
+  "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+  "model.detect_every_n=1",
+  "source.max_fps=15",
+  "counting.minimum_crossing_threshold=8",
+  "tracking.min_track_age=5"
+ ],
+ "crossings": [
+  {
+   "t": 1.63,
+   "line": "veh",
+   "dir": "out",
+   "cls": "truck",
+   "track_id": 19,
+   "x": 688.2,
+   "y": 270.0,
+   "t_count": 2.33
+  },
+  {
+   "t": 2.38,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 6,
+   "x": 575.0,
+   "y": 397.3,
+   "t_count": 2.87
+  },
+  {
+   "t": 2.77,
+   "line": "ped",
+   "dir": "in",
+   "cls": "pedestrian",
+   "track_id": 2,
+   "x": 575.0,
+   "y": 408.7,
+   "t_count": 3.47
+  },
+  {
+   "t": 5.65,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 46,
+   "x": 720.2,
+   "y": 270.0,
+   "t_count": 6.27
+  }
+ ],
+ "review": {
+  "removed": [],
+  "added": [],
+  "notes": []
+ }
+}

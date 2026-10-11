@@ -1,0 +1,116 @@
+{
+ "video": "52_strada_auto_frontale_1080p.mp4",
+ "calib": "52.json",
+ "made_with": {
+  "emulate_unoq": false,
+  "input_px": "960",
+  "threads": 0,
+  "conf": 0.1,
+  "frames_processed": 133,
+  "processed_fps": 15.0,
+  "calib": "52.json",
+  "metric": true,
+  "site": "urbano",
+  "overrides": [
+   "model.path=\"models/yolox_l_960.onnx\"",
+   "model.input_size=960",
+   "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+   "model.detect_every_n=1",
+   "source.max_fps=15",
+   "counting.minimum_crossing_threshold=8",
+   "tracking.min_track_age=5"
+  ],
+  "camera": {
+   "height_m": 8.2,
+   "focal_px": 15060
+  },
+  "stabilized": false,
+  "max_camera_shift_px": null
+ },
+ "overrides": [
+  "model.path=\"models/yolox_l_960.onnx\"",
+  "model.input_size=960",
+  "model.providers=[\"CoreMLExecutionProvider\",\"CPUExecutionProvider\"]",
+  "model.detect_every_n=1",
+  "source.max_fps=15",
+  "counting.minimum_crossing_threshold=8",
+  "tracking.min_track_age=5"
+ ],
+ "crossings": [
+  {
+   "t": 0.31,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 2,
+   "x": 483.1,
+   "y": 431.0,
+   "t_count": 0.8
+  },
+  {
+   "t": 0.99,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 1,
+   "x": 768.0,
+   "y": 431.0,
+   "t_count": 1.47
+  },
+  {
+   "t": 1.56,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 5,
+   "x": 485.3,
+   "y": 431.0,
+   "t_count": 2.07
+  },
+  {
+   "t": 2.3,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 6,
+   "x": 470.6,
+   "y": 431.0,
+   "t_count": 2.8
+  },
+  {
+   "t": 3.11,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 4,
+   "x": 760.0,
+   "y": 431.0,
+   "t_count": 3.6
+  },
+  {
+   "t": 3.45,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 8,
+   "x": 441.9,
+   "y": 431.0,
+   "t_count": 3.93
+  },
+  {
+   "t": 7.11,
+   "line": "veh",
+   "dir": "out",
+   "cls": "car",
+   "track_id": 7,
+   "x": 494.0,
+   "y": 431.0,
+   "t_count": 7.6
+  }
+ ],
+ "review": {
+  "removed": [],
+  "added": [],
+  "notes": []
+ }
+}
