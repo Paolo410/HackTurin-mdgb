@@ -502,7 +502,7 @@ are in [`ai/config.yaml`](../ai/config.yaml); decisions and their reasons in [`a
 | **onnxruntime**, CPU, 3 threads | The UNO Q has no NPU; the fourth core is left to camera, tracker and the rest |
 | Input with the shape of the image (`match_aspect`): 416x256 instead of 320x320 | Same pixels, no padding wasted: about twice the people found at the same cost |
 | Region of interest (`roi` in `calib.json`) | The detector looks only at stripes and approach: objects appear larger |
-| Detector on 1 frame in 2 (`detect_every_n: 2`), tracker on every frame | From 5.8 to 12.3 FPS on the test video; counts better than lowering the input to 256 px |
+| Detector on every frame (`detect_every_n: 1`, since 11 Oct; before 1 in 2) | 5.9 full analyses per second instead of 4.2: with the fixed tracking it counts many more crossings (§7.9) |
 | A dynamic-shape copy of the official model (`make_dynamic_model.py`) | The official file declares 416 px fixed; the network has no fixed size inside |
 
 Classes kept: person, bicycle, car, motorcycle, bus, truck, dog, cat, horse, sheep, cow, bear, bird.
@@ -515,6 +515,11 @@ born only from boxes above 0.4. Height and class votes use only boxes above 0.30
 Result: median track duration at night from 0.8 to 1.7 s; vehicles counted on the Turin video from 20+5 to 23+10.
 A track is valid after 5 frames on a PC, after 2 at 10 FPS on the board (5 frames would be half a second: a car
 would pass the line before counting).
+
+Fixes of 11 Oct ([`ai/DECISIONS.md`](../ai/DECISIONS.md), point 47): supervision's ByteTrack dropped the tracks of
+fast objects from its output (tracked but never counted); now every track comes out with the box it was matched with;
+boxes are compared enlarged by 50% (buffered IoU, from the C-BIoU tracker); the counting line remembers the side of a
+hidden object (behind a pole) for 30 detections instead of 4.
 
 ### 7.3 From pixels to metres: calibration and geometry
 
@@ -615,10 +620,27 @@ ignored: when in doubt, protect. Tested in simulation, not yet on the real senso
 
 Specification target: at least 8 FPS. Reference points for the same board: YOLOv8n at 640 px with OpenCV DNN 1–2 FPS.
 
+**Since 11 Oct** the `unoq` profile analyses every frame: measured on the board with a video as the source, 5.9 FPS all
+analysed against 8.4 FPS of which 4.2 analysed (to be measured again with the camera). Fewer FPS, more crossings counted.
+
+**How well it counts** ([`ai/docs/BENCHMARK.md`](../ai/docs/BENCHMARK.md), in Italian): 8 videos from a still camera,
+compared with a much larger model (YOLOX-l at 960 px) checked by eye.
+
+| | Real crossings | Counted until 10 Oct | Counted since 11 Oct |
+|---|---:|---:|---:|
+| Pedestrians | 23 | 9 | **13 (57%)** |
+| Cyclists | 4 | 0 | **2** |
+| Vehicles | 77 | 24 | **47 (61%)** |
+
+Right direction in 100% of cases and no false or double counts. Where the camera sees the line well: 17 out of 17. The
+misses are in the Turin videos shot from a balcony (a pole hides the line, people 15 pixels tall).
+
 ### 7.10 Known limits
 
 - Dense crowds: only part of the pedestrians are detected; counts in those scenes are not reliable.
-- With the board limits the far direction of vehicles is barely counted on some videos.
+- With the board limits the far direction of vehicles was barely counted on some videos: it was the tracker, fixed
+  on 11 Oct (§7.2).
+- People under 20 pixels tall (far crossings) are missed: the camera has to be mounted close to the crossing.
 - Small bicycles and scooters are often missed, so riders are counted as pedestrians.
 - Heights (and `child`) depend on a good calibration: to be verified with a person of known height on the real camera.
 - The aid classifier is not trained yet: wheelchairs and walkers are recognised only through slow walking.
@@ -857,11 +879,12 @@ priorities in [`hardware/BOM.md`](../hardware/BOM.md).
 
 | What | How | Result |
 |---|---|---|
-| AI | `pytest` in `ai/` (rule values of the specification, counting without duplicates, geometry, events, animals, thermal, technician page, health) | 186 tests passing (2 fail only on Windows: file permissions and file-name order) |
+| AI | `pytest` in `ai/` (rule values of the specification, counting without duplicates, geometry, events, animals, thermal, technician page, health) | 194 tests passing on 11 Oct (2 fail only on Windows: file permissions and file-name order) |
 | Network and central | `pytest comms` (real node on real files, Wi-Fi off/on, negative PUBACK, Bridge with the official library against a fake router) | 41 tests |
 | Expected flow | `pytest` on `ai/tests/test_forecast*.py` (model, fusion, sources with a local HTTP server, cache, calendar, metrics, check of the estimate) | 80 tests passing (re-run on Windows, Python 3.11, 11 Oct) |
 | Central: flow and customer API | `pytest comms/tests/test_dashboard.py comms/tests/test_customers.py` (keys, zones, permissions, rate limit, CSV, MQTT messages) | 29 tests passing (same run); the JavaScript of the map was tested by hand |
-| Vision on the board | camera, profile `unoq` | 9.2 FPS |
+| Vision on the board | camera, profile `unoq` | 9.2 FPS (10 Oct, detector 1 frame in 2); since 11 Oct detector on every frame, 5.9 FPS on a video |
+| Counting against a reference | `ai/scripts/benchmark.py`, 8 still-camera videos, disagreements checked by eye | pedestrians 13/23, cyclists 2/4, vehicles 47/77; right direction 100%, 0 double counts |
 | Kill test, vision | stop the vision | fail-safe after 485 ms; systemd restart 3.8 s; "vision connected" after 7.5 s |
 | Kill test, network | 100 s MQTT cut | Bluetooth backup at −41 dBm; back on Wi-Fi in 18 s; 0 lost, 0 duplicates |
 | Urgent red via Bridge | request while green had been on for 5 s | yellow at 8.0 s (minimum green), short yellow 1.5 s, red held while requested |
@@ -991,7 +1014,8 @@ A suggested 10-slide structure built on this document:
 5. **Safety first**: requests within limits, fail-safe in 485 ms (§6.3, §6.5).
 6. **Privacy by design**: no image saved, metadata only, technician behind badge + login (§3, §8.8).
 7. **Never loses data**: network cut, Bluetooth backup, 0 events lost (§6.7).
-8. **Under the hood**: 9 FPS local AI on an Arduino UNO Q, explicit rule (§7).
+8. **Under the hood**: local AI on an Arduino UNO Q, every frame analysed; crossings always counted in the right
+   direction and without double counts (§7.9); explicit rule (§7).
 9. **Business**: retrofit vs new smart crossings, revenue streams, the data service already working (halo map,
    API keys per zone), pilot (§11, §8.9).
 10. **Team and next steps** (§12).

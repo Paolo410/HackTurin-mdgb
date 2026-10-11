@@ -1,9 +1,11 @@
 # Bringing `ai/` to the Arduino UNO Q
 
-> English translation of [`ai/docs/DEPLOY_UNOQ.md`](../../../../ai/docs/DEPLOY_UNOQ.md), from `main` at `1f9a131` (11 October 2026). The Italian original is the reference: if the two differ, the original wins.
+> English translation of [`ai/docs/DEPLOY_UNOQ.md`](../../../../ai/docs/DEPLOY_UNOQ.md), from `main` at `1f9a131` (11 October 2026), updated with the counting benchmark of 11 October (PR #22). The Italian original is the reference: if the two differ, the original wins.
 
 **Tested on the board on 10/10/2026:** copy, Python environment, real camera, 9.2 FPS, and with the `mdgb` app running
 the traffic light driven through the Bridge (emergency red, fail-safe): see `DECISIONS.md`, point 33.
+**Since 11 Oct** the `unoq` profile analyses every frame: 5.9 FPS measured with a video as the source (before 8.4 FPS
+with half of the frames analysed), more crossings counted (`docs/BENCHMARK.md`). To be measured again with the camera.
 **Not yet tested:** a request coming from a real scene (calibration needed), the technician page from the phone, the
 automatic start.
 
@@ -123,7 +125,9 @@ libcamerify ~/venv/bin/python -m smartcrossing.app --source 0 --profile unoq --h
 
 What to look at:
 
-1. **FPS:** 9.2 measured end-to-end with the `unoq` profile (320 px, detector one frame out of two). The numbers are in
+1. **FPS:** with the `unoq` profile since 11 Oct (320 px, detector on every frame) about 6, all analysed; on 10 Oct,
+   with the detector one frame out of two, 9.2 with the camera. Below 5 with the camera: something else uses the CPU
+   (an App Lab app that opens the camera?). The numbers are in
    `ai/README.md`, "Measured performance".
 2. **Traffic light:** stopping the vision (`Ctrl+C`) it goes back to the normal cycle within half a second. With an
    unaccompanied child or a free animal the red comes after a short yellow; with someone walking slowly the vehicle red
@@ -224,6 +228,7 @@ ssh arduino@<board> 'journalctl -u mdgb-ai -f'
 - [x] Automatic start after a reboot of the board: vision, network and `mdgb` app.
 - [ ] Badge → page → login from the phone, with the buzzer muted until the logout.
 - [ ] Technician page from the phone: login, cost of the live view on the FPS, login time.
+- [ ] FPS with the camera and the detector on every frame (`unoq` profile since 11 Oct): about 6 expected.
 - [ ] Temperature and slowdowns after 10 minutes of operation.
 - [ ] Vision and App Lab app together: CPU load and memory.
 - [ ] Automatic start after a reboot of the board.

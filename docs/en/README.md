@@ -52,6 +52,7 @@ The Italian files are the reference and are updated first: a translation may lag
 | [ai/ README](ai/README.md) | `ai/README.md` |
 | [ai/ decisions](ai/DECISIONS.md) | `ai/DECISIONS.md` |
 | [Deploying ai/ on the UNO Q](ai/docs/DEPLOY_UNOQ.md) | `ai/docs/DEPLOY_UNOQ.md` |
+| [How well the vision counts (benchmark)](ai/docs/BENCHMARK.md) | `ai/docs/BENCHMARK.md` |
 | [Expected pedestrian flow (forecast)](ai/forecast/README.md) | `ai/forecast/README.md` |
 | [comms/ README](comms/README.md) | `comms/README.md` |
 | [comms/ and app/ decisions](comms/DECISIONS.md) | `comms/DECISIONS.md` |

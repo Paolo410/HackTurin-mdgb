@@ -2,7 +2,7 @@
 
 # ai/ — vision and rules of MDGB
 
-> English translation of [`ai/README.md`](../../../ai/README.md), from `main` at `1f9a131` (11 October 2026). The Italian original is the reference: if the two differ, the original wins.
+> English translation of [`ai/README.md`](../../../ai/README.md), from `main` at `1f9a131` (11 October 2026), updated with the counting benchmark of 11 October (PR #22). The Italian original is the reference: if the two differ, the original wins.
 
 **Owner:** Paolo Malugani (data scientist).
 
@@ -19,7 +19,9 @@ The `smartcrossing` package runs on the Linux side of the UNO Q (and identically
 
 It never saves frames to disk. Everything works without internet.
 
-Decisions, numbers, interfaces and open questions: [DECISIONS.md](DECISIONS.md).
+Decisions, numbers, interfaces and open questions: [DECISIONS.md](DECISIONS.md). How well it counts, with the method
+to measure it again: [docs/BENCHMARK.md](docs/BENCHMARK.md). For the AI assistant that takes over (demo launch and
+model improvement): [`ai/docs/ISTRUZIONI_AI.md`](../../../ai/docs/ISTRUZIONI_AI.md) (Italian).
 Full specification: [`PROMPT_SMART_CROSSING.md`](../PROMPT_SMART_CROSSING.md), §5.1.
 
 Next to `smartcrossing` there is [`forecast/`](forecast/README.md): the model of the expected flow that the central
@@ -35,7 +37,7 @@ the counts of the node).
 | AI-M3 | calibration, speed, attributes, rules, `SimActuator` | done |
 | AI-M4 | events, animals, logger, C3 output | done |
 | AI-M5 | thermal camera | done in simulation, to be tried with the sensor |
-| AI-M6 | `unoq` profile, test on the board, benchmark | the vision runs on the board with the real camera at 9 FPS and drives the traffic light of the `mdgb` app; the calibration on the crossing is missing. Guide in [docs/DEPLOY_UNOQ.md](docs/DEPLOY_UNOQ.md) |
+| AI-M6 | `unoq` profile, test on the board, benchmark | the vision runs on the board and drives the traffic light of the `mdgb` app; since 11 Oct detector on every frame (5.9 FPS with a video, to be measured again with the camera). Counting checked on 8 still-camera videos: [docs/BENCHMARK.md](docs/BENCHMARK.md). The calibration on the crossing is missing. Guide in [docs/DEPLOY_UNOQ.md](docs/DEPLOY_UNOQ.md) |
 
 ## How to start it
 
@@ -64,6 +66,7 @@ python scripts/scenario.py elderly_fast_car                # slow pedestrian + c
 python scripts/animal_probe.py photo_folder                # how the detector sees animals not covered by COCO
 python scripts/evaluate.py samples/video.mp4 --calib c.json  # numbers and annotated frames of a test video
 python scripts/bench.py samples/video.mp4                  # mean and p95 ms per stage
+python scripts/benchmark.py score scheda_prima scheda_nuova  # crossings counted against the reference (docs/BENCHMARK.md)
 pytest                                                     # tests, without hardware
 ```
 
@@ -271,15 +274,30 @@ Full chain on a crowded 720p test video (`scripts/bench.py`):
 | 256 px, 3 threads | 95 ms | 19 ms | 114 ms | 8.8 |
 | **320 px, 3 threads, detector one frame out of two (`unoq` profile)** | 139 ms | 24 ms | 82 ms on average | **12.3** |
 
-With the real camera of the board (IMX219 on CSI, empty scene), `unoq` profile: **9.2 FPS end-to-end**, detect 129 ms,
-track 1 ms. Target of the specification: at least 8.
+With the real camera of the board (IMX219 on CSI, empty scene), `unoq` profile of that time (detector one frame out
+of two): **9.2 FPS end-to-end**, detect 129 ms, track 1 ms. Target of the specification: at least 8.
 
-- **Why one frame out of two and not 256 px:** on the Turin video, with the same load, 256 px counts 8 vehicles,
-  320 px with the detector one frame out of two counts 16 (reference at 30 FPS and 512 px: 35).
+**Since 11 Oct the `unoq` profile runs the detector on every frame** (`DECISIONS.md`, point 47). Measured on the board
+with Torino_1 as the source, `mdgb-ai` service running:
+
+| Setting | FPS | analysed per second | detect |
+|---|---|---|---|
+| 320 px, detector one frame out of two (until 10 Oct) | 8.4 | 4.2 | 126 ms |
+| **320 px, detector on every frame (`unoq` profile since 11 Oct)** | **5.9** | **5.9** | 130 ms |
+| 416 px, detector on every frame | 3.8 | 3.8 | 205 ms |
+
+Fewer FPS but every frame is analysed: with the tracking fixed on 11 Oct the crossings counted on 8 still-camera videos
+go from 9 to 13 out of 23 pedestrians and from 24 to 47 out of 77 vehicles, always in the right direction
+([docs/BENCHMARK.md](docs/BENCHMARK.md)). To be measured again with the real camera.
+
+- **Why one frame out of two and not 256 px until 10 Oct:** on the Turin video, with the same load, 256 px counted 8
+  vehicles, 320 px with the detector one frame out of two 16 (reference at 30 FPS and 512 px: 35). The tracker of
+  that time lost fast objects between two detections: fixed on 11 Oct, one frame out of two is no longer needed.
 - **Three threads and not four:** the fourth core is needed by the camera, the tracker and the rest; with four it is
   the same or worse.
 - **The camera costs** about 20% of a core at 10 reads per second.
-- **With the App Lab app keeping the camera open** (140% of CPU) the detector at every frame dropped to 3.1 FPS.
+- **With the App Lab app keeping the camera open** (140% of CPU) the detector at every frame dropped to 3.1 FPS:
+  the `mdgb` app does not open the camera, but an app that does slows the vision down.
 
 ### On PC
 
