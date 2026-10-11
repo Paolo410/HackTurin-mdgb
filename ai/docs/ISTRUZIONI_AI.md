@@ -167,6 +167,25 @@ deploy/run_vision.sh camera                    # alla fine
 - Esposizione e guadagno della camera si fissano all'avvio (`scripts/camera_exposure.py`): se la luce cambia
   molto, `deploy/run_vision.sh restart`.
 
+### Clip per il trailer: cosa vede la telecamera
+
+`scripts/trailer_clip.py` rende un video registrato con sopra solo quello che la visione riconosce (riquadri con
+tipo e velocità, strisce e zone d'attesa), senza il riquadro di stato in alto e la fascia in basso. Gira sul Mac,
+serve `ffmpeg`, scrive solo in `ai/samples/trailer/` (fuori da git).
+
+```bash
+cd ai
+python scripts/trailer_clip.py samples/Torino_2.mp4 --calib samples/calib/torino_2.json                 # 1080x1920
+python scripts/trailer_clip.py samples/Torino_2.mp4 --calib samples/calib/torino_2.json --wide --wide-top 0.85   # 1920x1080
+python scripts/trailer_clip.py samples/Torino_2.mp4 --calib samples/calib/torino_2.json --input 640 --whole-frame
+```
+
+- Senza opzioni il detector è quello della scheda (320 px, sola zona della calibrazione): è quello che il nodo
+  vede davvero. `--input 640 --whole-frame` dà allo stesso modello più pixel e tutta l'inquadratura: riconosce
+  anche chi è piccolo e lontano, a una velocità che la scheda non raggiunge. Va detto quando si mostra la clip.
+- `--start` e `--seconds` tagliano il pezzo che serve; `--wide-top` sceglie la fascia 16:9 (0 in alto, 1 in basso).
+- Limite visto su Torino_2: chi è in bici lontano esce come `pedestrian` (la bici non viene riconosciuta).
+
 ### Trappole note
 
 - **Fotogrammi scuri uno su tre con la camera:** era l'esposizione automatica di libcamera che non si assesta.
