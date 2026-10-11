@@ -195,3 +195,22 @@ def test_free_size_model_matches_the_official_one_at_416():
     expected = reference.run(None, {reference.get_inputs()[0].name: blob})[0]
     actual = detector.session.run(None, {detector.input_name: blob})[0]
     assert np.array_equal(actual, expected)
+
+
+def test_picodet_decode_boxes_from_the_bin_distributions():
+    from smartcrossing.detector import PICODET_REG_MAX, PICODET_STRIDES, picodet_decode
+    size, bins = 64, PICODET_REG_MAX + 1
+    cls, reg = [], []
+    for stride in PICODET_STRIDES:
+        cells = (size // stride) ** 2
+        scores = np.zeros((1, cells, 80), np.float32)
+        scores[0, 0, 2] = 0.7                                    # first cell of each level: a car, 0.7
+        logits = np.zeros((1, cells, 4 * bins), np.float32)
+        logits.reshape(cells, 4, bins)[:, :, 2] = 50.0           # all the weight on bin 2: 2 strides per side
+        cls.append(scores)
+        reg.append(logits)
+    rows = picodet_decode(cls + reg, size, size)
+    assert rows.shape == (64 + 16 + 4 + 1, 85)
+    first = rows[0]                                              # stride 8, cell (0, 0): centre (4, 4)
+    assert np.allclose(first[:4], [4.0, 4.0, 32.0, 32.0], atol=1e-3) and first[4] == 1.0 and first[5 + 2] == 0.7
+    assert np.allclose(rows[-1][:4], [32.0, 32.0, 256.0, 256.0], atol=1e-2)   # stride 64, the only cell

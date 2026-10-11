@@ -3,6 +3,7 @@
 # "(spec)" = value fixed by PROMPT_SMART_CROSSING.md. The others are tunable defaults.
 
 model:
+  family: yolox                   # yolox | picodet (PP-PicoDet-S, scripts/get_picodet.py; fixed 320 or 416 input)
   path: models/yolox_nano_dynamic.onnx   # relative to ai/, made by scripts/get_model.sh (free input size)
   input_size: 320                 # (spec) 320, 416 optional. Must be a multiple of the largest stride.
   match_aspect: true              # same number of pixels as input_size squared, shaped like the image:
