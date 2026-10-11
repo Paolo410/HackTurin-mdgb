@@ -108,8 +108,10 @@ def main() -> None:
     }
     for name, (color, meaning) in PINS.items():
         files[f"mappa/pin-{name}.svg"] = pin(color, meaning, f"pin-{name}")
+    # Copy used by the panel of the App Lab app (firmware/unoq_mcu/assets, packed in both zips).
+    files["../../firmware/unoq_mcu/assets/logo.svg"] = files["mdgb-simbolo.svg"]
     for rel, text in files.items():
-        path = HERE / rel
+        path = (HERE / rel).resolve()
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(text.encode("utf-8"))
         print(rel)

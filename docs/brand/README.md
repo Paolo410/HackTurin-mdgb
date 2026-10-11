@@ -11,6 +11,7 @@ pedonali viste dall'auto; il faro ambra nella punta della M veglia sull'attraver
 | File | Per cosa |
 |---|---|
 | `mdgb-simbolo.svg` | simbolo da solo (icona, favicon, avatar); già dentro la pagina del tecnico |
+| `../../firmware/unoq_mcu/assets/logo.svg` | copia del simbolo per il pannello dell'app App Lab (barra e icona), scritta da `genera_logo.py` |
 | `mdgb-logo.svg` | simbolo e nome, per sfondi chiari |
 | `mdgb-logo-scuro.svg` | simbolo e nome, per sfondi scuri (video, mappa scura) |
 | `mappa/pin-ok.svg`, `pin-rete-giu.svg`, `pin-guasto.svg`, `pin-senza-dati.svg` | spilli della mappa della centrale, con i colori di stato di `app/` (punta a x 24, y 62 del disegno 48×64) |
