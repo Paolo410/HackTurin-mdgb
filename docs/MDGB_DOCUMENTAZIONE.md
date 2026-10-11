@@ -10,7 +10,7 @@ Documentazione di riferimento: il problema, il sistema, come funziona ogni parte
 
 <p align="center"><a href="MDGB_DOCUMENTATION.md">English version</a></p>
 
-> **Documento vivo.** Descrive il repository all'11 ottobre 2026 (`main` a `dad00d9`). Diverse parti sono ancora in
+> **Documento vivo.** Descrive il repository all'11 ottobre 2026 (`main` a `1f9a131`). Diverse parti sono ancora in
 > lavorazione: se questo file e il README di un modulo non coincidono, valgono il README e
 > [`docs/CONTRACTS.md`](CONTRACTS.md). I numeri indicati come *misurati* vengono da prove sulla scheda vera; quelli
 > indicati come *ipotesi* sono stime da verificare.
@@ -47,7 +47,9 @@ dispositivo** riconoscono chi sta arrivando (pedoni, ciclisti, veicoli, animali)
 - **conta e misura**: attraversamenti per direzione senza doppioni, quasi incidenti, incidenti, quanto spesso i
   conducenti danno la precedenza;
 - **riferisce**: alla centrale arrivano solo numeri anonimi, via Wi-Fi/MQTT, con una radio di backup quando la rete
-  cade.
+  cade;
+- **prevede**: la centrale stima il flusso atteso di pedoni, ciclisti e veicoli a ogni camera, adesso e per le
+  prossime 24 ore, e condivide conteggi e previsioni con i clienti tramite chiavi API legate a una zona.
 
 Tre idee lo rendono diverso:
 
@@ -105,9 +107,10 @@ flowchart LR
         CTRL --> LIGHTS["Lanterne veicolari e pedonali"]
         MDGB --> WARN["Avvisi<br/>ambra lampeggiante, luci a terra, display"]
     end
-    MDGB -- "numeri anonimi<br/>Wi-Fi / MQTT" --> CENTRAL["Centrale<br/>mappa, allarmi, statistiche"]
+    MDGB -- "numeri anonimi<br/>Wi-Fi / MQTT" --> CENTRAL["Centrale<br/>mappa, allarmi, statistiche,<br/>flusso atteso"]
     MDGB -. "radio di backup<br/>BLE oggi, LoRaWAN domani" .-> CENTRAL
     TECH["Telefono del tecnico"] -- "badge + login" --> MDGB
+    CENTRAL -- "conteggi e previsioni<br/>chiave API per zona, MQTT" --> CUST["Clienti<br/>Comune, negozi, urbanisti"]
 ```
 
 - **Attraversamenti con semaforo**: MDGB non sostituisce la centralina, le manda *richieste* (allungare il verde
@@ -144,7 +147,7 @@ flowchart LR
 | **Polizia locale, osservatori sulla sicurezza stradale** | Dati sui punti pericolosi | Incidenti e quasi incidenti anonimi, con ora e luogo |
 | **Tecnici della manutenzione** | Capire subito cosa è rotto e come ripararlo | Pagina del tecnico con lo stato di ogni parte e "cosa fare"; diagnosi a distanza in centrale |
 | **Produttori di semafori e centraline** | Nuovo valore sugli impianti installati | Un'aggiunta che parla con la loro centralina tramite richieste |
-| **Attività commerciali, urbanisti** | Passaggi e andamento orario | Flussi aggregati (servizio a pagamento), previsioni (roadmap) |
+| **Attività commerciali, urbanisti** | Passaggi e andamento orario | Conteggi, flusso atteso e previsioni a 24 ore delle camere della loro zona, con una chiave API (servizio a pagamento) |
 | **Garante della privacy, cittadini** | Nessuna sorveglianza | Nessuna immagine salvata, solo metadati, vista dal vivo solo per personale autenticato |
 | **GOMA, HackTurin** | Un prototipo credibile e funzionante | Demo sulla scheda vera con numeri misurati |
 
@@ -212,8 +215,15 @@ flowchart TB
         DB --> DIAG["diagnosi"]
         DB --> DASH["dashboard + mappa"]
         DIAG --> DASH
+        DB --> FLOW["flusso atteso<br/>(ai/forecast)"]
+        FLOW --> DASH
+        FLOW --> API["API per i clienti<br/>/api/v1, chiavi per zona"]
+        FLOW --> PUB["publisher<br/>forecast, analytics"]
+        PUB --> BROKER
     end
     PHONE["Telefono del tecnico"] --> PAGE8090
+    OPEN["OpenStreetMap, ESA WorldCover,<br/>Open-Meteo, Google (facoltativo)"] -. "contesto di ogni camera" .-> FLOW
+    CUSTOMER["Clienti"] --> API
 ```
 
 ### Chi fa cosa sulla scheda
@@ -254,6 +264,7 @@ flowchart LR
 | C4 | nodo → centrale | MQTT 5, QoS 1 | topic `mdgb/<nodo>/events`, `agg`, `hb` |
 | C4-B | nodo → centrale, backup | beacon BLE (LoRaWAN in produzione) | binari: `AGG` 26 byte, `HB` 12 byte, allarmi 5 byte |
 | C5 | firmware → Linux | Bridge / file di `mdgb_link.py` | `{"v":1,"src":"mcu","type":"tamper","code":3}` |
+| Dati in uscita | centrale → clienti e altri sistemi | HTTP `/api/v1/...` con chiave API; MQTT `mdgb/<nodo>/forecast`, `analytics` (retained) | [`docs/DATA_API.md`](DATA_API.md); interfacce nuove, i contratti C1–C5 non cambiano |
 
 ---
 
@@ -456,6 +467,27 @@ sequenceDiagram
 | no | no | batteria bassa o in calo | batteria scarica (probabile) |
 | no | no | nessun preavviso | nodo distrutto o senza alimentazione |
 
+### 6.10 Dai conteggi al flusso atteso e ai clienti
+
+```mermaid
+flowchart LR
+    AGG["Aggregati del nodo (C4 agg)<br/>conteggi per finestra"] --> DB[("Database della centrale")]
+    CTX["Contesto della camera<br/>luoghi OSM, suolo ESA,<br/>meteo, calendario"] --> MODEL
+    subgraph FORECAST["ai/forecast, dentro la centrale"]
+        MODEL["1. Modello<br/>gradient boosting, Poisson"] --> CAL["2. Calibrazione<br/>fattore per attraversamento"]
+        CAL --> FUSE["3. Fusione con gli<br/>ultimi conteggi (Gamma-Poisson)"]
+        FUSE --> NEXT["4. Prossime 24 ore<br/>l'anomalia si dimezza ogni ora"]
+    end
+    DB --> CAL
+    DB --> FUSE
+    NEXT --> HALO["Dashboard:<br/>alone sulla mappa, cursore dell'ora,<br/>riquadro 'Flusso atteso'"]
+    NEXT --> API["API per i clienti /api/v1<br/>chiave legata a una zona"]
+    NEXT --> MQTT["Argomenti MQTT forecast<br/>e analytics, retained"]
+```
+
+Una camera che non manda dati ha comunque la stima del solo modello; appena arrivano conteggi, la stima li segue.
+Dettagli in [§7.11](#711-flusso-atteso-in-centrale) e [§8.9](#89-dati-per-i-clienti-chiavi-api-e-mqtt).
+
 ---
 
 ## 7. AI e visione artificiale nel dettaglio
@@ -597,6 +629,49 @@ Obiettivo della specifica: almeno 8 FPS. Riferimenti per la stessa scheda: YOLOv
 - Il classificatore degli ausili non è ancora addestrato: carrozzine e deambulatori si riconoscono solo dal camminare
   lento.
 
+### 7.11 Flusso atteso in centrale
+
+Codice: [`ai/forecast/`](../ai/forecast/README.md) (owner Paolo), eseguito **dentro l'app della centrale**, non sulla
+scheda. Per ogni camera della mappa stima pedoni in, pedoni out, ciclisti e veicoli all'ora, adesso e per ciascuna
+delle prossime 24 ore. A runtime usa solo la libreria standard di Python (gli alberi addestrati si leggono da
+`model.json`); numpy e scikit-learn servono solo per riaddestrare.
+
+| Passo | Come | Numeri |
+|---|---|---|
+| 1. Modello | Gradient boosting, uno per classe, loss di Poisson, 17 variabili (calendario, festività italiane, luoghi vicini, uso del suolo, meteo) | Conteggio atteso per finestra di 15 minuti |
+| 2. Calibrazione | Quanto questo attraversamento si scosta da ciò che il suo contesto fa prevedere | Un fattore per classe, 0,05–20, vicino a 1 finché i conteggi sono pochi |
+| 3. Fusione | Le ultime finestre del nodo correggono la stima di adesso (Gamma-Poisson) | Il modello pesa quanto 10 passaggi attesi; una finestra di 30 minuti fa pesa la metà; si aggiungono finestre finché non ci si aspettano 80 passaggi; se i conteggi smentiscono il modello (10 volte) il modello perde subito peso |
+| 4. Prossime ore | Dalla stima di adesso si torna al modello calibrato | Ciò che adesso è insolito si dimezza a ogni ora |
+
+**Fonti del contesto.** Fuori escono solo le coordinate della camera; le risposte restano in una cache su disco e si
+aggiornano in background: senza internet si usa l'ultima risposta buona, e senza nessuna fonte solo il calendario.
+
+| Fonte | Cosa dà | Chiave |
+|---|---|---|
+| OpenStreetMap (Overpass, con ripiego sull'API ufficiale) | locali, negozi, fermate, scuole, svago entro 300 m; classe della strada | no |
+| ESA WorldCover 10 m (2021) | quota di costruito, verde e acqua entro 300 m (letture HTTP parziali dei riquadri pubblici) | no |
+| Open-Meteo | temperatura e pioggia delle prossime 30 ore | no |
+| Google Places, Google Routes | recensioni e orari di apertura; rapporto del traffico | sì (facoltativa, non ancora provata con una chiave vera) |
+| Il nodo stesso (C4 `agg`) | conteggi e temperatura misurati | — |
+
+**Verifica della stima.** Ogni finestra già contata viene ristimata con i soli dati disponibili prima che iniziasse,
+e confrontata con due riferimenti: ripetere l'ultimo conteggio, e il solo modello. Su conteggi inventati (Poisson
+intorno a un ritmo noto), errore medio in pedoni per finestra:
+
+| Situazione | Media per finestra | Stima MDGB | Ripetere l'ultimo | Solo modello |
+|---|---|---|---|---|
+| Affollato, finestre da 15 min | 90,5 | 15,1 | 13,9 | 40,6 |
+| Affollato, conteggi piatti giorno e notte | 128,0 | 12,9 | 13,0 | 78,2 |
+| Tranquillo, finestre da 15 min | 4,1 | 1,9 | 2,6 | 3,1 |
+
+Dove i passaggi sono molti la stima vale quanto ripetere l'ultimo conteggio; dove sono pochi è meglio. Addestrato su
+180 attraversamenti simulati e provato su 60 mai visti, il modello spiega il 56–60% della devianza per i pedoni e il
+73% per i veicoli, contro il 31–37% di un profilo settimanale.
+
+**Limiti, da dire nel pitch.** Lo storico di addestramento è **simulato** (all'hackathon non ci sono conteggi
+storici): i numeri mostrano il metodo, non misure reali, e ogni risposta dell'API lo dice. Né Google né i satelliti
+contano i pedoni: danno il contesto. La ripartizione in/out arriva solo dai conteggi del nodo.
+
 ---
 
 ## 8. Comunicazioni nel dettaglio
@@ -688,6 +763,11 @@ la visione scrive i suoi eventi C3 e da cui leggono sia la rete sia la visione.
 - Mostra: mappa dei nodi colorati per stato, canale (Wi-Fi o Bluetooth con il segnale), coda, batteria, traffico per
   finestra, sicurezza (precedenze, quasi incidenti, pedoni vulnerabili), allarmi, e i numeri della rete: eventi
   ricevuti, **eventi persi (deve restare 0)**, doppioni scartati.
+- **Flusso atteso** (§7.11): un alone intorno a ogni camera cresce con i pedoni attesi nell'ora scelta con un cursore
+  sopra la mappa (da adesso a +24 h); il dettaglio della camera ha i quattro numeri di quell'ora, il grafico delle 24
+  ore e le fonti usate. Funziona anche per una camera che non manda dati.
+- **Dati per i clienti** (§8.9): una scheda in fondo alla pagina crea le chiavi API; `customers.py` fa lo stesso da
+  terminale; `publisher.py` manda stime e metriche su MQTT ogni `ANALYTICS_PERIOD_S` secondi (30 di base).
 - Gli spilli dei nodi per la mappa, nei quattro colori di stato, sono in [`docs/brand/mappa/`](brand/mappa).
 
 ### 8.8 Sicurezza e privacy del percorso dei dati
@@ -698,6 +778,46 @@ la visione scrive i suoi eventi C3 e da cui leggono sia la rete sia la visione.
 | Contenuto | solo metadati anonimi | lo stesso |
 | Immagini | vista dal vivo solo sulla scheda, dietro badge + login, mai salvata | `operator.share_images: false`: nessuna immagine esce dalla visione |
 | Pagina del tecnico | HTTP sulla rete locale | serve HTTPS |
+| API per i clienti | ascolta solo sul PC della centrale salvo `WEB_HOST=0.0.0.0`; chiave in un'intestazione, salvata come SHA-256 | proxy HTTPS che inoltra solo `/api/v1/` |
+| Argomenti di stime e metriche | broker aperto alla rete locale, senza password | utenti sul broker, in sola lettura per cliente |
+
+### 8.9 Dati per i clienti: chiavi API e MQTT
+
+Formati ed esempi: [`docs/DATA_API.md`](DATA_API.md) (interfacce nuove scritte da Paolo, da far vedere a Lorenzo;
+i contratti C1–C5 non cambiano). Dalla centrale escono solo conteggi per attraversamento: mai immagini, eventi singoli
+o identificativi di persone.
+
+```mermaid
+sequenceDiagram
+    participant O as Operatore (PC della centrale)
+    participant C as MDGB Centrale
+    participant K as Cliente
+    O->>C: crea la chiave (cliente, zona = cerchio o elenco di nodi, scadenza)
+    C-->>O: mdgb_id_segreto, mostrata una volta sola (si salva solo lo SHA-256)
+    O->>K: consegna la chiave
+    K->>C: GET /api/v1/forecast (intestazione X-API-Key)
+    C->>C: controlla chiave, tipo di dati, scadenza, 120 richieste al minuto
+    C-->>K: previsione oraria delle camere della zona (JSON o CSV)
+    C->>C: conta la richiesta per chiave, giorno e tipo di dati (api_usage)
+```
+
+| Indirizzo | Tipo di dati | Restituisce |
+|---|---|---|
+| `GET /api/v1/zone` | qualsiasi | la zona della chiave, le sue camere, la scadenza |
+| `GET /api/v1/realtime` | `realtime` | per camera: ultima finestra, ultima ora, stima di adesso all'ora con intervallo all'80%; totale della zona |
+| `GET /api/v1/forecast?hours=24` | `forecast` | previsione ora per ora per camera e per la zona; CSV con `&format=csv` |
+| `GET /api/v1/history?hours=24` | `realtime` | le finestre contate, fino a 24 ore; anche in CSV |
+| `GET /api/v1/metrics` | `realtime` | metriche di traffico e sicurezza delle ultime 24 ore, e la verifica della stima |
+
+Errori: 401 (chiave mancante, sconosciuta, scaduta o revocata), 403 (tipo di dati non compreso), 429 (più di 120
+richieste in un minuto). Una zona senza camere risponde `"available": false` e si riempie da sola quando una camera
+viene installata lì.
+
+Su MQTT la centrale pubblica ogni 30 s, per camera, `mdgb/<nodo>/forecast` (stima di adesso e prossime 24 ore, con il
+livello di `anomaly` normal/high/low) e `mdgb/<nodo>/analytics` (metriche), QoS 1 e retained. Sono argomenti diversi
+da quelli che pubblicano i nodi, quindi non rientrano mai nella ricezione.
+
+La tabella `api_usage` è la base per misurare e far pagare un servizio di dati (§11).
 
 ---
 
@@ -746,6 +866,8 @@ non visivo (PIR, ToF) letto direttamente dal microcontrollore; monitoraggio dell
 |---|---|---|
 | AI | `pytest` in `ai/` (valori della regola della specifica, conteggio senza doppioni, geometria, eventi, animali, termocamera, pagina del tecnico, controllo delle parti) | 186 test passano (2 falliscono solo su Windows: permessi dei file e ordine dei nomi dei file) |
 | Rete e centrale | `pytest comms` (nodo vero su file veri, Wi-Fi spento/riacceso, PUBACK negativo, Bridge con la libreria ufficiale contro un router finto) | 41 test |
+| Flusso atteso | `pytest` su `ai/tests/test_forecast*.py` (modello, fusione, fonti con un server HTTP locale, cache, calendario, metriche, verifica della stima) | 80 test passano (rieseguiti su Windows, Python 3.11, 11/10) |
+| Centrale: flusso e API per i clienti | `pytest comms/tests/test_dashboard.py comms/tests/test_customers.py` (chiavi, zone, permessi, limite di richieste, CSV, messaggi MQTT) | 29 test passano (stessa prova); il JavaScript della mappa è stato provato a mano |
 | Visione sulla scheda | camera, profilo `unoq` | 9,2 FPS |
 | Kill test della visione | visione fermata | fail-safe dopo 485 ms; riavvio di systemd 3,8 s; "visione collegata" dopo 7,5 s |
 | Kill test della rete | MQTT tagliato per 100 s | backup Bluetooth a −41 dBm; di nuovo su Wi-Fi in 18 s; 0 persi, 0 doppioni |
@@ -775,7 +897,7 @@ precedenze e quasi incidenti a schermo; "nessun fotogramma salvato" detto nel pi
 | Comune | Attraversamenti più sicuri senza cantieri; dati (quasi incidenti, precedenze) per decidere dove investire; open data |
 | Pedoni vulnerabili | Tempo per attraversare misurato su di loro, non su chi cammina a velocità media |
 | Manutenzione | Diagnosi a distanza e una pagina del tecnico che dice cosa sistemare |
-| Attività commerciali, urbanisti | Flussi anonimi per ora e giorno, e previsioni |
+| Attività commerciali, urbanisti | Flussi anonimi per ora e giorno e previsioni a 24 ore per gli attraversamenti della loro zona, con una chiave API |
 
 ### 11.2 Modello di business
 
@@ -799,7 +921,7 @@ flowchart LR
 | Nodo (una tantum o noleggio) | Comune | Nodo industrializzato con case, montaggio, alimentazione e radio: obiettivo ben sotto il costo di un nuovo attraversamento "smart" |
 | Piattaforma della centrale | Comune | Canone annuo per nodo: broker, archiviazione, dashboard, aggiornamenti |
 | Manutenzione | Comune | La diagnosi a distanza abbassa il costo di ogni intervento |
-| Servizi sui dati | Attività commerciali, urbanisti | Passaggi per ora, previsioni; gli open data restano gratuiti per il Comune |
+| Servizi sui dati | Attività commerciali, urbanisti | Passaggi per ora e previsioni per zona; gli open data restano gratuiti per il Comune. Già nel prototipo: chiavi per cliente e zona, tipi di dati, scadenza, revoca e uso contato per chiave e giorno (§8.9). Prezzi e condizioni d'uso da definire |
 
 ### 11.3 Costi di riferimento
 
@@ -819,8 +941,8 @@ le richieste alla centralina, i conteggi e i dati, sul semaforo che c'è già.
 ```mermaid
 timeline
     title Dal prototipo al servizio (ipotesi)
-    Hackathon : prototipo funzionante sulla UNO Q : fail-safe e rete misurati
-    Pilota : 1-3 attraversamenti con un Comune : calibrazione su attraversamenti veri : base di partenza per quasi incidenti e precedenze
+    Hackathon : prototipo funzionante sulla UNO Q : fail-safe e rete misurati : previsione e API dei dati su storico simulato
+    Pilota : 1-3 attraversamenti con un Comune : calibrazione su attraversamenti veri : base di partenza per quasi incidenti e precedenze : previsione riaddestrata su conteggi veri
     Primo contratto : decine di nodi : broker in cloud con TLS : backup LoRaWAN
     Crescita : accordi con i produttori di centraline : servizi sui dati per le attività
 ```
@@ -835,7 +957,8 @@ timeline
 
 Quota di precedenze, quasi incidenti ogni 1.000 attraversamenti, verdi allungati concessi a pedoni vulnerabili, rossi
 d'urgenza, tempo di funzionamento del nodo, **eventi persi (obiettivo 0)**, tempo di fail-safe (obiettivo < 0,5 s),
-interventi dei tecnici evitati grazie alla diagnosi a distanza.
+interventi dei tecnici evitati grazie alla diagnosi a distanza; per il servizio di dati, errore della previsione
+rispetto a "ripetere l'ultimo conteggio" e richieste all'API per cliente.
 
 ### 11.6 Rischi e contromisure
 
@@ -858,7 +981,7 @@ interventi dei tecnici evitati grazie alla diagnosi a distanza.
 | AI | Calibrazione sull'attraversamento vero; classificatore degli ausili (carrozzina, deambulatore, passeggino); termocamera sul sensore vero; rilevamento migliore di veicoli lontani e bici |
 | Firmware | Strip e ring LED, LCD e OLED; secondo percorso di sicurezza (PIR, ToF); monitoraggio della lampada (sensore di corrente); watchdog hardware |
 | Comunicazioni | Broker in cloud con TLS mutuo; backup LoRaWAN con il watchdog `DEAD`; aggiornamento del contratto v1 (`tech`, `veh_red_now`, limite di 238 byte del Bridge) |
-| Dati | Previsione dei flussi pedonali (lavoro in corso sul branch `paolo/forecast-flusso-pedonale`) |
+| Dati | Flusso atteso e API per i clienti sono su `main` (§7.11, §8.9). Prossimi passi: riaddestrare sugli aggregati veri, provare le fonti Google con una chiave vera, orari di apertura da OpenStreetMap, archivio oltre le 24 ore, HTTPS e utenti MQTT per i clienti, prezzi |
 | Prodotto | Case, alimentazione con batteria tampone, guida all'installazione, HTTPS per la pagina del tecnico |
 | Extra | V2X: "pedone nascosto a X m" trasmesso ai veicoli |
 
@@ -876,7 +999,8 @@ Una struttura possibile in 10 slide, costruita su questo documento:
 6. **Privacy fin dal progetto**: nessuna immagine salvata, solo metadati, tecnico dietro badge + login (§3, §8.8).
 7. **Non perde dati**: rete tagliata, backup Bluetooth, 0 eventi persi (§6.7).
 8. **Sotto il cofano**: AI locale a 9 FPS su una Arduino UNO Q, regola esplicita (§7).
-9. **Business**: aggiunta al semaforo esistente contro nuovi attraversamenti smart, fonti di ricavo, pilota (§11).
+9. **Business**: aggiunta al semaforo esistente contro nuovi attraversamenti smart, fonti di ricavo, il servizio di
+   dati che già funziona (mappa con gli aloni, chiavi API per zona), pilota (§11, §8.9).
 10. **Team e prossimi passi** (§12).
 
 ---
@@ -898,17 +1022,20 @@ Una struttura possibile in 10 slide, costruita su questo documento:
 | Store and forward | Salvare ogni evento prima di inviarlo, cancellarlo solo dopo la conferma |
 | Bridge | Il collegamento RPC tra Linux e il microcontrollore della UNO Q |
 | App Lab | L'ambiente di Arduino per le app che uniscono uno sketch e Python sulla UNO Q |
+| Flusso atteso | Passaggi all'ora che la centrale si aspetta a una camera, da un modello corretto con i conteggi del nodo |
+| Chiave API, zona | Credenziale di un cliente dei dati, valida per le camere dentro un cerchio sulla mappa o in un elenco di nodi |
 
 ### Mappa del repository
 
 | Percorso | Cosa | Owner |
 |---|---|---|
 | [`ai/`](../ai/README.md) | visione, regola, pagina del tecnico | Paolo Malugani |
+| [`ai/forecast/`](../ai/forecast/README.md) | flusso atteso, eseguito dalla centrale | Paolo Malugani |
 | [`firmware/`](../firmware/unoq_panel/README.md) | app di App Lab, sketch | Salvatore Gullotta |
 | [`comms/`](../comms/README.md) | nodo di rete | Lorenzo Dragoni |
 | [`app/`](../app/README.md) | app della centrale | Lorenzo Dragoni |
 | [`hardware/`](../hardware/BOM.md) | componenti, alimentazione | Kuzey Bicher |
-| [`docs/`](CONTRACTS.md) | contratti, logo, questo documento; traduzioni in inglese in [`docs/en/`](en/README.md) | tutti |
+| [`docs/`](CONTRACTS.md) | contratti, [API dei dati](DATA_API.md), logo, questo documento; traduzioni in inglese in [`docs/en/`](en/README.md) | tutti |
 
 ### Fonti
 

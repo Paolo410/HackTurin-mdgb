@@ -10,7 +10,7 @@ Reference documentation: the problem, the system, how each part works, and a fir
 
 <p align="center"><a href="MDGB_DOCUMENTAZIONE.md">Versione italiana</a></p>
 
-> **Living document.** It describes the repository as of 11 October 2026 (`main` at `dad00d9`). Several parts are
+> **Living document.** It describes the repository as of 11 October 2026 (`main` at `1f9a131`). Several parts are
 > still being changed by the team: when this file and a module README disagree, the README and
 > [`docs/CONTRACTS.md`](CONTRACTS.md) win. Numbers marked *measured* come from tests on the real board; numbers marked
 > *assumption* are estimates to be checked.
@@ -47,7 +47,9 @@ pedestrian crossing. A camera and an AI model that run **entirely on the device*
 - **counts and measures**: crossings by direction without duplicates, near misses, incidents, how often drivers
   give way;
 - **reports**: only anonymous numbers go to a central office, over Wi-Fi/MQTT, with a radio backup when the network
-  is down.
+  is down;
+- **forecasts**: the central office estimates the expected flow of pedestrians, cyclists and vehicles at every camera,
+  now and for the next 24 hours, and shares counts and forecasts with customers through API keys tied to a zone.
 
 Three ideas make it different:
 
@@ -104,9 +106,10 @@ flowchart LR
         CTRL --> LIGHTS["Vehicle and pedestrian lights"]
         MDGB --> WARN["Warnings<br/>amber flash, ground lights, displays"]
     end
-    MDGB -- "anonymous numbers<br/>Wi-Fi / MQTT" --> CENTRAL["Central office<br/>map, alarms, statistics"]
+    MDGB -- "anonymous numbers<br/>Wi-Fi / MQTT" --> CENTRAL["Central office<br/>map, alarms, statistics,<br/>expected flow"]
     MDGB -. "backup radio<br/>BLE today, LoRaWAN tomorrow" .-> CENTRAL
     TECH["Technician's phone"] -- "badge + login" --> MDGB
+    CENTRAL -- "counts and forecasts<br/>API key per zone, MQTT" --> CUST["Customers<br/>municipality, shops, planners"]
 ```
 
 - **Signalised crossings**: MDGB does not replace the controller, it sends *requests* (extend pedestrian green, hold
@@ -143,7 +146,7 @@ flowchart LR
 | **Local police, road-safety observatories** | Facts on dangerous spots | Anonymous incidents and near misses with time and place |
 | **Maintenance technicians** | Know quickly what is broken and how to fix it | Technician page with the status of every part and "what to do"; remote diagnosis at the central office |
 | **Traffic-light and controller manufacturers** | New value on installed equipment | An add-on that talks to their controller through requests |
-| **Commercial activities, urban planners** | Footfall and time patterns | Aggregated flows (paid service), forecasts (roadmap) |
+| **Commercial activities, urban planners** | Footfall and time patterns | Counts, expected flow and 24-hour forecasts of the cameras in their zone, through an API key (paid service) |
 | **Privacy authority, citizens** | No surveillance | No images stored, metadata only, live view only for authenticated staff |
 | **GOMA, HackTurin** | A credible, working prototype | Demo on the real board with measured numbers |
 
@@ -211,8 +214,15 @@ flowchart TB
         DB --> DIAG["diagnosis"]
         DB --> DASH["dashboard + map"]
         DIAG --> DASH
+        DB --> FLOW["expected flow<br/>(ai/forecast)"]
+        FLOW --> DASH
+        FLOW --> API["customer API<br/>/api/v1, keys per zone"]
+        FLOW --> PUB["publisher<br/>forecast, analytics"]
+        PUB --> BROKER
     end
     PHONE["Technician's phone"] --> PAGE8090
+    OPEN["OpenStreetMap, ESA WorldCover,<br/>Open-Meteo, Google (optional)"] -. "context of each camera" .-> FLOW
+    CUSTOMER["Customers"] --> API
 ```
 
 ### Who runs what on the board
@@ -253,6 +263,7 @@ flowchart LR
 | C4 | node → central | MQTT 5, QoS 1 | topics `mdgb/<node>/events`, `agg`, `hb` |
 | C4-B | node → central, backup | BLE beacons (LoRaWAN in production) | binary `AGG` 26 bytes, `HB` 12 bytes, alarms 5 bytes |
 | C5 | firmware → Linux | Bridge / files of `mdgb_link.py` | `{"v":1,"src":"mcu","type":"tamper","code":3}` |
+| Data out | central → customers and other systems | HTTP `/api/v1/...` with API key; MQTT `mdgb/<node>/forecast`, `analytics` (retained) | [`docs/DATA_API.md`](DATA_API.md); new interfaces, the C1–C5 contracts do not change |
 
 ---
 
@@ -455,6 +466,27 @@ sequenceDiagram
 | no | no | battery low or falling | battery empty (probable) |
 | no | no | nothing | node destroyed or without power |
 
+### 6.10 From counts to expected flow and customers
+
+```mermaid
+flowchart LR
+    AGG["Node aggregates (C4 agg)<br/>counts per window"] --> DB[("Central database")]
+    CTX["Context of the camera<br/>OSM places, ESA land cover,<br/>weather, calendar"] --> MODEL
+    subgraph FORECAST["ai/forecast, inside the central office"]
+        MODEL["1. Model<br/>gradient boosting, Poisson"] --> CAL["2. Calibration<br/>factor per crossing"]
+        CAL --> FUSE["3. Fusion with the<br/>latest counts (Gamma-Poisson)"]
+        FUSE --> NEXT["4. Next 24 hours<br/>anomaly halves every hour"]
+    end
+    DB --> CAL
+    DB --> FUSE
+    NEXT --> HALO["Dashboard:<br/>halo on the map, hour slider,<br/>'Flusso atteso' box"]
+    NEXT --> API["Customer API /api/v1<br/>key tied to a zone"]
+    NEXT --> MQTT["MQTT topics forecast<br/>and analytics, retained"]
+```
+
+A camera that sends no data still gets the estimate of the model alone; as soon as counts arrive, the estimate follows
+them. Details in [§7.11](#711-expected-flow-at-the-central-office) and [§8.9](#89-data-for-customers-api-keys-and-mqtt).
+
 ---
 
 ## 7. AI and computer vision in detail
@@ -591,6 +623,49 @@ Specification target: at least 8 FPS. Reference points for the same board: YOLOv
 - Heights (and `child`) depend on a good calibration: to be verified with a person of known height on the real camera.
 - The aid classifier is not trained yet: wheelchairs and walkers are recognised only through slow walking.
 
+### 7.11 Expected flow at the central office
+
+Code: [`ai/forecast/`](../ai/forecast/README.md) (owner Paolo), run **inside the central office app**, not on the
+board. For every camera on the map it estimates pedestrians in, pedestrians out, cyclists and vehicles per hour, now
+and for each of the next 24 hours. The runtime uses only the Python standard library (the trained trees are read from
+`model.json`); numpy and scikit-learn are needed only to retrain.
+
+| Step | How | Numbers |
+|---|---|---|
+| 1. Model | Gradient boosting, one per class, Poisson loss, 17 variables (calendar, Italian holidays, nearby places, land cover, weather) | Expected count per 15-minute window |
+| 2. Calibration | How much this crossing deviates from what its context predicts | One factor per class, 0.05–20, close to 1 while counts are few |
+| 3. Fusion | Latest node windows correct the current estimate (Gamma-Poisson) | Model weighs as 10 expected passages; a window 30 min old weighs half; windows are added until 80 passages are expected; if the counts contradict the model (10×) the model loses weight at once |
+| 4. Next hours | From the current estimate back to the calibrated model | Whatever is unusual now halves every hour |
+
+**Sources of context.** Only the coordinates of the camera are sent out; answers are cached on disk and refreshed in
+the background, so without internet the last good answer is used, and without any source only the calendar.
+
+| Source | Gives | Key |
+|---|---|---|
+| OpenStreetMap (Overpass, fallback to the official API) | bars, shops, stops, schools, leisure within 300 m; road class | no |
+| ESA WorldCover 10 m (2021) | share of built-up, green, water within 300 m (partial HTTP reads of the public tiles) | no |
+| Open-Meteo | temperature and rain for the next 30 hours | no |
+| Google Places, Google Routes | reviews and opening hours; traffic ratio | yes (optional, not yet tried with a real key) |
+| The node itself (C4 `agg`) | measured counts and temperature | — |
+
+**Check of the estimate.** Every window already counted is re-estimated with only the data available before it
+started, and compared with two references: repeating the last count, and the model alone. On invented counts
+(Poisson around a known rhythm), mean error in pedestrians per window:
+
+| Situation | Mean per window | MDGB estimate | Repeat the last | Model only |
+|---|---|---|---|---|
+| Crowded, 15-min windows | 90.5 | 15.1 | 13.9 | 40.6 |
+| Crowded, flat counts day and night | 128.0 | 12.9 | 13.0 | 78.2 |
+| Quiet, 15-min windows | 4.1 | 1.9 | 2.6 | 3.1 |
+
+Where passages are many the estimate is as good as repeating the last count; where they are few it is better. Training
+on 180 simulated crossings and testing on 60 unseen ones, the model explains 56–60% of the deviance for pedestrians and
+73% for vehicles, against 31–37% for a weekly profile.
+
+**Limits, to say in the pitch.** The training history is **simulated** (there are no historical counts at the
+hackathon): the numbers show the method, not real measures, and every API answer says so. Neither Google nor the
+satellites count pedestrians: they give context. The in/out split comes only from the node counts.
+
 ---
 
 ## 8. Communications engineering in detail
@@ -682,6 +757,11 @@ writes its C3 events and where both the network and the vision read.
 - Shows: map of nodes coloured by status, channel (Wi-Fi or Bluetooth with signal), queue, battery, traffic per
   window, safety (give way, near misses, vulnerable pedestrians), alarms, and the network numbers: events received,
   **events lost (must stay 0)**, duplicates discarded.
+- **Expected flow** (§7.11): a halo around every camera grows with the pedestrians expected in the hour chosen on a
+  slider above the map (now to +24 h); the camera detail has the four numbers of that hour, a 24-hour chart and the
+  sources used. It works also for a camera that sends no data.
+- **Data for customers** (§8.9): a card at the bottom of the page creates API keys; `customers.py` does the same from
+  the terminal; `publisher.py` sends estimates and metrics on MQTT every `ANALYTICS_PERIOD_S` seconds (30 by default).
 - Map pins for the nodes in four status colours are in [`docs/brand/mappa/`](brand/mappa).
 
 ### 8.8 Security and privacy of the data path
@@ -692,6 +772,45 @@ writes its C3 events and where both the network and the vision read.
 | Content | anonymous metadata only | same |
 | Images | live view only on the board, behind badge + login, never saved | `operator.share_images: false`: no image leaves the vision |
 | Technician page | HTTP on the local network | HTTPS needed |
+| Customer API | listens only on the central office PC unless `WEB_HOST=0.0.0.0`; key in a header, stored as SHA-256 | HTTPS proxy that forwards only `/api/v1/` |
+| Forecast and analytics topics | broker open to the local network, no password | broker users with read-only access per customer |
+
+### 8.9 Data for customers: API keys and MQTT
+
+Formats and examples: [`docs/DATA_API.md`](DATA_API.md) (new interfaces written by Paolo, to be reviewed by Lorenzo;
+the C1–C5 contracts do not change). Only counts per crossing leave the central office: never images, single events or
+identifiers of people.
+
+```mermaid
+sequenceDiagram
+    participant O as Operator (central office PC)
+    participant C as MDGB Centrale
+    participant K as Customer
+    O->>C: create key (customer, zone = circle or list of nodes, expiry)
+    C-->>O: mdgb_id_secret, shown once (only the SHA-256 is stored)
+    O->>K: hands over the key
+    K->>C: GET /api/v1/forecast (header X-API-Key)
+    C->>C: check key, scope, expiry, 120 requests per minute
+    C-->>K: hourly forecast of the cameras in the zone (JSON or CSV)
+    C->>C: count the request per key, day and data type (api_usage)
+```
+
+| Address | Scope | Returns |
+|---|---|---|
+| `GET /api/v1/zone` | any | the zone of the key, its cameras, the expiry |
+| `GET /api/v1/realtime` | `realtime` | per camera: last window, last hour, current estimate per hour with an 80% interval; zone total |
+| `GET /api/v1/forecast?hours=24` | `forecast` | hour-by-hour forecast per camera and for the zone; CSV with `&format=csv` |
+| `GET /api/v1/history?hours=24` | `realtime` | the counted windows, up to 24 hours; CSV available |
+| `GET /api/v1/metrics` | `realtime` | traffic and safety metrics of the last 24 hours, and the check of the estimate |
+
+Errors: 401 (key missing, unknown, expired or revoked), 403 (scope not included), 429 (more than 120 requests in a
+minute). A zone with no camera yet answers `"available": false` and fills in by itself when a camera is installed.
+
+On MQTT the central office publishes every 30 s, per camera, `mdgb/<node>/forecast` (current estimate and next 24
+hours, with an `anomaly` level normal/high/low) and `mdgb/<node>/analytics` (metrics), QoS 1 and retained. These topics
+are separate from the ones the nodes publish, so they never re-enter the ingest.
+
+The `api_usage` table is the metering base for a paid data service (§11).
 
 ---
 
@@ -740,6 +859,8 @@ priorities in [`hardware/BOM.md`](../hardware/BOM.md).
 |---|---|---|
 | AI | `pytest` in `ai/` (rule values of the specification, counting without duplicates, geometry, events, animals, thermal, technician page, health) | 186 tests passing (2 fail only on Windows: file permissions and file-name order) |
 | Network and central | `pytest comms` (real node on real files, Wi-Fi off/on, negative PUBACK, Bridge with the official library against a fake router) | 41 tests |
+| Expected flow | `pytest` on `ai/tests/test_forecast*.py` (model, fusion, sources with a local HTTP server, cache, calendar, metrics, check of the estimate) | 80 tests passing (re-run on Windows, Python 3.11, 11 Oct) |
+| Central: flow and customer API | `pytest comms/tests/test_dashboard.py comms/tests/test_customers.py` (keys, zones, permissions, rate limit, CSV, MQTT messages) | 29 tests passing (same run); the JavaScript of the map was tested by hand |
 | Vision on the board | camera, profile `unoq` | 9.2 FPS |
 | Kill test, vision | stop the vision | fail-safe after 485 ms; systemd restart 3.8 s; "vision connected" after 7.5 s |
 | Kill test, network | 100 s MQTT cut | Bluetooth backup at −41 dBm; back on Wi-Fi in 18 s; 0 lost, 0 duplicates |
@@ -769,7 +890,7 @@ misses on screen; "no frame saved" said in the pitch.
 | Municipality | Safer crossings without roadworks; evidence (near misses, give way) to decide where to invest; open data |
 | Vulnerable pedestrians | Time to cross measured on them, not on an average walker |
 | Maintenance | Remote diagnosis and a technician page that says what to fix |
-| Commercial activities, planners | Anonymous flows by hour and day, and forecasts |
+| Commercial activities, planners | Anonymous flows by hour and day and 24-hour forecasts for the crossings in their zone, through an API key |
 
 ### 11.2 Business model
 
@@ -793,7 +914,7 @@ flowchart LR
 | Node (one-off or leasing) | Municipality | Industrialised node with enclosure, mounting, power and radio: target well below the cost of a new "smart" crossing |
 | Central platform | Municipality | Yearly fee per node: broker, storage, dashboard, updates |
 | Maintenance | Municipality | Remote diagnosis lowers the cost of every visit |
-| Data services | Commercial activities, planners | Footfall by hour, forecasts; open data stays free for the municipality |
+| Data services | Commercial activities, planners | Footfall by hour and forecasts per zone; open data stays free for the municipality. Already in the prototype: keys per customer and zone, scopes, expiry, revocation and usage counted per key and day (§8.9). Prices and terms of use still to define |
 
 ### 11.3 Reference costs
 
@@ -813,8 +934,8 @@ controller, counting and data, on the traffic light that is already there.
 ```mermaid
 timeline
     title From prototype to service (assumption)
-    Hackathon : working prototype on the UNO Q : measured fail-safe and network
-    Pilot : 1 to 3 crossings with a municipality : calibration on real crossings : near-miss and give-way baseline
+    Hackathon : working prototype on the UNO Q : measured fail-safe and network : forecast and data API on simulated history
+    Pilot : 1 to 3 crossings with a municipality : calibration on real crossings : near-miss and give-way baseline : retrain the forecast on real counts
     First contract : tens of nodes : cloud broker with TLS : LoRaWAN backup
     Scale : partnerships with controller makers : data services for businesses
 ```
@@ -829,7 +950,8 @@ timeline
 
 Give-way rate, near misses per 1,000 crossings, extended greens granted to vulnerable pedestrians, urgent reds,
 uptime of the node, **events lost (target 0)**, time to fail-safe (target < 0.5 s), technician interventions avoided
-thanks to remote diagnosis.
+thanks to remote diagnosis; for the data service, forecast error against "repeat the last count" and API requests per
+customer.
 
 ### 11.6 Risks and mitigations
 
@@ -852,7 +974,7 @@ thanks to remote diagnosis.
 | AI | Calibration on the real crossing; aid classifier (wheelchair, walker, stroller); thermal camera on the real sensor; better far-vehicle and bicycle detection |
 | Firmware | LED strips and ring, LCD and OLED; second safety path (PIR, ToF); lamp monitoring (current sensor); hardware watchdog |
 | Communications | Cloud broker with mutual TLS; LoRaWAN backup with the `DEAD` watchdog; contract v1 update (`tech`, `veh_red_now`, 238-byte Bridge limit) |
-| Data | Forecast of pedestrian flows (work in progress on branch `paolo/forecast-flusso-pedonale`) |
+| Data | Expected flow and customer API are on `main` (§7.11, §8.9). Next: retrain on real aggregates, try the Google sources with a real key, opening hours from OpenStreetMap, archive beyond 24 hours, HTTPS and MQTT users for customers, prices |
 | Product | Enclosure, power with backup battery, installation guide, HTTPS for the technician page |
 | Stretch | V2X: "hidden pedestrian at X m" broadcast to vehicles |
 
@@ -870,7 +992,8 @@ A suggested 10-slide structure built on this document:
 6. **Privacy by design**: no image saved, metadata only, technician behind badge + login (§3, §8.8).
 7. **Never loses data**: network cut, Bluetooth backup, 0 events lost (§6.7).
 8. **Under the hood**: 9 FPS local AI on an Arduino UNO Q, explicit rule (§7).
-9. **Business**: retrofit vs new smart crossings, revenue streams, pilot (§11).
+9. **Business**: retrofit vs new smart crossings, revenue streams, the data service already working (halo map,
+   API keys per zone), pilot (§11, §8.9).
 10. **Team and next steps** (§12).
 
 ---
@@ -892,17 +1015,20 @@ A suggested 10-slide structure built on this document:
 | Store and forward | Save every event before sending it, delete only after confirmation |
 | Bridge | The RPC link between Linux and the microcontroller of the UNO Q |
 | App Lab | Arduino's environment for apps that combine a sketch and Python on the UNO Q |
+| Expected flow | Passages per hour that the central office expects at a camera, from a model corrected with the node counts |
+| API key, zone | Credential of a data customer, valid for the cameras inside a circle on the map or a list of nodes |
 
 ### Repository map
 
 | Path | What | Owner |
 |---|---|---|
 | [`ai/`](../ai/README.md) | vision, rule, technician page | Paolo Malugani |
+| [`ai/forecast/`](../ai/forecast/README.md) | expected flow, run by the central office | Paolo Malugani |
 | [`firmware/`](../firmware/unoq_panel/README.md) | App Lab apps, sketch | Salvatore Gullotta |
 | [`comms/`](../comms/README.md) | network node | Lorenzo Dragoni |
 | [`app/`](../app/README.md) | central office app | Lorenzo Dragoni |
 | [`hardware/`](../hardware/BOM.md) | components, power | Kuzey Bicher |
-| [`docs/`](CONTRACTS.md) | contracts, brand, this document; English translations in [`docs/en/`](en/README.md) | everyone |
+| [`docs/`](CONTRACTS.md) | contracts, [data API](DATA_API.md), brand, this document; English translations in [`docs/en/`](en/README.md) | everyone |
 
 ### Sources
 
