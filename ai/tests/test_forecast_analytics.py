@@ -122,6 +122,21 @@ def test_nowcast_follows_the_last_window_of_a_busy_crossing_and_averages_a_quiet
     assert EVIDENCE > 10 * 2.0, "the test relies on a quiet crossing needing many windows"
 
 
+def test_nowcast_lets_the_node_win_at_once_when_it_contradicts_the_model():
+    # found with the node simulator at 6 in the morning: the model expected one person a quarter, the node
+    # counted 32 a minute, and for the first hour the estimate stayed at a fifth of what was being counted
+    mu = dict.fromkeys(features.TARGETS, 1.0)
+    for minutes in (1, 4, 15):
+        post = nowcast(seen_from(windows(MONDAY_18, minutes, 60, ped_in=32), mu), mu, "ped_in", MONDAY_18)
+        assert post["mean"] == pytest.approx(480, rel=0.03) and post["weight"] > 0.95, "%d minutes of counts" % minutes
+    empty_street = dict.fromkeys(features.TARGETS, 300.0)              # and the other way round
+    post = nowcast(seen_from(windows(MONDAY_18, 4, 900, ped_in=3), empty_street), empty_street, "ped_in", MONDAY_18)
+    assert post["mean"] < 10
+    in_line = dict.fromkeys(features.TARGETS, 2.0)                     # counts that agree with the model change nothing
+    agree = nowcast(seen_from(windows(MONDAY_18, 3, 60, ped_in=0), in_line), in_line, "ped_in", MONDAY_18)
+    assert agree["mean"] == pytest.approx(2.0, rel=0.1) and agree["weight"] < 0.1, "three empty minutes are no news"
+
+
 def test_nowcast_without_counts_is_the_model_with_a_wide_interval():
     mu = dict.fromkeys(features.TARGETS, 40.0)
     alone = nowcast([], mu, "ped_in", MONDAY_18)

@@ -105,7 +105,7 @@ def test_calibration_needs_evidence():
     assert fusion.calibration(0, 0) == 1.0
     assert 1.0 < fusion.calibration(6, 2) < 2.0, "few counts: pulled towards 1"
     assert fusion.calibration(600, 200) == pytest.approx(3.0, rel=0.05)
-    assert fusion.calibration(10000, 10) == 10.0 and fusion.calibration(0, 10000) == 0.1
+    assert fusion.calibration(10000, 10) == 20.0 and fusion.calibration(0, 10000) == 0.05
 
 
 # ---------------------------------------------------------------- sources (canned answers)

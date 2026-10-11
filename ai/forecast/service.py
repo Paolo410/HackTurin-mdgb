@@ -46,8 +46,13 @@ def nowcast(seen, mu_now, target, now):
     windows are added, newest first, until they are expected to hold EVIDENCE counts, so a busy crossing
     follows its last window and a quiet one averages many. (Tried and dropped: moving the old counts along the
     model's daily rhythm. It helps when the crossing follows that rhythm and hurts more when it does not, and
-    the rhythm comes from simulated data.) seen: [(window, exposure, model expectation)] of the earlier
-    windows; mu_now: the model now.
+    the rhythm comes from simulated data.)
+
+    A prior that the counts contradict is not allowed to hold the estimate back: its weight is divided by
+    1 + z^2, where z is how many standard deviations the recent counts are from what the prior expected. With
+    counts in line with the prior nothing changes; when the node sees ten times the people, the node wins at once
+    instead of after an hour. seen: [(window, exposure, model expectation)] of the earlier windows; mu_now: the
+    model now.
     """
     usual = mu_now[target] * fusion.calibration(sum(w[target] for w, _, _ in seen),
                                                 sum(mu[target] * exposure for _, exposure, mu in seen))
@@ -59,7 +64,11 @@ def nowcast(seen, mu_now, target, now):
             break
         recent.append((w[target], exposure, age))
         wanted -= usual * exposure * 0.5 ** (max(age, 0.0) / fusion.HALF_LIFE_S)
-    return fusion.posterior(usual, recent, strength=fusion.SHRINK / usual)
+    weights = [0.5 ** (max(age, 0.0) / fusion.HALF_LIFE_S) for _, _, age in recent]
+    counted = sum(w * count for w, (count, _, _) in zip(weights, recent))
+    awaited = usual * sum(w * exposure for w, (_, exposure, _) in zip(weights, recent))
+    surprise = (counted - awaited) ** 2 / (awaited + awaited ** 2 / fusion.SHRINK) if awaited > 0 else 0.0
+    return fusion.posterior(usual, recent, strength=fusion.SHRINK / (1 + surprise) / usual)
 
 
 def quality(seen):

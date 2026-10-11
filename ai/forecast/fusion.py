@@ -36,7 +36,7 @@ def posterior(mu, observations, strength=PRIOR_STRENGTH, half_life_s=HALF_LIFE_S
             "weight": 1 - strength / rate}
 
 
-def calibration(measured, expected, shrink=SHRINK, limits=(0.1, 10.0)):
+def calibration(measured, expected, shrink=SHRINK, limits=(0.05, 20.0)):
     """How much this crossing differs from what its surroundings suggest: measured / expected, pulled towards 1
     while the counts are few. The model cannot know it (road layout, a school gate, the side the camera looks at)."""
     c = (measured + shrink) / (expected + shrink)
