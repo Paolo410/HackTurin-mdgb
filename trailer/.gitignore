@@ -1,0 +1,17 @@
+# media and generated files never go in the repo (team rule: no video > 5 MB, no generated files)
+assets/b-roll/
+assets/music/
+assets/own/
+build/
+output/
+models/
+motion/node_modules/
+.venv/
+.env
+*.mp4
+*.mov
+*.wav
+*.mp3
+
+# the root .gitignore (Python template) ignores every lib/ folder: keep the Remotion sources
+!motion/src/lib/

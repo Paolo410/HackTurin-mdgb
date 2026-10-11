@@ -1,0 +1,25 @@
+{
+  "name": "mdgb-trailer-motion",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Remotion project: the MDGB trailer composition (b-roll + motion graphics + on-screen text).",
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Trailer ../build/video.mp4",
+    "still": "remotion still src/index.ts Trailer ../build/still.png"
+  },
+  "dependencies": {
+    "@fontsource/barlow": "5.2.5",
+    "@fontsource/barlow-condensed": "5.2.5",
+    "@fontsource/jetbrains-mono": "5.2.5",
+    "@remotion/cli": "4.0.534",
+    "@remotion/transitions": "4.0.534",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.534"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.8",
+    "typescript": "5.8.3"
+  }
+}

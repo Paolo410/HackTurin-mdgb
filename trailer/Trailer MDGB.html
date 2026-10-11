@@ -1,0 +1,1292 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Trailer MDGB</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: the call sheet of a film shot on one zebra crossing. Masthead slate, the animatic monitor as hero,
+   then the production documents in one readable column with a sticky section bar. */
+:root{
+  --bg:#F2F2EE; --surface:#FFFFFF; --sunk:#E8E8E2; --ink:#15171A; --muted:#565B61; --line:#D4D5CF;
+  --accent:#9A5800; --accent-fill:#F2A516; --accent-soft:#FBEACB;
+  --ok:#2E7A1E; --bad:#B3261E;
+  --act-open:#7C8289; --act-problem:#D2403E; --act-reveal:#DC8C0C; --act-proof:#459226; --act-vision:#3570D8; --act-close:#7C8289;
+  /* the monitor is a screen: same values in both themes */
+  --stage:#0A0C0F; --stage-2:#121519; --stage-3:#1C2025; --stage-ink:#EEEEE8; --stage-muted:#8C9197; --stage-line:#262A30;
+  --s-open:#9AA0A6; --s-problem:#E5484D; --s-reveal:#F2A516; --s-proof:#5CC35A; --s-vision:#4C8DF6; --s-close:#9AA0A6;
+  --font-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --font-body:"Barlow",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1013; --surface:#16191D; --sunk:#1E2227; --ink:#ECEDE8; --muted:#A1A7AD; --line:#2C3137;
+    --accent:#F4B442; --accent-fill:#F2A516; --accent-soft:#3A2A0C; --ok:#86D06A; --bad:#F08A84;
+    --act-open:#9AA0A6; --act-problem:#F0605E; --act-reveal:#F5A623; --act-proof:#72C04A; --act-vision:#6EA2FF; --act-close:#9AA0A6;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1013; --surface:#16191D; --sunk:#1E2227; --ink:#ECEDE8; --muted:#A1A7AD; --line:#2C3137;
+  --accent:#F4B442; --accent-fill:#F2A516; --accent-soft:#3A2A0C; --ok:#86D06A; --bad:#F08A84;
+  --act-open:#9AA0A6; --act-problem:#F0605E; --act-reveal:#F5A623; --act-proof:#72C04A; --act-vision:#6EA2FF; --act-close:#9AA0A6;
+  color-scheme:dark;
+}
+html{scroll-behavior:smooth;scroll-padding-top:64px}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:17px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin-inline:auto;padding-inline:clamp(16px,4vw,40px)}
+a{color:var(--accent);text-underline-offset:3px}
+p{margin:0 0 12px}
+.muted{color:var(--muted)}
+.mono{font-family:var(--font-mono)}
+strong{font-weight:700}
+.btn:focus-visible,a:focus-visible,.timeline:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent-fill);outline-offset:2px}
+
+/* masthead */
+.mast{padding-block:44px 22px}
+.eyebrow{font-family:var(--font-mono);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--font-display);font-weight:800;font-size:clamp(58px,10vw,118px);line-height:.88;letter-spacing:-.005em;margin:12px 0 16px;text-wrap:balance}
+h1 em{font-style:normal;color:var(--accent)}
+.lead{font-size:clamp(17px,1.7vw,20px);max-width:64ch}
+.slate{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid var(--line);border-radius:12px;background:var(--surface);margin:24px 0 0;overflow:hidden}
+.slate div{padding:12px 16px;border-right:1px solid var(--line);min-width:0}
+.slate div:last-child{border-right:0}
+.slate dt{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.slate dd{margin:3px 0 0;font-family:var(--font-display);font-weight:600;font-size:22px;line-height:1.15}
+@media (max-width:860px){
+  .slate{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .slate div{border-bottom:1px solid var(--line)}
+  .slate div:nth-child(2n){border-right:0}
+  .slate div:last-child{grid-column:1/-1;border-bottom:0}
+}
+
+/* section bar */
+.toc{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:color-mix(in srgb,var(--bg) 90%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.toc .wrap{display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;padding-block:8px}
+.toc .wrap::-webkit-scrollbar{display:none}
+.toc a{font-family:var(--font-mono);font-size:12.5px;text-decoration:none;color:var(--muted);padding:6px 10px;border-radius:999px;white-space:nowrap}
+.toc a:hover{color:var(--ink);background:var(--sunk)}
+
+/* monitor */
+.monitor-sec{padding-block:28px 0}
+.clapper{height:14px;border-radius:14px 14px 0 0;background:repeating-linear-gradient(-55deg,var(--stage-ink) 0 16px,var(--stage) 16px 32px)}
+.monitor{background:var(--stage);border-radius:0 0 16px 16px;overflow:hidden;color:var(--stage-ink)}
+.screen{position:relative;background:#000}
+canvas#stage{display:block;width:100%;height:auto;aspect-ratio:16/9}
+.bigplay{position:absolute;left:clamp(10px,2vw,22px);bottom:clamp(10px,2vw,22px);display:inline-flex;align-items:center;gap:10px;border:0;border-radius:999px;background:var(--s-reveal);color:#0A0C0F;font:700 clamp(13px,1.4vw,16px)/1 var(--font-body);padding:12px 18px 12px 14px;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+.bigplay svg{width:18px;height:18px}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px 10px;background:var(--stage-2)}
+.controls .btn{font:600 14px/1 var(--font-body);border:1px solid var(--stage-line);background:var(--stage-3);color:var(--stage-ink);padding:9px 13px;border-radius:8px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.controls .btn:hover{background:#262B31}
+.controls .btn.primary{background:var(--s-reveal);border-color:transparent;color:#0A0C0F}
+.controls .btn[aria-pressed="true"]{border-color:var(--s-reveal);color:var(--s-reveal)}
+.controls .btn svg{width:15px;height:15px}
+.tcread{font-family:var(--font-mono);font-variant-numeric:tabular-nums;font-size:14px;color:var(--stage-ink);margin-left:auto}
+.tcread span{color:var(--stage-muted)}
+.timeline{position:relative;display:flex;height:48px;margin:0 14px;border-radius:8px;overflow:hidden;cursor:pointer;touch-action:none;background:var(--stage-line)}
+.timeline .seg{flex:var(--d) 1 0;min-width:0;background:color-mix(in srgb,var(--c) 26%,#14171B);border-right:1px solid var(--stage);color:var(--stage-ink);font-family:var(--font-mono);font-size:10.5px;line-height:1.2;padding:6px 0 0 6px;overflow:hidden;white-space:nowrap;transition:background .2s}
+.timeline .seg:last-child{border-right:0}
+.timeline .seg b{display:block;font-weight:700}
+.timeline .seg.on{background:color-mix(in srgb,var(--c) 64%,#14171B);color:#0A0C0F}
+.playhead{position:absolute;top:0;bottom:0;left:0;width:2px;background:#FFFFFF;pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.45)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:10px 14px 14px;font-family:var(--font-mono);font-size:11.5px;color:var(--stage-muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:2px;background:var(--c);display:inline-block}
+.beatcard{margin-top:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px 32px}
+.beatcard .bhead{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;padding-bottom:10px;border-bottom:1px solid var(--line);margin-bottom:6px}
+.beatcard .bhead h3{font-family:var(--font-display);font-size:30px;font-weight:700;margin:0;line-height:1}
+.beatcard .bhead .bid{font-family:var(--font-mono);font-size:13px;padding:2px 8px;border-radius:5px;background:var(--sunk)}
+.beatcard .bhead .btc{font-family:var(--font-mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.beatcard .bhead .bact{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--c)}
+dl.kv{display:grid;grid-template-columns:118px minmax(0,1fr);gap:8px 14px;margin:0;align-content:start}
+dl.kv dt{font-family:var(--font-mono);font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);padding-top:4px}
+dl.kv dd{margin:0}
+dl.kv dd.vo{font-style:italic}
+@media (max-width:860px){
+  .beatcard{grid-template-columns:1fr}
+  dl.kv{grid-template-columns:1fr;gap:1px}
+  dl.kv dd{margin-bottom:9px}
+  .tcread{margin-left:0;width:100%}
+}
+
+/* sections */
+section{padding-block:60px 4px}
+.sec-head{display:grid;gap:8px;margin-bottom:24px;max-width:72ch}
+h2{font-family:var(--font-display);font-weight:700;font-size:clamp(36px,5vw,54px);line-height:.98;margin:0;text-wrap:balance}
+h3{font-family:var(--font-display);font-weight:700;font-size:25px;line-height:1.1;margin:0 0 8px;text-wrap:balance}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:900px){.grid2,.grid3{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px;min-width:0}
+.card.pick{border-color:var(--accent-fill);box-shadow:inset 0 0 0 1px var(--accent-fill)}
+.badge{display:inline-block;font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--accent);margin-bottom:10px}
+.badge.plain{background:var(--sunk);color:var(--muted)}
+ul.tight,ol.tight{margin:0;padding-left:20px;display:grid;gap:6px}
+ul.tight li::marker{color:var(--accent-fill)}
+.kicker{font-family:var(--font-mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.thesis{font-family:var(--font-display);font-weight:600;font-size:clamp(24px,2.6vw,32px);line-height:1.15;max-width:46ch;margin:0 0 18px;text-wrap:balance}
+.nums{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 22px}
+.nums span{font-family:var(--font-mono);font-size:13.5px;padding:6px 10px;border-radius:8px;background:var(--surface);border:1px solid var(--line);font-variant-numeric:tabular-nums}
+.nums b{color:var(--accent);font-weight:700}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+table{border-collapse:collapse;width:100%}
+th{text-align:left;font-family:var(--font-mono);font-size:11px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:12px 14px;border-bottom:1px solid var(--line);vertical-align:bottom}
+td{vertical-align:top;padding:13px 14px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+table.req td:last-child{font-family:var(--font-mono);font-size:14px;white-space:nowrap}
+table.script{min-width:1000px;font-size:15px}
+table.script td.tc{font-family:var(--font-mono);font-size:13px;white-space:nowrap;font-variant-numeric:tabular-nums;border-left:4px solid var(--c)}
+table.script td.tc b{display:block;font-size:14px;color:var(--ink)}
+table.script td.tc span{color:var(--muted)}
+table.script .scn{font-family:var(--font-display);font-weight:700;font-size:21px;line-height:1.05;display:block}
+table.script .actn{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--c)}
+table.script .src{display:inline-block;margin-top:6px;font-family:var(--font-mono);font-size:12px;padding:2px 7px;border-radius:5px;background:var(--sunk)}
+table.script .pb{display:block;margin-top:6px;font-size:13.5px;color:var(--muted)}
+table.script .vo{font-style:italic}
+table.script .vo.none{font-style:normal;color:var(--muted)}
+table.script .ost{display:block;font-family:var(--font-mono);font-size:12.5px;margin-bottom:6px}
+table.script .sfx{display:block;font-size:13.5px;color:var(--muted)}
+@media (max-width:760px){
+  table.script{min-width:0}
+  table.script thead{display:none}
+  table.script tr{display:block;border-bottom:1px solid var(--line);padding:6px 0}
+  table.script tr:last-child{border-bottom:0}
+  table.script td{display:block;border:0;padding:6px 14px}
+  table.script td.tc{border-left:4px solid var(--c)}
+  table.script td[data-l]::before{content:attr(data-l);display:block;font-family:var(--font-mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+}
+.vo-list{display:grid;gap:0;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow:hidden}
+.vo-row{display:grid;grid-template-columns:110px minmax(0,1fr) minmax(0,1fr);gap:18px;padding:12px 18px;border-bottom:1px solid var(--line)}
+.vo-row:last-child{border-bottom:0}
+.vo-row .t{font-family:var(--font-mono);font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.vo-row .it{font-size:17px}
+.vo-row .en{font-size:15px;color:var(--muted)}
+@media (max-width:760px){.vo-row{grid-template-columns:1fr;gap:2px}}
+.stat-row{display:flex;flex-wrap:wrap;gap:10px 22px;margin:14px 0 0;font-family:var(--font-mono);font-size:13px;color:var(--muted)}
+.stat-row b{color:var(--ink)}
+
+/* shots */
+.shots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+@media (max-width:900px){.shots{grid-template-columns:1fr}}
+.shotgroup{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;min-width:0}
+.shotgroup.wide{grid-column:1/-1}
+.shotgroup header{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.shotgroup header h3{margin:0}
+.shotgroup .intro{font-size:15px;color:var(--muted);margin:6px 0 0}
+.prog{font-family:var(--font-mono);font-size:12px;color:var(--muted);white-space:nowrap;font-variant-numeric:tabular-nums}
+.shotgroup ul{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:0}
+.shotgroup.wide ul{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:28px}
+@media (max-width:900px){.shotgroup.wide ul{grid-template-columns:1fr}}
+.shotgroup li{border-top:1px solid var(--line);padding:11px 0 10px}
+.shotgroup label{display:flex;gap:10px;align-items:baseline;cursor:pointer;font-weight:600}
+.sid{font-family:var(--font-mono);font-size:12.5px;font-weight:500;background:var(--sunk);padding:1px 7px;border-radius:5px;flex:none}
+input[type=checkbox]{accent-color:var(--accent-fill);width:18px;height:18px;flex:none;transform:translateY(3px);margin:0}
+.shotgroup li p{margin:5px 0 0 28px;font-size:15px}
+.shotgroup li p.meta{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+.shotgroup li code,.card code,td code,p code,li code{font-family:var(--font-mono);font-size:.86em;background:var(--sunk);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+.shotgroup li:has(input:checked) .st{text-decoration:line-through;color:var(--muted)}
+.savenote{font-family:var(--font-mono);font-size:12px;color:var(--muted);margin-top:12px}
+
+/* schedule */
+.sched{list-style:none;margin:0;padding:0 0 0 2px;border-left:2px solid var(--line)}
+.sched li{display:grid;grid-template-columns:132px minmax(0,1fr);gap:18px;padding:13px 0 13px 20px;position:relative}
+.sched li::before{content:"";position:absolute;left:-8px;top:20px;width:12px;height:12px;border-radius:50%;background:var(--bg);border:2px solid var(--accent-fill)}
+.sched li.key::before{background:var(--accent-fill)}
+.sched time{font-family:var(--font-mono);font-size:14px;font-variant-numeric:tabular-nums;color:var(--accent);padding-top:2px}
+.sched b{display:block;font-family:var(--font-display);font-size:21px;font-weight:700;line-height:1.15;margin-bottom:3px}
+.sched .who{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+@media (max-width:600px){.sched li{grid-template-columns:1fr;gap:2px}}
+.musicmap{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.musicmap div{padding:12px 14px;border-right:1px solid var(--line);min-width:0;border-top:4px solid var(--c)}
+.musicmap div:last-child{border-right:0}
+.musicmap .tt{font-family:var(--font-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.musicmap b{display:block;font-family:var(--font-display);font-size:20px;line-height:1.1;margin:2px 0 4px}
+.musicmap p{font-size:14px;margin:0}
+@media (max-width:900px){.musicmap{grid-template-columns:repeat(2,minmax(0,1fr))}.musicmap div{border-bottom:1px solid var(--line)}}
+
+/* prompts */
+.prompts{display:grid;gap:16px}
+.prompt{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;min-width:0}
+.prompt header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px 10px 18px;border-bottom:1px solid var(--line)}
+.prompt header h3{font-size:21px;margin:0}
+.prompt header p{margin:0;font-size:14px;color:var(--muted)}
+.prompt pre{margin:0;padding:16px 18px;white-space:pre-wrap;word-break:break-word;font-family:var(--font-mono);font-size:13.5px;line-height:1.6;max-height:440px;overflow:auto;background:var(--bg)}
+.copybtn{font:600 13px/1 var(--font-body);border:1px solid var(--line);background:var(--surface);color:var(--ink);padding:8px 12px;border-radius:8px;cursor:pointer;flex:none}
+.copybtn:hover{background:var(--sunk)}
+.note{border-left:3px solid var(--accent-fill);padding:4px 0 4px 14px;margin:16px 0 0;font-size:15.5px;max-width:78ch}
+footer{padding-block:56px 64px;color:var(--muted);font-size:14px}
+.sources{display:grid;gap:6px;padding-left:20px;margin:0}
+</style>
+
+<header class="wrap mast">
+  <div class="eyebrow">MDGB · HackTurin 2026 · Sfida GOMA Smart Crossing</div>
+  <h1>Il tempo <em>che serve</em></h1>
+  <p class="lead">Il piano per il trailer di due minuti: l'animatic da guardare subito, la sceneggiatura scena per scena, le riprese con il drone e il piano per oggi. I numeri sullo schermo vengono dal vostro repo e dalle vostre prove.</p>
+  <dl class="slate">
+    <div><dt>Durata</dt><dd>2:00</dd></div>
+    <div><dt>Formato</dt><dd>16:9 · 1080p</dd></div>
+    <div><dt>Voce</dt><dd>Italiano, sottotitoli EN</dd></div>
+    <div><dt>Musica</dt><dd>120 BPM, drop a 0:30</dd></div>
+    <div><dt>Consegna</dt><dd>Oggi entro le 16 (da confermare)</dd></div>
+  </dl>
+</header>
+
+<nav class="toc" aria-label="Sezioni">
+  <div class="wrap">
+    <a href="#animatic">Animatic</a><a href="#servono">Cosa mi serve</a><a href="#idea">L'idea</a><a href="#sceneggiatura">Sceneggiatura</a><a href="#voce">Voce</a><a href="#riprese">Riprese</a><a href="#oggi">Piano di oggi</a><a href="#suono">Musica</a><a href="#montaggio">Montaggio</a><a href="#regole">Regole</a><a href="#prompt">Prompt</a><a href="#fonti">Fonti</a>
+  </div>
+</nav>
+
+<main>
+<section class="wrap monitor-sec" id="animatic" aria-label="Animatic">
+  <div class="clapper" aria-hidden="true"></div>
+  <div class="monitor">
+    <div class="screen">
+      <canvas id="stage" width="1920" height="1080" role="img" aria-label="Animatic del trailer: la scena corrente è descritta nella scheda sotto il monitor"></canvas>
+      <button class="bigplay" id="bigplay" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 4l15 8-15 8z"/></svg><span>Guarda l'animatic · 2:00</span></button>
+    </div>
+    <div class="controls">
+      <button class="btn primary" id="play" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 4l15 8-15 8z"/></svg><span>Play</span></button>
+      <button class="btn" id="restart" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.4" d="M4 12a8 8 0 1 0 2.5-5.8M4 4v5h5"/></svg><span>Da capo</span></button>
+      <button class="btn" id="prev" type="button" aria-label="Scena precedente"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 5h2v14H7zM20 5v14L10 12z"/></svg></button>
+      <button class="btn" id="next" type="button" aria-label="Scena successiva"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M15 5h2v14h-2zM4 5v14l10-7z"/></svg></button>
+      <button class="btn" id="sound" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 9h4l5-4v14l-5-4H4z"/><path fill="none" stroke="currentColor" stroke-width="2" d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg><span>Click guida 120 BPM</span></button>
+      <div class="tcread" id="tcread">0:00 <span>/ 2:00</span></div>
+    </div>
+    <div class="timeline" id="timeline" tabindex="0" role="slider" aria-label="Posizione nel trailer" aria-valuemin="0" aria-valuemax="120" aria-valuenow="0"><div class="playhead" id="playhead"></div></div>
+    <div class="legend" id="legend"></div>
+  </div>
+  <article class="beatcard" id="beatcard"></article>
+</section>
+
+<section class="wrap" id="servono">
+  <div class="sec-head">
+    <div class="kicker">Cosa mi serve, cosa faccio io</div>
+    <h2>Il brief l'ho già scritto io</h2>
+    <p class="muted">Ho letto la trascrizione della traccia, la specifica, i README e i DECISIONS dei branch <code>paolo/ai-unoq</code>, <code>paolo/ai-video-tests</code> e <code>lorenzo/ble-backup</code>. La versione da incollare in qualsiasi assistente è nella sezione Prompt. Da voi servono materiali e qualche decisione.</p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <div class="badge">Da voi</div>
+      <h3>Materiali e decisioni</h3>
+      <ol class="tight">
+        <li><strong>Scadenza e dove va il video:</strong> proiettato al pitch finale, caricato con la consegna o sui social? Cambia formato e durata delle versioni.</li>
+        <li><strong>Le immagini di Torino già analizzate</strong> e, se ci sono, i video annotati e i <code>.json</code> di <code>evaluate.py</code> (sul PC di Paolo, in <code>ai/samples/report</code>). Non sono in questa cartella: allegatele qui o mettetele nella cartella del trailer.</li>
+        <li><strong>Una cartella per il trailer</strong> fuori da Desktop e Documenti se iCloud è attivo (es. <code>~/Movies/MDGB-trailer</code>), collegata a questa chat. Le clip con il nome della ripresa: <code>D1_zenitale.mp4</code>, <code>P3_warn_driver.mov</code>.</li>
+        <li><strong>Nomi e ruoli</strong> per i titoli di coda: ho messo i quattro del repo, aggiungete chi manca.</li>
+        <li><strong>Chi fa la voce:</strong> un membro del team (consigliato) o una voce sintetica.</li>
+        <li><strong>I numeri veri della scheda entro le 10:</strong> FPS sulla UNO Q, tempo del fail-safe, eventi persi nella prova di rete. Nel trailer va solo ciò che avete misurato.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <div class="badge">Da me</div>
+      <h3>Cosa posso produrre stanotte e domattina</h3>
+      <ul class="tight">
+        <li><strong>Pacchetto grafiche M1–M11</strong> in 1080p e 4K: su fondo nero (MP4) e trasparenti (MOV ProRes 4444), pronte da trascinare nel montaggio. Sono le scene di questo animatic, rifinite.</li>
+        <li><strong>Overlay «da trailer» per le vostre riprese:</strong> uno script che usa la pipeline di <code>smartcrossing</code> e disegna riquadri ad angoli, scie, km/h, mini vista dall'alto e sfoca le teste in automatico. Lo lancia Paolo sulla ripresa S1.</li>
+        <li><strong>Sottotitoli</strong> <code>.srt</code> in italiano e inglese, tempificati sul montaggio finale.</li>
+        <li><strong>Primo montaggio automatico</strong> con ffmpeg: clip nominate + musica + grafiche + voce, da rifinire nel vostro editor.</li>
+        <li><strong>Versione verticale 9:16</strong> da 45 secondi per i social.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" id="idea">
+  <div class="sec-head">
+    <div class="kicker">L'idea</div>
+    <h2>In MDGB tutto è una questione di tempo</h2>
+  </div>
+  <p class="thesis">Il trailer mette in scena i numeri che il sistema calcola davvero. Ogni scena ha il suo, e lo spettatore lo vede nascere.</p>
+  <div class="nums" aria-label="I numeri del trailer">
+    <span><b>100 ms</b> battito verso il microcontrollore</span>
+    <span><b>0,5 s</b> fail-safe</span>
+    <span><b>4,3 s</b> arrivo dell'auto (TTC)</span>
+    <span><b>9,8 s</b> tempo che serve (T_need)</span>
+    <span><b>50 cm</b> una striscia</span>
+    <span><b>0,8 m/s</b> passo lento</span>
+    <span><b>30 s</b> poi Bluetooth</span>
+    <span><b>0</b> eventi persi</span>
+    <span><b>2 Hz</b> ambra = 120 BPM</span>
+  </div>
+  <div class="grid3">
+    <article class="card pick">
+      <div class="badge">Consigliato</div>
+      <h3>A · Il tempo che serve</h3>
+      <p>Un duello di numeri apre il trailer: 9,8 secondi per attraversare contro 4,3 secondi all'arrivo dell'auto. Poi il prodotto risolve il conto. Tono cinematografico: tensione, poi fiducia.</p>
+      <p class="muted">Musica ibrida elettronica a 120 BPM. Rischio basso: ogni numero viene dai vostri test.</p>
+    </article>
+    <article class="card">
+      <div class="badge plain">Alternativa</div>
+      <h3>B · Non vede volti</h3>
+      <p>Tutto il trailer è la vista della macchina: riquadri, punti, vettori, mai facce. La voce parla in prima persona: «Non so chi sei. So quanto tempo ti serve.»</p>
+      <p class="muted">Elegante e cerebrale. Rischio: meno emozione, la giuria GOMA guarda prima la sicurezza.</p>
+    </article>
+    <article class="card">
+      <div class="badge plain">Alternativa</div>
+      <h3>C · Torino in miniatura</h3>
+      <p>Riprese tilt-shift col drone fanno sembrare Torino un modellino; stacco sul vostro plastico con le figurine. Simmetrie dall'alto, tono ironico.</p>
+      <p class="muted">Perfetto per i social. Rischio: sembra un gioco a una giuria tecnica.</p>
+    </article>
+  </div>
+  <p class="note">La proposta usa A come spina dorsale e prende una scena da B (B13, nessun volto) e una da C (B06, lo stacco dalla città vera al plastico). Taglio alternativo per il titolo finale: «Vede. Calcola. Protegge. Anche offline.» oppure, dalla traccia GOMA, «L'attraversamento che capisce».</p>
+
+  <h3 style="margin-top:34px">I requisiti della traccia, scena per scena</h3>
+  <p class="muted">La giuria ha una lista in testa. Il trailer gliela spunta in ordine.</p>
+  <div class="tablewrap">
+    <table class="req">
+      <thead><tr><th>Cosa chiede GOMA</th><th>Come lo mostriamo</th><th>Scene</th></tr></thead>
+      <tbody>
+        <tr><td>Riconoscere pedoni, ciclisti, veicoli, persone con disabilità, animali</td><td>Riquadri sulla vista dal palo; passo lento misurato; cane al guinzaglio o libero. La carrozzina solo se il classificatore degli ausili è addestrato.</td><td>B07 B09</td></tr>
+        <tr><td>Segnalazione luminosa in tempo reale, con una regola esplicita</td><td>La formula sullo schermo, la <code>reason</code> vera, poi l'ambra a 2 Hz e i testi su LCD e OLED.</td><td>B10</td></tr>
+        <tr><td>Contare gli attraversamenti e distinguerne la direzione</td><td>Linee di conteggio con IN e OUT; il contatore che fa +1 nel finale.</td><td>B07 B15</td></tr>
+        <tr><td>Funzionare senza internet</td><td>«Tutto a bordo, senza internet»; la centrale che mostra «rete giù, nodo sano».</td><td>B07 B12</td></tr>
+        <tr><td>Embedded, real-time, AI interamente locale</td><td>Il modulo sull'Arduino UNO Q, la visione che gira sulla scheda.</td><td>B05 B06 B07</td></tr>
+        <tr><td>In più rispetto alla traccia</td><td>Fail-safe in 0,5 s, nessuna immagine salvata, termocamera di notte, dati per la città.</td><td>B11 B13 B14</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="wrap" id="sceneggiatura">
+  <div class="sec-head">
+    <div class="kicker">Sceneggiatura · 15 scene · 2:00</div>
+    <h2>Scena per scena, al secondo</h2>
+    <p class="muted">Dal secondo 30 ogni scena dura 8 secondi: a 120 BPM sono 4 battute esatte, quindi i tagli cadono sempre sul battere. Ogni riga ha un piano B se la ripresa non arriva.</p>
+  </div>
+  <div class="tablewrap">
+    <table class="script" id="scripttable">
+      <thead><tr><th>Tempo</th><th>Scena</th><th>Cosa si vede · fonte</th><th>Voce</th><th>Testo a schermo · suono</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="wrap" id="voce">
+  <div class="sec-head">
+    <div class="kicker">Voce fuori campo</div>
+    <h2>Tredici frasi, una voce calma</h2>
+    <p class="muted">La voce racconta, i numeri stanno sullo schermo. In voce i numeri sono arrotondati («dieci secondi»), a schermo sono esatti («9,8 s»).</p>
+  </div>
+  <div class="vo-list" id="volist"></div>
+  <div class="stat-row" id="vostats"></div>
+  <div class="grid2" style="margin-top:22px">
+    <div class="card">
+      <h3>Come registrarla in 20 minuti</h3>
+      <ul class="tight">
+        <li>Stanza piccola, dentro un armadio o sotto una coperta: niente eco.</li>
+        <li>Telefono a 20 cm dalla bocca, di lato, in memo vocale ad alta qualità.</li>
+        <li>Tre take per frase, una frase per file. Pausa di mezzo secondo dopo ogni numero.</li>
+        <li>Tono calmo e protettivo, senza enfasi da spot, un filo più lento del normale.</li>
+        <li>Niente musica in cuffia mentre registri: il ritmo lo dà il montaggio.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Una voce del team o una sintetica?</h3>
+      <p>Una voce del team è coerente con il progetto, tutto fatto da voi e in locale, e ai giurati piace riconoscerla al pitch. Una voce sintetica è più pulita e si rifà in un minuto se cambiate il testo.</p>
+      <p class="muted">Se scegliete la sintetica, scrivetelo nei titoli di coda. Il prompt per la voce è nella sezione Prompt.</p>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" id="riprese">
+  <div class="sec-head">
+    <div class="kicker">Lista riprese</div>
+    <h2>Cosa girare, con cosa, quando</h2>
+    <p class="muted">Il drone fa le immagini da cinema. Le riprese che passano nell'AI vanno fatte con il telefono fermo su un'asta o da una finestra: è la vista che avrà la camera sul palo, e la calibrazione vuole una camera immobile.</p>
+  </div>
+  <div class="shots">
+    <article class="shotgroup" data-group="drone">
+      <header><h3>Drone</h3><span class="prog" data-prog></span></header>
+      <p class="intro">Solo riprese cinematografiche, mai basse sopra le persone. Profilo colore normale: non c'è tempo per il grading del LOG.</p>
+      <ul>
+        <li><label><input type="checkbox" id="shot-D1"><span class="sid">D1</span><span class="st">Zenitale sulle strisce</span></label><p>Gimbal a −90°, 30–40 m o il limite della zona su D-Flight. 20 s fermo, poi 10 s di salita lenta. Un membro del team attraversa piano con il verde.</p><p class="meta">7:10–7:40 · B01 B02 B15</p></li>
+        <li><label><input type="checkbox" id="shot-D2"><span class="sid">D2</span><span class="st">Il quadrante</span></label><p>Zenitale su un grande incrocio con i binari del tram, rotazione lenta di 90° in 20 s: sembra il quadrante di un orologio.</p><p class="meta">7:30–8:00 · B04 o transizione verso B14</p></li>
+        <li><label><input type="checkbox" id="shot-D3"><span class="sid">D3</span><span class="st">La rivelazione</span></label><p>Parte a 10–15 m verso le strisce, sale e alza l'inquadratura fino all'orizzonte: tetti, la Mole o le Alpi, se la zona lo consente.</p><p class="meta">7:40–8:20, luce dorata · B04 o B14</p></li>
+        <li><label><input type="checkbox" id="shot-D4"><span class="sid">D4</span><span class="st">Il tram</span></label><p>Carrellata laterale a 20–30 m che segue un tram mentre passa sulle strisce.</p><p class="meta">quando passa · B03</p></li>
+        <li><label><input type="checkbox" id="shot-D5"><span class="sid">D5</span><span class="st">Obliqua per il tilt-shift</span></label><p>Camera a 45°, 50–60 m, ferma 15 s. In montaggio: sfocatura sopra e sotto, saturazione su, velocità ×4. Torino sembra un modellino.</p><p class="meta">8:00–8:30 · B06, stacco su P2</p></li>
+      </ul>
+    </article>
+    <article class="shotgroup" data-group="strada">
+      <header><h3>Strada, con il telefono</h3><span class="prog" data-prog></span></header>
+      <p class="intro">4K a 30 fps. Attori: solo membri del team. Passanti di spalle, dall'alto o da lontano.</p>
+      <ul>
+        <li><label><input type="checkbox" id="shot-S1"><span class="sid">S1</span><span class="st">La vista dal palo</span></label><p>Telefono su asta o treppiede a 2,5–3 m, o da una finestra al primo piano, inclinato di 35–45°, immobile per 3 minuti. In quadro: strisce, le due zone d'attesa, 30–60 m di strada in arrivo. Un compagno attraversa piano, uno a passo normale. Contate le strisce: servono a <code>calibrate.py</code>.</p><p class="meta">8:30–8:45 · B07 B08 B09 B13</p></li>
+        <li><label><input type="checkbox" id="shot-S2"><span class="sid">S2</span><span class="st">Dettagli al rallentatore</span></label><p>120 o 240 fps: piedi sulle strisce, la punta di un bastone, le ruote di un passeggino, fari che arrivano, il pulsante di chiamata, asfalto bagnato. Niente volti.</p><p class="meta">7:00–8:45 · B03 B04</p></li>
+        <li><label><input type="checkbox" id="shot-S3"><span class="sid">S3</span><span class="st">Sera finta, all'alba</span></label><p>Tra le 7:00 e le 7:30 i lampioni sono ancora accesi e il cielo è blu: sembra sera. Fari, semafori, una figura in controluce sulle strisce.</p><p class="meta">7:00–7:30 · B04</p></li>
+        <li><label><input type="checkbox" id="shot-S4"><span class="sid">S4</span><span class="st">Suoni</span></label><p>30 s puliti del segnale acustico per non vedenti (il tic-tic), un'auto che passa, la campanella del tram, l'ambiente. Telefono vicino alla sorgente, senza parlare.</p><p class="meta">in qualsiasi momento · tutto il trailer</p></li>
+      </ul>
+    </article>
+    <article class="shotgroup" data-group="plastico">
+      <header><h3>Plastico e hardware, al buio</h3><span class="prog" data-prog></span></header>
+      <p class="intro">Stanza buia, i LED come unica luce, telefono in modalità Cinema o ritratto. Una lampada da scrivania di lato per il controluce.</p>
+      <ul>
+        <li><label><input type="checkbox" id="shot-P1"><span class="sid">P1</span><span class="st">Il modulo, da eroe</span></label><p>Avvicinamento lento alla UNO Q con camera e case; il fuoco passa dall'obiettivo all'anello LED che si accende ambra.</p><p class="meta">B05</p></li>
+        <li><label><input type="checkbox" id="shot-P2"><span class="sid">P2</span><span class="st">Il plastico dall'alto</span></label><p>Stessa inquadratura di D5 per lo stacco; una mano aggancia il modulo al palo.</p><p class="meta">B06</p></li>
+        <li><label><input type="checkbox" id="shot-P3"><span class="sid">P3</span><span class="st">Gli stati del semaforo</span></label><p><code>python scripts/scenario.py elderly_fast_car --realtime --actuator serial --port …</code> muove LED e display veri. Girate PRESENCE, WARN_DRIVER (ambra a 2 Hz, LCD «PEDONE 50 km/h / RALLENTA», OLED «ATTENDI») e WARN_PEDESTRIAN (rosso a terra, «FRENA!»). Primi piani leggibili di LCD e OLED.</p><p class="meta">Salvatore, 20 min · B10</p></li>
+        <li><label><input type="checkbox" id="shot-P4"><span class="sid">P4</span><span class="st">Il kill test</span></label><p>Inquadratura larga: plastico e terminale nello stesso quadro. Si chiude la visione o si stacca il cavo: entro 0,5 s il semaforo torna al suo ciclo. 240 fps, un cronometro in campo. Poi una mano davanti a PIR e ToF: ambra anche senza visione.</p><p class="meta">solo se il fail-safe gira sullo sketch · B11</p></li>
+        <li><label><input type="checkbox" id="shot-P5"><span class="sid">P5</span><span class="st">I sensori</span></label><p>Sei macro da un secondo: termocamera, PIR, ToF, sensore di corrente della lampada, AHT20, badge del tecnico.</p><p class="meta">Kuzey · B05 B13</p></li>
+        <li><label><input type="checkbox" id="shot-P6"><span class="sid">P6</span><span class="st">Le figurine</span></label><p>Una figurina anziana con il bastone, un'auto giocattolo, un cane al guinzaglio e uno libero sul plastico.</p><p class="meta">B09 B10</p></li>
+      </ul>
+    </article>
+    <article class="shotgroup" data-group="schermo">
+      <header><h3>Schermo</h3><span class="prog" data-prog></span></header>
+      <p class="intro">Registrazione a 1080p o più, tema scuro, caratteri grandi, notifiche spente.</p>
+      <ul>
+        <li><label><input type="checkbox" id="shot-SC1"><span class="sid">SC1</span><span class="st">Overlay su S1</span></label><p><code>python scripts/evaluate.py S1.mp4 --calib calib.json --save-video --video-step 1</code>. Oggi il video annotato esce a 960 px di larghezza: per il trailer serve a risoluzione piena (lo script di overlay che vi preparo lo fa).</p><p class="meta">Paolo, 30 min · B07 B08</p></li>
+        <li><label><input type="checkbox" id="shot-SC2"><span class="sid">SC2</span><span class="st">La calibrazione</span></label><p><code>python scripts/calibrate.py --source S1.mp4</code>: i quattro clic sulle strisce e le zone che compaiono.</p><p class="meta">B08</p></li>
+        <li><label><input type="checkbox" id="shot-SC3"><span class="sid">SC3</span><span class="st">La regola nel terminale</span></label><p><code>python scripts/scenario.py elderly_fast_car</code>: gli stati con la loro <code>reason</code>.</p><p class="meta">B10</p></li>
+        <li><label><input type="checkbox" id="shot-SC4"><span class="sid">SC4</span><span class="st">La centrale, Wi-Fi spento e riacceso</span></label><p>App MDGB Centrale: nodo verde, poi MQTT tagliato (<code>iptables</code>, sezione 9 delle istruzioni), giallo «rete giù, nodo sano» con il canale BLE, poi di nuovo verde e «Eventi persi 0». Registrate tutto e accelerate.</p><p class="meta">Lorenzo, 10 min · B12</p></li>
+        <li><label><input type="checkbox" id="shot-SC5"><span class="sid">SC5</span><span class="st">Terminale e test</span></label><p><code>journalctl -u mdgb-comms -f</code> con «backup BLE reale» e «rete=ONLINE»; <code>pytest</code> tutto verde. Inquadrature da un secondo.</p><p class="meta">B07 B12</p></li>
+        <li><label><input type="checkbox" id="shot-SC6"><span class="sid">SC6</span><span class="st">La pagina del tecnico</span></label><p>Sul telefono, dopo il badge: solo numeri, mai immagini.</p><p class="meta">B13</p></li>
+      </ul>
+    </article>
+    <article class="shotgroup wide" data-group="grafiche">
+      <header><h3>Grafiche animate, le faccio io</h3><span class="prog" data-prog></span></header>
+      <p class="intro">Sono le scene dell'animatic. Le renderizzo in 1080p e 4K, su nero e trasparenti, con lo stesso carattere e gli stessi colori del semaforo.</p>
+      <ul>
+        <li><label><input type="checkbox" id="shot-M1"><span class="sid">M1</span><span class="st">Il duello: 9,8 s contro 4,3 s</span></label><p class="meta">B01 B02</p></li>
+        <li><label><input type="checkbox" id="shot-M2"><span class="sid">M2</span><span class="st">Il dato: 470 pedoni</span></label><p class="meta">B03</p></li>
+        <li><label><input type="checkbox" id="shot-M3"><span class="sid">M3</span><span class="st">Il logo: tre luci, un faro</span></label><p class="meta">B05</p></li>
+        <li><label><input type="checkbox" id="shot-M4"><span class="sid">M4</span><span class="st">Le strisce come metro</span></label><p class="meta">B08</p></li>
+        <li><label><input type="checkbox" id="shot-M5"><span class="sid">M5</span><span class="st">Dalla prospettiva ai metri</span></label><p class="meta">B08</p></li>
+        <li><label><input type="checkbox" id="shot-M6"><span class="sid">M6</span><span class="st">La regola, la reason, LCD e OLED</span></label><p class="meta">B10</p></li>
+        <li><label><input type="checkbox" id="shot-M7"><span class="sid">M7</span><span class="st">Il battito di 100 ms e il fail-safe</span></label><p class="meta">B11</p></li>
+        <li><label><input type="checkbox" id="shot-M8"><span class="sid">M8</span><span class="st">Wi-Fi, Bluetooth, eventi persi 0</span></label><p class="meta">B12</p></li>
+        <li><label><input type="checkbox" id="shot-M9"><span class="sid">M9</span><span class="st">Persone che diventano dati; termocamera 16×4</span></label><p class="meta">B13</p></li>
+        <li><label><input type="checkbox" id="shot-M10"><span class="sid">M10</span><span class="st">Torino: nodi, flussi, previsione</span></label><p class="meta">B14</p></li>
+        <li><label><input type="checkbox" id="shot-M11"><span class="sid">M11</span><span class="st">Titolo finale e squadra</span></label><p class="meta">B15</p></li>
+      </ul>
+    </article>
+  </div>
+  <p class="savenote">Le spunte restano salvate su questo dispositivo: ognuno spunta la sua lista.</p>
+</section>
+
+<section class="wrap" id="oggi">
+  <div class="sec-head">
+    <div class="kicker">Domenica 11 ottobre</div>
+    <h2>Piano di oggi</h2>
+    <p class="muted">Pensato per non togliere tempo alla demo: due persone girano, gli altri danno 20–30 minuti a testa. Alba verso le 7:40, crepuscolo civile dalle 7:10.</p>
+  </div>
+  <ol class="sched">
+    <li class="key"><time>stanotte</time><div><b>Decidere e preparare</b>Confermate idea, voce e scadenza. Scegliete su D-Flight due incroci: uno per D1 e S1, uno panoramico per D3. Caricate batterie del drone e telefoni, liberate memoria, preparate un bastone e le figurine. Tre brani candidati.<div class="who">tutti, 30 min · io preparo le grafiche</div></div></li>
+    <li><time>06:50</time><div><b>Sul posto</b>Sopralluogo, spotter in posizione, controllo vento.<div class="who">regia + pilota</div></div></li>
+    <li><time>07:00–07:30</time><div><b>Sera finta</b>Lampioni accesi e cielo blu: S3 e i dettagli S2.<div class="who">regia</div></div></li>
+    <li class="key"><time>07:10–08:30</time><div><b>Drone</b>D1 e D2 con la luce blu, D3 e D5 con la luce dorata, D4 quando passa un tram.<div class="who">pilota + spotter</div></div></li>
+    <li><time>08:30–08:50</time><div><b>La vista dal palo</b>S1: tre minuti immobili con i passaggi del team. Poi i suoni S4.<div class="who">regia + un attore</div></div></li>
+    <li><time>09:00–09:30</time><div><b>Overlay sulle riprese</b>Calibrazione di S1 e video annotato (SC1, SC2).<div class="who">Paolo</div></div></li>
+    <li><time>09:00–10:15</time><div><b>Plastico al buio</b>P1–P6. Salvatore lancia gli stati, Kuzey sistema luci e hardware.<div class="who">regia + Salvatore + Kuzey</div></div></li>
+    <li><time>10:15–10:45</time><div><b>Schermi</b>SC3–SC6, compresa la prova Wi-Fi spento e riacceso.<div class="who">Lorenzo + Paolo</div></div></li>
+    <li><time>10:45–11:05</time><div><b>Voce</b>Tredici frasi, tre take ciascuna.<div class="who">la voce scelta</div></div></li>
+    <li class="key"><time>11:00–13:15</time><div><b>Montaggio</b>Musica, struttura sui battiti, grafiche, voce, sottotitoli, colore, mix.<div class="who">regia (+ io per grafiche e srt)</div></div></li>
+    <li><time>13:15–13:45</time><div><b>Visione con tutto il team</b>Una lista di correzioni, non una discussione.<div class="who">tutti</div></div></li>
+    <li><time>13:45–14:00</time><div><b>Export</b>Master 16:9, copia su due chiavette e nel cloud. Prova sul PC del palco.<div class="who">regia</div></div></li>
+    <li><time>14:00–16:00</time><div><b>Margine</b>Versione 9:16 da 45 s, se avanza tempo.<div class="who">regia</div></div></li>
+  </ol>
+</section>
+
+<section class="wrap" id="suono">
+  <div class="sec-head">
+    <div class="kicker">Musica e suono</div>
+    <h2>120 BPM, come il lampeggio</h2>
+    <p class="muted">Lo stato WARN_DRIVER fa lampeggiare l'ambra a 2 Hz: a 120 BPM è un lampeggio per battito. Montate la scena B10 con il LED a tempo e la sincronia si sente.</p>
+  </div>
+  <div class="musicmap">
+    <div style="--c:var(--act-open)"><div class="tt">0:00–0:12</div><b>Tic-tic</b><p>Quasi silenzio: il segnale acustico registrato in strada e un tappeto basso.</p></div>
+    <div style="--c:var(--act-problem)"><div class="tt">0:12–0:30</div><b>Pulsazione</b><p>Percussione che accelera fino a 120 BPM, riser negli ultimi 4 s.</p></div>
+    <div style="--c:var(--act-reveal)"><div class="tt">0:30</div><b>Drop</b><p>Impatto e basso sul logo. Poi il tema.</p></div>
+    <div style="--c:var(--act-proof)"><div class="tt">0:30–1:42</div><b>Corsa</b><p>Arpeggi e colpi; un accento ogni 8 s, sul cambio di scena.</p></div>
+    <div style="--c:var(--act-vision)"><div class="tt">1:42–1:52</div><b>Respiro</b><p>Pad caldi e pianoforte sulla città.</p></div>
+    <div style="--c:var(--act-close)"><div class="tt">1:52–2:00</div><b>Fine</b><p>Impatto sul titolo, silenzio, un ultimo tic.</p></div>
+  </div>
+  <div class="grid2" style="margin-top:18px">
+    <div class="card">
+      <h3>Dove trovare la musica</h3>
+      <ul class="tight">
+        <li>YouTube Audio Library o Pixabay Music: cercate «cinematic tech trailer 120 bpm», «hybrid trailer pulse», «ticking clock tension». Controllate la licenza di ogni brano.</li>
+        <li>Musica generata (Suno, Udio): il prompt è sotto. Verificate che il vostro piano consenta l'uso pubblico.</li>
+        <li>Se il brano non è a 120 BPM, contate i suoi battiti e allungate o accorciate le scene di B05–B13 in multipli di battuta.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Effetti e mix</h3>
+      <ul class="tight">
+        <li>Il tic-tic vero del semaforo di Torino vale più di qualsiasi effetto: è il motivo sonoro di tutto il trailer.</li>
+        <li>Freesound per whoosh e bip (licenza CC0 o con attribuzione nei titoli).</li>
+        <li>Voce sopra la musica con ducking di 6–8 dB.</li>
+        <li>Volume finale −14 LUFS integrati, picco −1 dBTP. In sala si alza dal mixer, non dal file.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" id="montaggio">
+  <div class="sec-head">
+    <div class="kicker">Montaggio</div>
+    <h2>Regole per tagliare in due ore</h2>
+  </div>
+  <div class="grid3">
+    <div class="card">
+      <h3>Progetto ed export</h3>
+      <ul class="tight">
+        <li>DaVinci Resolve (gratis, colore e testi) o CapCut desktop (sottotitoli rapidissimi).</li>
+        <li>Timeline 1920×1080 a 30 fps. Il 4K del drone serve per stringere l'inquadratura.</li>
+        <li>Export H.264, 1080p30, 20–40 Mbps, audio AAC 320 kbps.</li>
+        <li>Il file sta sul PC del palco, non in streaming. Provatelo sul proiettore.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Ritmo e immagine</h3>
+      <ul class="tight">
+        <li>Tagli secchi sul battere. Rampe di velocità solo sul drone.</li>
+        <li>Nelle prove nessuna inquadratura oltre 3 s, tranne la formula.</li>
+        <li>Un solo look per tutto: ombre blu notte, luci ambra come il faro.</li>
+        <li>Testi in Barlow Condensed, numeri in JetBrains Mono, margini di sicurezza del 5%.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Versioni</h3>
+      <ul class="tight">
+        <li><strong>Master 2:00</strong> in 16:9, sottotitoli in italiano impressi: la sala sarà rumorosa.</li>
+        <li><strong>Social 45 s</strong> in 9:16: B01–B02, B05–B07, B10–B12, B15.</li>
+        <li><strong>Teaser 15 s</strong>: B01, B05, B11, B15.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" id="regole">
+  <div class="sec-head">
+    <div class="kicker">Regole, privacy, numeri</div>
+    <h2>Da controllare prima di girare</h2>
+  </div>
+  <div class="grid3">
+    <div class="card">
+      <h3>Drone</h3>
+      <ul class="tight">
+        <li>Operatore registrato su D-Flight e QR code sul drone: serve anche sotto i 250 g se ha la camera.</li>
+        <li>Assicurazione RC: in Italia è obbligatoria.</li>
+        <li>Sotto i 250 g (sottocategoria A1): sorvolo occasionale di persone non coinvolte sì, assembramenti mai. Sempre a vista, massimo 120 m.</li>
+        <li>Mappa D-Flight per ogni punto: Torino è vicina alla CTR di Caselle e alcune zone hanno limiti di quota o divieti.</li>
+        <li>Sopra i 250 g, in città serve l'attestato A2 e le distanze dalle persone: meglio girare fuori dal centro.</li>
+        <li>Prima delle 7:10 è notte anche per le regole del volo, con requisiti in più: aspettate il crepuscolo civile.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Privacy</h3>
+      <ul class="tight">
+        <li>Attori solo del team, con il loro consenso. I passanti di spalle, dall'alto o sfocati.</li>
+        <li>Teste sfocate nelle riprese di strada: lo script di overlay lo fa dai riquadri delle persone.</li>
+        <li>Solo riprese vostre: niente video presi dai social, anche se li avete usati per i test.</li>
+        <li>Nei titoli di coda: «Riprese di test del team, volti oscurati. MDGB non salva immagini.»</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Numeri e onestà</h3>
+      <ul class="tight">
+        <li>Solo funzioni che girano davvero. «Simulazione» sulle scene di <code>scenario.py</code>, «concept · dati simulati» sulle previsioni.</li>
+        <li>FPS sulla UNO Q solo se misurati: oggi c'è solo il dato su PC (11,5 ms per il detector a 320 px su M1).</li>
+        <li>Costo: «circa 200 € di componenti», non «200 € installato». Como ha messo a bilancio 50.000 € per 3 attraversamenti luminosi: citatelo così, con la fonte.</li>
+        <li>Ciclisti: mostrateli solo se riconosciuti in una vostra ripresa. Sui video di Torino la bici piccola spesso non viene vista.</li>
+        <li>Nessuna situazione pericolosa messa in scena: il quasi-incidente si racconta con il plastico e le grafiche.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="wrap" id="prompt">
+  <div class="sec-head">
+    <div class="kicker">Prompt pronti</div>
+    <h2>Da incollare</h2>
+    <p class="muted">Il primo riassume tutto il progetto: usatelo con qualsiasi assistente, o in una nuova chat con me, per continuare il lavoro senza rispiegare nulla.</p>
+  </div>
+  <div class="prompts">
+    <article class="prompt">
+      <header><div><h3>Brief del trailer</h3><p>Contesto, idea, vincoli. Cambiate solo l'ultima riga.</p></div><button class="copybtn" type="button" data-copy="p-brief">Copia</button></header>
+      <pre id="p-brief">Sei il regista e montatore di un trailer di 2:00 per MDGB (Mobility Data &amp; Guardian Beacon), progetto del nostro team per la sfida GOMA Smart Crossing di HackTurin 2026, a Torino.
+
+PRODOTTO
+- Modulo da circa 200 € di componenti che si monta sul semaforo esistente. Arduino UNO Q: visione e AI interamente a bordo (YOLOX-nano ONNX + ByteTrack), funziona senza internet.
+- Riconosce pedoni, ciclisti, veicoli e animali; conta gli attraversamenti per direzione, senza doppioni.
+- Misura distanze e velocità usando le strisce pedonali come metro (50 cm di striscia + 50 cm di intervallo).
+- Attributi misurati, non indovinati: passo lento sotto 0,9 m/s, bambino sotto 1,30 m.
+- Regola fisica esplicita: d_stop = v·1,0 + v²/(2·7); T_need = W/v_ped + 1; TTC = d/v. Esempio dei test: anziano a 0,8 m/s, strada di 7 m, auto a 50 km/h a 60 m → TTC 4,3 s &lt; T_need 9,8 s → WARN_DRIVER.
+- Avvisa chi guida (LCD «PEDONE 50 km/h / RALLENTA») e chi cammina (OLED «ATTENDI»), chiede di trattenere il rosso e allungare il verde.
+- Battito verso il microcontrollore ogni 100 ms: senza battito, entro 0,5 s il semaforo torna al suo ciclo normale.
+- Rete: MQTT con store &amp; forward su disco; dopo 30 s senza conferme passa al Bluetooth; nella prova Wi-Fi spento/riacceso, eventi persi 0.
+- Nessuna immagine salvata: solo metadati anonimi. Di notte termocamera 16×4, che non riconosce nessuno.
+- Visione (concept, dati simulati): aggregati anonimi + sensori ambientali (temperatura, umidità, luce, aria) per prevedere gli afflussi; open data per il Comune, servizio per le attività.
+
+IDEA: «Il tempo che serve». Ogni scena mette in scena un numero misurato dal sistema.
+Struttura: duello 9,8 s contro 4,3 s → problema (470 pedoni morti in Italia nel 2024, fonte ACI–ISTAT; dal 25 ottobre il buio arriva all'ora di punta) → rivelazione MDGB → prove (vede, misura, capisce, decide, fail-safe, non perde nulla, nessun volto) → la città → «MDGB. Il tempo che serve.»
+
+VINCOLI: niente funzioni presentate come reali se non girano; simulazioni etichettate; volti sfocati; solo riprese nostre; voce in italiano con sottotitoli; 16:9 1080p; musica a 120 BPM con drop a 0:30; dal secondo 30 scene da 8 s.
+
+COMPITO: [scrivi qui cosa vuoi, es. «accorcia la voce a 110 secondi», «proponi 3 brani», «lista dei tagli per la versione 9:16»]</pre>
+    </article>
+    <article class="prompt">
+      <header><div><h3>Musica generata</h3><p>Per Suno o Udio. In inglese: rendono meglio.</p></div><button class="copybtn" type="button" data-copy="p-music">Copia</button></header>
+      <pre id="p-music">Instrumental cinematic hybrid trailer, 120 BPM, 2 minutes. Intro 0:00–0:12: near silence, a ticking pedestrian-signal click and a low drone. 0:12–0:30: pulsing percussion that accelerates, riser into a big impact drop at 0:30. 0:30–1:42: driving synth bass, arpeggios and punchy hits, an accent every 8 seconds. 1:42–1:52: emotional breakdown with warm pads and piano. 1:52: final impact, then silence and one last tick. Urban night, hopeful, modern, no vocals.</pre>
+    </article>
+    <article class="prompt">
+      <header><div><h3>Voce sintetica o attore</h3><p>Direzione per ElevenLabs o per chi legge.</p></div><button class="copybtn" type="button" data-copy="p-voice">Copia</button></header>
+      <pre id="p-voice">Voce italiana, 30–45 anni, calda e sicura, registro documentaristico. Ritmo pacato, un filo più lento del parlato. Mezzo secondo di pausa dopo ogni numero e dopo ogni frase breve («Mai.», «Senza internet.»). Nessuna enfasi pubblicitaria; tono calmo e protettivo. L'ultima frase, «MDGB. Il tempo che serve.», più lenta e più bassa.</pre>
+    </article>
+    <article class="prompt">
+      <header><div><h3>Video generato, solo per l'atmosfera</h3><p>Piano C per B04 se manca la ripresa. Mai per mostrare il prodotto in funzione; dichiaratelo nei titoli di coda.</p></div><button class="copybtn" type="button" data-copy="p-video">Copia</button></header>
+      <pre id="p-video">Cinematic aerial shot at blue hour over an Italian city boulevard with tram tracks and a zebra crossing, wet asphalt reflecting warm street lights, a lone figure with a walking cane starting to cross, car headlights approaching from far away, slow descending camera, 35mm, anamorphic, muted teal shadows and amber highlights, no text, no logos.</pre>
+    </article>
+  </div>
+</section>
+
+<section class="wrap" id="fonti">
+  <div class="sec-head">
+    <div class="kicker">Fonti</div>
+    <h2>Da dove vengono i numeri</h2>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Dal vostro repo</h3>
+      <ul class="tight">
+        <li><code>docs/Transcription.txt</code>: la traccia GOMA letta dagli organizzatori.</li>
+        <li><code>PROMPT_SMART_CROSSING.md</code>: concept, regole, contratti, checklist della demo.</li>
+        <li><code>ai/README.md</code> e <code>ai/DECISIONS.md</code> sul branch <code>paolo/ai-unoq</code>: regola, attributi, tempi del detector, prove sui video di Torino e loro limiti.</li>
+        <li><code>comms/README.md</code>, <code>comms/DECISIONS.md</code>, <code>app/README.md</code>, <code>docs/INSTRUCTIONS_FOR_OTHERS.md</code>: rete, failover, centrale, prova Wi-Fi.</li>
+        <li><code>hardware/BOM.md</code>: componenti, costo stimato, sensori.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Dal web</h3>
+      <ul class="tight">
+        <li><a href="https://aci.gov.it/comunicati-stampa/aci-istat-gli-incidenti-stradali-2024-nelle-107-province-italiane/" target="_blank" rel="noopener">ACI–ISTAT, incidenti stradali 2024</a>: 470 pedoni morti, −3,1% sul 2023.</li>
+        <li><a href="https://www.espansionetv.it/2024/12/20/como-tutelare-i-pedoni-e-ridurre-gli-incidenti-arrivano-i-nuovi-attraversamenti-pedonali-luminosi" target="_blank" rel="noopener">Espansione TV, Como</a>: 50.000 € per tre attraversamenti luminosi a sensori.</li>
+        <li><a href="https://www.money.it/le-regole-per-i-droni-in-italia-ecco-le-normative-in-vigore" target="_blank" rel="noopener">Money.it, regole per i droni</a>: categorie, D-Flight, assicurazione. Per il volo verificate sempre su D-Flight ed ENAC.</li>
+        <li>Strisce da 50 cm: D.P.R. 495/1992, art. 145, già citato in <code>ai/README.md</code>.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="wrap">
+  <p>Animatic e piano per il trailer di MDGB · HackTurin 2026. Le grafiche dell'animatic sono schemi: dove compare un'etichetta FONTE va la ripresa reale.</p>
+</footer>
+
+<script>
+(function(){
+"use strict";
+/* ------------------------------------------------------------------ data */
+const BEATS=[
+ {id:"B01",act:"open",dur:6,name:"Il duello",scene:"duel",src:"Drone D1 + grafica M1",
+  see:"Dall'alto, sulle strisce, una persona attraversa piano. Sopra di lei compare «9,8 s». Dal bordo destro arrivano i fari di un'auto: «4,3 s».",
+  vo:"",voEn:"",ost:"9,8 s per attraversare · 4,3 s all'arrivo dell'auto",sfx:"Buio, poi solo il tic-tic del segnale acustico per non vedenti.",
+  pb:"Senza drone: la grafica M1 da sola, o il telefono da una finestra alta."},
+ {id:"B02",act:"open",dur:6,name:"Il conto",scene:"duel2",src:"Drone D1, fermo immagine + grafica M1",
+  see:"Fermo immagine. I due numeri si spostano al centro: 4,3 < 9,8.",
+  vo:"Le servono dieci secondi per attraversare. L'auto arriva tra quattro. Un semaforo normale non lo sa.",
+  voEn:"She needs ten seconds to cross. The car arrives in four. An ordinary traffic light doesn't know.",
+  ost:"4,3 s < 9,8 s",sfx:"Tic-tic. Un colpo basso su «non lo sa».",pb:"Come B01."},
+ {id:"B03",act:"problem",dur:8,name:"Il dato",scene:"stat",src:"Strada S2 + drone D4 + grafica M2",
+  see:"Montaggio rapido, un'inquadratura al secondo: piedi sulle strisce, un bastone, fari, un tram, il pulsante del segnale acustico. Sopra, il dato.",
+  vo:"",voEn:"",ost:"470 pedoni morti in Italia nel 2024. Più di uno al giorno. (ACI–ISTAT)",sfx:"Parte una pulsazione lenta che accelera.",
+  pb:"I video di Torino già analizzati, dentro una cornice «CAM 01», con le teste sfocate."},
+ {id:"B04",act:"problem",dur:10,name:"Il buio",scene:"dark",src:"Strada S3 (luce blu dell'alba) + drone D2 o D3",
+  see:"Lo skyline al tramonto diventa notte, l'orologio segna 17:30. Un pedone vestito scuro sparisce tra i fari.",
+  vo:"Dal 25 ottobre il buio arriva all'ora di punta. E il verde dura uguale per chi ha vent'anni e per chi ne ha ottanta.",
+  voEn:"From October 25, darkness falls at rush hour. And the green light lasts the same for someone who is twenty and someone who is eighty.",
+  ost:"25 ottobre · torna l'ora solare · 17:30",sfx:"Riser di 4 secondi fino a 0:30.",pb:"Riprese di giorno scurite in montaggio, più la grafica del cielo."},
+ {id:"B05",act:"reveal",dur:8,name:"MDGB",scene:"logo",src:"Plastico P1 + grafica M3",
+  see:"Il modulo nel buio; il fuoco passa dall'obiettivo all'anello LED che si accende ambra. Le tre luci del semaforo diventano un solo faro: MDGB.",
+  vo:"Questo è MDGB.",voEn:"This is MDGB.",ost:"MDGB · Mobility Data & Guardian Beacon",sfx:"Drop: impatto e basso.",pb:"Solo la grafica M3."},
+ {id:"B06",act:"reveal",dur:8,name:"Sul semaforo che c'è già",scene:"mini",src:"Drone D5 in tilt-shift → plastico P2",
+  see:"Torino dall'alto sembra un modellino. Stacco sul plastico vero con la stessa inquadratura: una mano aggancia il modulo al palo.",
+  vo:"Un modulo da circa duecento euro, sul semaforo che c'è già. Vede chi arriva. E chiede il tempo che serve.",
+  voEn:"A module of about two hundred euros, on the traffic light that's already there. It sees who's coming. And asks for the time it takes.",
+  ost:"~200 € di componenti · si monta sul semaforo esistente",sfx:"Clic del modulo sul palo, a tempo.",pb:"Zoom dalla mappa di Torino (M10) dentro il plastico."},
+ {id:"B07",act:"proof",dur:8,name:"Vede",scene:"see",src:"Strada S1 + overlay SC1",
+  see:"La vista dal palo con i riquadri: un pedone che attraversa, un'auto che rallenta e si ferma, un ciclista. Linee di conteggio e contatori IN/OUT.",
+  vo:"Riconosce pedoni, ciclisti, auto e animali. Tutto a bordo. Senza internet.",
+  voEn:"It recognizes pedestrians, cyclists, cars and animals. All on board. No internet.",
+  ost:"AI a bordo · Wi-Fi spento · conteggi IN/OUT",sfx:"Un bip leggero per ogni riquadro che compare.",pb:"Il video annotato di Torino_1 dentro una cornice «CAM 01»."},
+ {id:"B08",act:"proof",dur:8,name:"Misura",scene:"measure",src:"Calibrazione SC2 + grafiche M4 e M5",
+  see:"Le strisce si accendono una a una: 1 m, 2 m… 7 m. Poi la prospettiva si raddrizza in una vista dall'alto, in metri.",
+  vo:"Le strisce sono il suo metro: cinquanta centimetri, sempre. Così misura distanze e velocità vere.",
+  voEn:"The stripes are its ruler: fifty centimetres, every time. That's how it measures real distances and speeds.",
+  ost:"50 cm + 50 cm = 1 m · W = 7,0 m",sfx:"Un tick per ogni striscia.",pb:"Solo grafica."},
+ {id:"B09",act:"proof",dur:8,name:"Capisce",scene:"understand",src:"S1 con overlay + figurine P6",
+  see:"Compaiono le etichette: passo lento 0,8 m/s; bambino sotto 1,30 m; cane al guinzaglio, nessun allarme; cane libero in strada, allerta.",
+  vo:"Non indovina l'età. Misura il passo. Se cammini piano, ti aspetta.",
+  voEn:"It doesn't guess your age. It measures your pace. If you walk slowly, it waits for you.",
+  ost:"lento 0,8 m/s · bambino < 1,30 m · al guinzaglio: nessun allarme",sfx:"Tre colpi secchi, uno per etichetta.",pb:"Figurine sul plastico, etichette in grafica."},
+ {id:"B10",act:"proof",dur:8,name:"Decide e agisce",scene:"decide",src:"Terminale SC3 + plastico P3 + grafica M6",
+  see:"La formula si scrive, poi la «reason» vera del sistema. L'ambra lampeggia a 2 Hz; LCD «PEDONE 50 km/h / RALLENTA», OLED «ATTENDI». Poi il rosso a terra: «FRENA!».",
+  vo:"Ogni decisione è una regola fisica, scritta e verificabile. Avvisa chi guida. Trattiene il rosso. Allunga il verde.",
+  voEn:"Every decision is a physical rule, written down and verifiable. It warns drivers. Holds the red. Extends the green.",
+  ost:"TTC = d/v = 4,3 s < T_need = W/v + 1 = 9,8 s → WARN_DRIVER",sfx:"Il lampeggio a 2 Hz va a tempo: 120 BPM sono due battiti al secondo.",pb:"Se i LED non rispondono: terminale + grafica M6."},
+ {id:"B11",act:"proof",dur:8,name:"Fail-safe",scene:"failsafe",src:"Plastico P4 a 240 fps + grafica M7",
+  see:"Un battito scorre sullo schermo, uno ogni 100 ms. Si spegne la visione: linea piatta. Entro 0,5 s il semaforo torna al suo ciclo.",
+  vo:"E se l'intelligenza artificiale si spegne? In mezzo secondo il semaforo torna esattamente com'era.",
+  voEn:"And if the AI shuts down? Within half a second, the traffic light goes back exactly as it was.",
+  ost:"battito ogni 100 ms → fail-safe entro 0,5 s",sfx:"Bip del battito, poi mezzo secondo di silenzio totale.",
+  pb:"Se il fail-safe non è sullo sketch, togliete la scena e date gli 8 s a B10 e B12. Non mostratelo finto."},
+ {id:"B12",act:"proof",dur:8,name:"Non perde nulla",scene:"network",src:"App MDGB Centrale SC4 + grafica M8",
+  see:"Sulla mappa della centrale il nodo diventa giallo: «rete giù, nodo sano». Partono i beacon Bluetooth. Torna il Wi-Fi e la coda si svuota.",
+  vo:"Se cade la rete, passa al Bluetooth. Quando torna, recupera tutto. Eventi persi: zero.",
+  voEn:"If the network drops, it switches to Bluetooth. When it's back, it recovers everything. Events lost: zero.",
+  ost:"Wi-Fi ✕ → BLE, 27 byte → Wi-Fi ✓ · Eventi persi: 0",sfx:"Un ping da sonar per ogni beacon.",
+  pb:"Se la scheda non è pronta: la stessa prova sul PC (stesso codice, broker vero), senza dire «sulla scheda»."},
+ {id:"B13",act:"proof",dur:8,name:"Nessun volto",scene:"privacy",src:"S1 + grafica M9 + termocamera",
+  see:"Le persone diventano punti e scie; a destra scorrono i dati che escono dal nodo. Di notte la striscia termica 16×4 si accende al passaggio.",
+  vo:"Non salva immagini. Mai. Solo numeri anonimi. Di notte sente il calore, ma non riconosce nessuno.",
+  voEn:"It never stores images. Ever. Only anonymous numbers. At night it senses heat, but recognizes no one.",
+  ost:"0 frame salvati · solo metadati",sfx:"La musica si alleggerisce.",pb:"Se la termocamera non è provata sul sensore, togliete l'ultima frase."},
+ {id:"B14",act:"vision",dur:10,name:"La città",scene:"city",src:"Grafica M10 + drone D3",
+  see:"Si allarga su Torino: i nodi si accendono incrocio dopo incrocio, compaiono i flussi e la previsione per domani alle 18, con la pioggia.",
+  vo:"Un incrocio protegge chi passa. Cento incroci raccontano la città: flussi, meteo, aria. Per prevedere dove servirà più tempo.",
+  voEn:"One crossing protects the people who pass. A hundred crossings tell the story of a city: flows, weather, air. To predict where more time will be needed.",
+  ost:"concept · dati simulati",sfx:"Respiro: pad caldi e pianoforte.",pb:"La mappa della centrale in tema scuro, registrata dallo schermo."},
+ {id:"B15",act:"close",dur:8,name:"Il tempo che serve",scene:"end",src:"Drone D1 + grafica M11",
+  see:"Torniamo alle strisce dell'inizio: la persona arriva sul marciapiede e il contatore fa +1. Titolo, poi la squadra.",
+  nosub:true,vo:"MDGB. Il tempo che serve.",voEn:"MDGB. The time it takes.",ost:"MDGB · Il tempo che serve · HackTurin 2026 · sfida GOMA",sfx:"Impatto finale, silenzio, un solo tic.",pb:"Grafiche M1 e M11."}
+];
+const ACTS={open:["Apertura","--s-open","--act-open"],problem:["Problema","--s-problem","--act-problem"],reveal:["Rivelazione","--s-reveal","--act-reveal"],proof:["Prove","--s-proof","--act-proof"],vision:["Visione","--s-vision","--act-vision"],close:["Chiusura","--s-close","--act-close"]};
+const STAGE_ACT={open:"#9AA0A6",problem:"#E5484D",reveal:"#F2A516",proof:"#5CC35A",vision:"#4C8DF6",close:"#9AA0A6"};
+let acc=0; for(const b of BEATS){ b.t0=acc; acc+=b.dur; }
+const TOTAL=acc;
+const TEAM=[["Paolo Malugani","AI e visione"],["Salvatore Gullotta","firmware"],["Lorenzo Dragoni","rete e centrale"],["Kuzey Bicher","elettronica"]];
+/* Turin municipal boundary (ISTAT 001272), metres from the west/north edge. Source: openpolis/geojson-italy */
+const TO_RING=[[15024,6274],[14941,6417],[15217,6646],[15231,6635],[15237,6633],[15288,6634],[15319,6643],[15339,6651],[15349,6660],[15371,6692],[15369,6698],[14888,7474],[14871,7501],[14825,7576],[14773,7661],[14717,7750],[14471,8146],[14019,8874],[13993,8915],[13991,8919],[13969,8945],[13603,9391],[13572,9428],[13546,9461],[13472,9550],[13447,9581],[13401,9636],[13394,9644],[13379,9662],[13218,9847],[13175,9896],[12768,10361],[12177,11117],[11368,11858],[10604,12172],[10234,12396],[10035,12645],[9575,12725],[9082,12665],[8235,12867],[7546,13458],[7295,13414],[7290,13414],[7075,13429],[6877,13444],[6825,13450],[6546,13484],[6391,13503],[6373,13506],[6262,13862],[6100,14413],[5933,14426],[5329,14524],[4966,14469],[3113,14155],[2698,14153],[1713,13859],[1202,13752],[1189,13739],[1145,13695],[987,13512],[1110,13121],[1149,13108],[1168,13102],[1171,13102],[1223,13104],[1325,13124],[1558,13175],[1564,13176],[1726,13214],[1733,13216],[1764,13224],[1801,13189],[2263,12147],[2311,12037],[2321,12010],[1281,11769],[830,11489],[158,10894],[0,10679],[172,10438],[200,10410],[682,10366],[1162,10676],[2121,11270],[2317,11388],[2626,11555],[2658,11565],[3114,10774],[3263,10343],[3590,9356],[3277,8761],[2512,8658],[2446,8640],[2380,8622],[2347,8613],[2340,8611],[2351,8573],[2480,8117],[2612,8066],[2708,7890],[2406,7526],[2404,7524],[2289,7487],[2262,7480],[2120,7453],[2017,7436],[2171,7145],[2188,7112],[2201,7087],[2289,6902],[2368,6735],[2586,6277],[2954,5469],[3158,4560],[3149,4552],[3146,4548],[2932,4336],[2876,4279],[2864,4252],[2861,4247],[2859,4239],[2672,3470],[2674,3457],[2852,3355],[2992,3346],[3201,3347],[3519,3122],[3543,2721],[4441,2823],[4822,2864],[5309,2913],[5403,2918],[5667,2907],[5977,2847],[6025,2835],[6028,2613],[6013,2572],[5948,2488],[5939,2477],[5911,2440],[5907,2364],[5901,2258],[5893,2056],[5878,1681],[6009,1531],[6141,1325],[6157,1300],[6168,1283],[6232,1181],[6232,1135],[6197,1050],[6151,996],[6139,986],[6125,974],[6046,712],[5970,380],[7047,0],[7918,39],[8290,176],[8857,542],[9116,448],[9152,609],[9409,813],[9898,751],[10340,650],[10479,584],[10483,562],[10504,435],[10505,425],[10525,303],[10528,289],[10548,164],[10565,145],[10569,142],[10640,100],[10915,41],[10983,46],[11201,80],[11238,86],[11472,139],[11488,144],[11517,161],[11550,183],[11554,189],[11541,294],[11533,326],[11401,754],[11252,851],[11189,870],[11352,1371],[11933,1461],[12383,1622],[12486,1663],[12384,2089],[12583,2835],[12804,3199],[13164,3571],[13316,3702],[13512,3831],[13706,4003],[13639,4401],[13630,4446],[13609,4546],[13365,4754],[13205,4869],[12967,5170],[13331,5772],[13445,5905],[13545,6013],[13594,6056],[13739,6106],[13965,6172],[14195,6206],[14792,6275],[15024,6274]];
+const TO_W=15371,TO_H=14524,SAN_CARLO=[8259,7796];
+
+/* ------------------------------------------------------------------ helpers */
+const W=1920,H=1080;
+const C={bg:"#0A0C0F",ink:"#EEEEE8",dim:"#8C9197",faint:"#2A2F35",amber:"#F2A516",red:"#E5484D",green:"#5CC35A",blue:"#4C8DF6",cyan:"#46D3E3",magenta:"#E067D8",road:"#15181B",walk:"#24282D",curb:"#41474E",stripe:"#E6E6DF",pedbox:"#7CF29A"};
+const F={d:'"Barlow Condensed","Arial Narrow",Arial,sans-serif',b:'Barlow,system-ui,-apple-system,sans-serif',m:'"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace'};
+function clamp(x,a,b){if(a===undefined)a=0;if(b===undefined)b=1;return x<a?a:x>b?b:x;}
+const lerp=(a,b,k)=>a+(b-a)*k;
+const seg=(u,a,b)=>clamp((u-a)/(b-a));
+const eio=k=>k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
+const eo=k=>1-Math.pow(1-k,3);
+const it=(n,d)=>n.toFixed(d===undefined?1:d).replace(".",",");
+const fmt=s=>{s=Math.max(0,s);const m=Math.floor(s/60),r=Math.floor(s%60);return m+":"+String(r).padStart(2,"0");};
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function rgba(hex,a){const n=parseInt(hex.slice(1),16);return "rgba("+(n>>16&255)+","+(n>>8&255)+","+(n&255)+","+a+")";}
+
+const canvas=document.getElementById("stage");
+const ctx=canvas.getContext("2d");
+const hasLS=("letterSpacing" in ctx);
+function T(s,x,y,o){o=o||{};ctx.save();ctx.globalAlpha=(o.a===undefined?1:o.a);ctx.fillStyle=o.c||C.ink;ctx.font=(o.w||600)+" "+(o.s||48)+"px "+(o.f||F.d);ctx.textAlign=o.al||"left";ctx.textBaseline=o.bl||"alphabetic";if(o.ls&&hasLS)ctx.letterSpacing=o.ls+"px";ctx.fillText(s,x,y);ctx.restore();}
+function TW(s,o){o=o||{};ctx.save();ctx.font=(o.w||600)+" "+(o.s||48)+"px "+(o.f||F.d);if(o.ls&&hasLS)ctx.letterSpacing=o.ls+"px";const w=ctx.measureText(s).width;ctx.restore();return w;}
+function rr(x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h);}
+function fillBg(c){ctx.fillStyle=c||C.bg;ctx.fillRect(0,0,W,H);}
+function glow(x,y,r,c,a){if(r<=0)return;const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,rgba(c,1));g.addColorStop(1,rgba(c,0));ctx.save();ctx.globalAlpha=(a===undefined?1:a);ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();ctx.restore();}
+function chip(s,x,y,o){o=o||{};const sz=o.s||24,px=o.px||14,h=sz+(o.py||16);const w=TW(s,{s:sz,f:o.f||F.m,w:o.w||500})+px*2;const X=o.al==="right"?x-w:o.al==="center"?x-w/2:x;ctx.save();ctx.globalAlpha=(o.a===undefined?1:o.a);ctx.fillStyle=o.bg||"rgba(12,14,17,.82)";rr(X,y,w,h,o.r===undefined?8:o.r);ctx.fill();if(o.stroke){ctx.strokeStyle=o.stroke;ctx.lineWidth=2;ctx.stroke();}ctx.restore();T(s,X+px,y+h/2+1,{s:sz,f:o.f||F.m,w:o.w||500,c:o.c||C.ink,bl:"middle",a:o.a});return w;}
+function vignette(){const g=ctx.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,H*1.05);g.addColorStop(0,"rgba(0,0,0,0)");g.addColorStop(1,"rgba(0,0,0,.55)");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
+function fadeBlack(k){if(k<=0)return;ctx.fillStyle="rgba(0,0,0,"+clamp(k)+")";ctx.fillRect(0,0,W,H);}
+function arrow(x1,y1,x2,y2,c,lw){ctx.save();ctx.strokeStyle=c;ctx.fillStyle=c;ctx.lineWidth=lw||3;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();const a=Math.atan2(y2-y1,x2-x1),L=16;ctx.beginPath();ctx.moveTo(x2,y2);ctx.lineTo(x2-L*Math.cos(a-0.45),y2-L*Math.sin(a-0.45));ctx.lineTo(x2-L*Math.cos(a+0.45),y2-L*Math.sin(a+0.45));ctx.closePath();ctx.fill();ctx.restore();}
+function typed(s,k){const n=Math.floor(s.length*clamp(k));return s.slice(0,n);}
+
+/* ------------------------------------------------------------------ top-down crossing (plan view) */
+const TD={S:46,ox:960,oy:372};
+const tdx=x=>TD.ox+x*TD.S, tdy=y=>TD.oy+y*TD.S;
+function topCrossing(o){
+  o=o||{};const S=TD.S;
+  ctx.fillStyle=C.walk;ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle="rgba(255,255,255,.04)";ctx.lineWidth=2;ctx.beginPath();
+  for(let x=0;x<=W;x+=64){ctx.moveTo(x,0);ctx.lineTo(x,tdy(0)-9);ctx.moveTo(x,tdy(7)+9);ctx.lineTo(x,H);}
+  for(let y=24;y<tdy(0)-9;y+=64){ctx.moveTo(0,y);ctx.lineTo(W,y);}
+  for(let y=tdy(7)+40;y<H;y+=64){ctx.moveTo(0,y);ctx.lineTo(W,y);}
+  ctx.stroke();
+  ctx.fillStyle=C.road;ctx.fillRect(0,tdy(0),W,7*S);
+  ctx.fillStyle=C.curb;ctx.fillRect(0,tdy(0)-9,W,9);ctx.fillRect(0,tdy(7),W,9);
+  ctx.fillStyle="rgba(230,230,223,.5)";
+  for(let x=-24;x<24;x+=6){if(x>-5&&x<3)continue;ctx.fillRect(tdx(x),tdy(3.5)-3,3*S,6);}
+  for(let k=0;k<7;k++){ctx.fillStyle=o.stripe?o.stripe(k):C.stripe;ctx.fillRect(tdx(-2),tdy(k+.25),4*S,.5*S);}
+}
+function pedTop(x,y,o){o=o||{};const r=.3*TD.S,X=tdx(x),Y=tdy(y);if(o.glow)glow(X,Y,r*5,o.gc||"#FFFFFF",o.ga===undefined?.22:o.ga);ctx.save();ctx.globalAlpha=(o.a===undefined?1:o.a);ctx.fillStyle=o.c||"#F4F4EE";ctx.globalAlpha*=.45;ctx.beginPath();ctx.ellipse(X,Y,r*1.6,r*.8,0,0,Math.PI*2);ctx.fill();ctx.globalAlpha/=.45;ctx.beginPath();ctx.arc(X,Y,r*.8,0,Math.PI*2);ctx.fill();if(o.cane){ctx.strokeStyle=o.c||"#F4F4EE";ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(X+r*1.2,Y);ctx.lineTo(X+r*2,Y+r*1.6);ctx.stroke();}ctx.restore();}
+function carTop(x,y,o){o=o||{};const S=TD.S,L=4.4*S,Wd=1.8*S,X=tdx(x),Y=tdy(y),dir=o.dir||1;
+  if(o.lights!==false){ctx.save();const hx=X+dir*L/2;const g=ctx.createLinearGradient(hx,0,hx+dir*16*S,0);g.addColorStop(0,"rgba(255,236,190,.36)");g.addColorStop(1,"rgba(255,236,190,0)");ctx.fillStyle=g;ctx.beginPath();ctx.moveTo(hx,Y-Wd*.4);ctx.lineTo(hx+dir*16*S,Y-Wd*1.7);ctx.lineTo(hx+dir*16*S,Y+Wd*1.7);ctx.lineTo(hx,Y+Wd*.4);ctx.closePath();ctx.fill();ctx.restore();}
+  ctx.save();ctx.fillStyle=o.c||"#2E3845";rr(X-L/2,Y-Wd/2,L,Wd,16);ctx.fill();ctx.fillStyle="rgba(255,255,255,.13)";rr(X-L*.18,Y-Wd/2+9,L*.42,Wd-18,8);ctx.fill();ctx.fillStyle="#FFF3D2";const fx=X+dir*(L/2-7);ctx.fillRect(fx-4,Y-Wd/2+9,8,15);ctx.fillRect(fx-4,Y+Wd/2-24,8,15);ctx.restore();}
+
+/* ------------------------------------------------------------------ perspective world (pole camera) */
+const V={sub:(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],dot:(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],cross:(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],norm:a=>{const l=Math.hypot(a[0],a[1],a[2]);return[a[0]/l,a[1]/l,a[2]/l];}};
+const CAM=(function(){const P=[-9,-2.2,5.5],Tg=[8,3.5,0];const fw=V.norm(V.sub(Tg,P));const rt=V.norm(V.cross(fw,[0,0,1]));const up=V.cross(rt,fw);return{P:P,fw:fw,rt:rt,up:up,f:1150};})();
+let MORPH=0;
+function pp(x,y,z){z=z||0;const d=[x-CAM.P[0],y-CAM.P[1],z-CAM.P[2]];const Z=Math.max(.25,V.dot(d,CAM.fw));return[960+CAM.f*V.dot(d,CAM.rt)/Z,540-CAM.f*V.dot(d,CAM.up)/Z,Z];}
+function tp(x,y){return[960+(x-6)*40,540+(3.5-y)*40];}
+function gp(x,y,z){const a=pp(x,y,z);if(MORPH<=0)return a;const b=tp(x,y);return[lerp(a[0],b[0],MORPH),lerp(a[1],b[1],MORPH),a[2]];}
+function poly(pts,fill){ctx.beginPath();for(let i=0;i<pts.length;i++){const p=pts[i];const q=gp(p[0],p[1],p[2]||0);if(i)ctx.lineTo(q[0],q[1]);else ctx.moveTo(q[0],q[1]);}ctx.closePath();ctx.fillStyle=fill;ctx.fill();}
+const BLD=(function(){const R=mulberry(11);const out=[];let x=7;while(x<120){const w=6+R()*10,h=10+R()*16;const wins=[];for(let i=0;i<10;i++)wins.push([x+R()*w,2+R()*(h-3),R()]);out.push({x0:x,x1:x+w,h:h,c:["#10141A","#131820","#0E1217","#151A21"][Math.floor(R()*4)],wins:wins});x+=w+.6;}return out;})();
+function world(o){
+  o=o||{};
+  const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,"#0B1018");g.addColorStop(1,"#151A21");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  const fade=1-MORPH;
+  if(fade>.02){ctx.save();ctx.globalAlpha=fade;for(const b of BLD){poly([[b.x0,11,0],[b.x1,11,0],[b.x1,11,b.h],[b.x0,11,b.h]],b.c);for(const w of b.wins){if(w[2]<.55)continue;const p=pp(w[0],11,w[1]);const s=Math.max(2,520/p[2]);ctx.fillStyle="rgba(242,177,58,.55)";ctx.fillRect(p[0]-s/2,p[1]-s/2,s,s*1.3);}}ctx.restore();}
+  poly([[-4,-6],[130,-6],[130,0],[-4,0]],"#22262B");
+  poly([[-4,7],[130,7],[130,11],[-4,11]],"#22262B");
+  poly([[-4,0],[130,0],[130,7],[-4,7]],C.road);
+  poly([[-4,-.18],[130,-.18],[130,0],[-4,0]],C.curb);
+  poly([[-4,7],[130,7],[130,7.18],[-4,7.18]],C.curb);
+  for(let x=4;x<126;x+=6)poly([[x,3.43],[x+3,3.43],[x+3,3.57],[x,3.57]],"rgba(230,230,223,.45)");
+  for(let k=0;k<7;k++)poly([[-2,k+.25],[2,k+.25],[2,k+.75],[-2,k+.75]],o.stripe?o.stripe(k):C.stripe);
+  if(o.zones){ctx.save();ctx.setLineDash([10,8]);ctx.lineWidth=2;ctx.strokeStyle=rgba(C.amber,.7*(o.zones));for(const z of [[-2.5,-1.5,2.5,0],[-2.5,7,2.5,8.5]]){const a=gp(z[0],z[1]),b=gp(z[2],z[1]),c=gp(z[2],z[3]),d=gp(z[0],z[3]);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.lineTo(c[0],c[1]);ctx.lineTo(d[0],d[1]);ctx.closePath();ctx.stroke();}ctx.restore();}
+}
+const KIND={ped:{L:.46,W:.46,h:1.72,body:"#B9BEC5",box:C.pedbox,name:"pedone"},child:{L:.38,W:.38,h:1.15,body:"#B9BEC5",box:C.pedbox,name:"pedone"},car:{L:4.4,W:1.8,h:1.48,body:"#36414E",box:C.cyan,name:"auto"},bike:{L:1.8,W:.6,h:1.75,body:"#A9AEB5",box:C.amber,name:"ciclista"},dog:{L:.9,W:.32,h:.62,body:"#9C8E7C",box:C.magenta,name:"cane"}};
+function hull(pts){const P=pts.map(p=>[p[0],p[1]]).sort((a,b)=>a[0]-b[0]||a[1]-b[1]);const cr=(o,a,b)=>(a[0]-o[0])*(b[1]-o[1])-(a[1]-o[1])*(b[0]-o[0]);const lo=[],up=[];for(const p of P){while(lo.length>=2&&cr(lo[lo.length-2],lo[lo.length-1],p)<=0)lo.pop();lo.push(p);}for(let i=P.length-1;i>=0;i--){const p=P[i];while(up.length>=2&&cr(up[up.length-2],up[up.length-1],p)<=0)up.pop();up.push(p);}up.pop();lo.pop();return lo.concat(up);}
+function cuboid(x,y,L,Wd,h){const pts=[];for(const dx of [-L/2,L/2])for(const dy of [-Wd/2,Wd/2])for(const z of [0,h])pts.push(gp(x+dx,y+dy,z));return pts;}
+function bbox(pts){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;for(const p of pts){if(p[0]<x0)x0=p[0];if(p[0]>x1)x1=p[0];if(p[1]<y0)y0=p[1];if(p[1]>y1)y1=p[1];}return[x0,y0,x1,y1];}
+function bracket(b,c,lw,fillA){const x0=b[0],y0=b[1],x1=b[2],y1=b[3];const l=Math.max(8,Math.min(26,(x1-x0)*.28,(y1-y0)*.28));ctx.save();ctx.strokeStyle=c;ctx.lineWidth=lw||3;ctx.beginPath();ctx.moveTo(x0,y0+l);ctx.lineTo(x0,y0);ctx.lineTo(x0+l,y0);ctx.moveTo(x1-l,y0);ctx.lineTo(x1,y0);ctx.lineTo(x1,y0+l);ctx.moveTo(x1,y1-l);ctx.lineTo(x1,y1);ctx.lineTo(x1-l,y1);ctx.moveTo(x0+l,y1);ctx.lineTo(x0,y1);ctx.lineTo(x0,y1-l);ctx.stroke();ctx.globalAlpha=fillA===undefined?.07:fillA;ctx.fillStyle=c;ctx.fillRect(x0,y0,x1-x0,y1-y0);ctx.restore();}
+function tag(s,x,y,c,o){o=o||{};const sz=o.s||21;const w=TW(s,{s:sz,f:F.m,w:600})+16;const X=Math.min(Math.max(x,8),W-w-8);ctx.save();ctx.globalAlpha=(o.a===undefined?1:o.a);ctx.fillStyle=c;rr(X,y-sz-12,w,sz+12,4);ctx.fill();ctx.restore();T(s,X+8,y-sz/2-6,{s:sz,f:F.m,w:600,c:"#0A0C0F",bl:"middle",a:o.a});return[X,y-sz-12,w,sz+12];}
+function drawBody(ob){const K=KIND[ob.k];const h=ob.h||K.h;
+  if(ob.k==="ped"||ob.k==="child"){const f=gp(ob.x,ob.y,0),hd=gp(ob.x,ob.y,h);const wpx=Math.max(4,CAM.f*K.W/f[2]);ctx.save();ctx.globalAlpha=ob.dim?.35:1;ctx.fillStyle=ob.body||K.body;rr(hd[0]-wpx/2,hd[1]+wpx*.55,wpx,Math.max(4,f[1]-hd[1]-wpx*.55),wpx/2.4);ctx.fill();ctx.beginPath();ctx.arc(hd[0],hd[1]+wpx*.3,wpx*.36,0,Math.PI*2);ctx.fill();if(ob.cane){ctx.strokeStyle=ob.body||K.body;ctx.lineWidth=Math.max(2,wpx*.12);ctx.beginPath();ctx.moveTo(hd[0]+wpx*.55,hd[1]+(f[1]-hd[1])*.5);ctx.lineTo(f[0]+wpx*.9,f[1]);ctx.stroke();}ctx.restore();return;}
+  const pts=cuboid(ob.x,ob.y,K.L,K.W,h);const hl=hull(pts);ctx.save();ctx.globalAlpha=ob.dim?.35:1;ctx.fillStyle=ob.body||K.body;ctx.beginPath();hl.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fill();
+  if(ob.k==="car"){const top=[gp(ob.x-K.L*.3,ob.y-K.W/2+.15,h),gp(ob.x+K.L*.2,ob.y-K.W/2+.15,h),gp(ob.x+K.L*.2,ob.y+K.W/2-.15,h),gp(ob.x-K.L*.3,ob.y+K.W/2-.15,h)];ctx.fillStyle="rgba(255,255,255,.12)";ctx.beginPath();top.forEach((p,i)=>i?ctx.lineTo(p[0],p[1]):ctx.moveTo(p[0],p[1]));ctx.closePath();ctx.fill();if(ob.lights){const d=ob.dir||-1;const a=gp(ob.x+d*K.L/2,ob.y-.6,.7),b=gp(ob.x+d*K.L/2,ob.y+.6,.7);glow(a[0],a[1],CAM.f*.9/a[2],"#FFF1C8",.85);glow(b[0],b[1],CAM.f*.9/b[2],"#FFF1C8",.85);}}
+  if(ob.k==="bike"){const hd=gp(ob.x,ob.y,h);ctx.fillStyle="#C9CED4";ctx.beginPath();ctx.arc(hd[0],hd[1],Math.max(3,CAM.f*.13/hd[2]),0,Math.PI*2);ctx.fill();}
+  ctx.restore();}
+function drawDetections(objs,o){o=o||{};
+  objs.forEach(ob=>{ob._z=gp(ob.x,ob.y,0)[2];});
+  objs.sort((a,b)=>b._z-a._z);
+  for(const ob of objs)drawBody(ob);
+  for(const ob of objs){if(ob.nobox)continue;const K=KIND[ob.k];const b=bbox(cuboid(ob.x,ob.y,K.L,K.W,ob.h||K.h));const pad=4;const bb=[b[0]-pad,b[1]-pad,b[2]+pad,b[3]+pad];const col=ob.color||K.box;ctx.save();ctx.globalAlpha=ob.dim?.3:(ob.a===undefined?1:ob.a);bracket(bb,col,ob.thick||3);ctx.restore();if(!ob.dim&&ob.label!==false){const kmh=Math.round(Math.abs(ob.v||0)*3.6);const s=ob.label||("#"+ob.id+" "+(ob.nm||K.name)+" "+kmh+" km/h");tag(s,bb[0],bb[1]-2,col,{a:ob.a});if(ob.sub)tag(ob.sub,bb[0],bb[1]-40,ob.subc||C.amber,{a:ob.a,s:19});}}
+}
+function lineOnGround(x1,y1,x2,y2,c,lw,dash){const a=gp(x1,y1),b=gp(x2,y2);ctx.save();ctx.strokeStyle=c;ctx.lineWidth=lw||4;if(dash)ctx.setLineDash(dash);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();ctx.restore();return[a,b];}
+
+/* ------------------------------------------------------------------ scenes */
+const SC={};
+SC.duel=function(u){
+  const push=1+.05*eio(seg(u,1.4,6));
+  ctx.save();ctx.translate(W/2,H/2);ctx.scale(push,push);ctx.translate(-W/2,-H/2);
+  topCrossing();
+  const py=-1.25+.38*u;
+  pedTop(.2,py,{glow:true,ga:.2,cane:true});
+  const hl=seg(u,2.3,3.4);
+  if(hl>0){glow(W+40,tdy(1.2),300,"#FFE9B8",.6*hl);glow(W+40,tdy(2.3),300,"#FFE9B8",.6*hl);}
+  ctx.restore();
+  const P=(x,y)=>[W/2+(x-W/2)*push,H/2+(y-H/2)*push];
+  const a1=eo(seg(u,.9,1.7));
+  if(a1>0){const p=P(tdx(.2),tdy(py));ctx.save();ctx.globalAlpha=a1;ctx.strokeStyle="rgba(238,238,232,.6)";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(p[0]+18,p[1]-18);ctx.lineTo(p[0]+70,p[1]-120);ctx.lineTo(p[0]+110,p[1]-120);ctx.stroke();ctx.restore();
+    T("9,8 s",p[0]+120,p[1]-92,{s:118,f:F.m,w:700,a:a1});T("per attraversare",p[0]+124,p[1]-48,{s:34,f:F.b,w:500,c:C.dim,a:a1});}
+  const a2=eo(seg(u,3.2,4.0));
+  if(a2>0){const y=P(0,tdy(1.75))[1];ctx.save();ctx.globalAlpha=a2*.8;ctx.setLineDash([14,10]);ctx.strokeStyle=C.red;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(P(tdx(2.3),0)[0],y);ctx.lineTo(W-30,y);ctx.stroke();ctx.restore();
+    arrow(W-130,y,W-24,y,rgba(C.red,a2),3);
+    T("60 m · 50 km/h",P(tdx(2.6),0)[0],y-16,{s:30,f:F.m,w:500,c:C.red,a:a2});
+    T("4,3 s",W-70,y+150,{s:118,f:F.m,w:700,c:C.red,al:"right",a:a2});T("all'arrivo dell'auto",W-74,y+194,{s:34,f:F.b,w:500,c:C.dim,al:"right",a:a2});}
+  fadeBlack(1-seg(u,0,1.3));
+};
+SC.duel2=function(u){
+  topCrossing();pedTop(.2,-1.25+.38*6,{glow:true,ga:.2,cane:true});glow(W+40,tdy(1.2),300,"#FFE9B8",.6);glow(W+40,tdy(2.3),300,"#FFE9B8",.6);
+  ctx.fillStyle="rgba(5,6,8,"+(.3+.5*eo(seg(u,0,1)))+")";ctx.fillRect(0,0,W,H);
+  const k=eio(seg(u,.2,1.5));
+  const s=lerp(118,165,k);
+  const wA=TW("4,3 s",{s:118,f:F.m,w:700}),wB=TW("9,8 s",{s:118,f:F.m,w:700});
+  T("4,3 s",lerp(W-70-wA/2,540,k),lerp(tdy(1.75)+150,560,k),{s:s,f:F.m,w:700,c:C.red,al:"center"});
+  T("9,8 s",lerp(tdx(.2)+120+wB/2,1380,k),lerp(tdy(-1.25+.38*6)-92,560,k),{s:s,f:F.m,w:700,al:"center"});
+  const lt=eo(seg(u,1.4,2.0));
+  T("<",960,552,{s:170,f:F.m,w:700,c:C.amber,al:"center",a:lt});
+  T("all'arrivo dell'auto",540,636,{s:36,f:F.b,w:500,c:C.dim,al:"center",a:lt});
+  T("per attraversare",1380,636,{s:36,f:F.b,w:500,c:C.dim,al:"center",a:lt});
+};
+const MONT=[
+ ["S2 · piedi sulle strisce, 240 fps",v=>{fillBg("#17191C");for(let i=0;i<6;i++){ctx.fillStyle="#DCDCD4";ctx.fillRect(0,40+i*200,W,100);}const x=lerp(640,980,v);ctx.fillStyle="#0E0F11";ctx.beginPath();ctx.ellipse(x,560,170,62,-.18,0,Math.PI*2);ctx.fill();ctx.beginPath();ctx.ellipse(x+300,760,170,62,-.18,0,Math.PI*2);ctx.fill();}],
+ ["S2 · la punta di un bastone",v=>{fillBg("#17191C");for(let i=0;i<6;i++){ctx.fillStyle="#DCDCD4";ctx.fillRect(0,-60+i*200,W,100);}ctx.strokeStyle="#5B4A39";ctx.lineWidth=22;ctx.lineCap="round";const y=lerp(560,600,eo(v));ctx.beginPath();ctx.moveTo(1500,-40);ctx.lineTo(1030,y);ctx.stroke();ctx.lineCap="butt";ctx.fillStyle="#111";ctx.beginPath();ctx.arc(1030,y+8,24,0,Math.PI*2);ctx.fill();}],
+ ["S3 · fari che arrivano",v=>{fillBg("#05070B");const s=lerp(.55,1.35,v);glow(960-170*s,560,240*s,"#FFF1CC",.95);glow(960+170*s,560,240*s,"#FFF1CC",.95);glow(960,620,900*s,"#2A3550",.25);}],
+ ["D4 · il tram",v=>{const g=ctx.createLinearGradient(0,0,0,H);g.addColorStop(0,"#2C3442");g.addColorStop(1,"#14171C");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);ctx.fillStyle="#9AA1AA";ctx.fillRect(0,860,W,8);ctx.fillRect(0,930,W,8);const x=lerp(-500,700,v);ctx.fillStyle="#E5822A";rr(x,520,1100,330,26);ctx.fill();ctx.fillStyle="#1B2027";for(let i=0;i<6;i++)ctx.fillRect(x+60+i*170,580,130,130);ctx.fillStyle="#F3EFE6";ctx.fillRect(x,760,1100,22);}],
+ ["S2 · le ruote di un passeggino",v=>{fillBg("#1A1C20");for(const cx of [740,1180]){ctx.save();ctx.translate(cx,620);ctx.rotate(v*6);ctx.strokeStyle="#C9CDD2";ctx.lineWidth=16;ctx.beginPath();ctx.arc(0,0,170,0,Math.PI*2);ctx.stroke();ctx.lineWidth=6;for(let i=0;i<8;i++){ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(170*Math.cos(i*Math.PI/4),170*Math.sin(i*Math.PI/4));ctx.stroke();}ctx.restore();}}],
+ ["S4 · il segnale acustico per non vedenti",v=>{fillBg("#15171A");ctx.fillStyle="#3A3F46";rr(760,260,400,560,26);ctx.fill();ctx.fillStyle="#E9C33B";ctx.beginPath();ctx.arc(960,560,92,0,Math.PI*2);ctx.fill();ctx.strokeStyle="rgba(242,165,22,.6)";ctx.lineWidth=5;const r=(v*3%1);ctx.globalAlpha=1-r;ctx.beginPath();ctx.arc(960,560,92+r*260,0,Math.PI*2);ctx.stroke();ctx.globalAlpha=1;ctx.fillStyle="#22262B";for(let i=0;i<5;i++)ctx.fillRect(840+i*52,330,30,90);}],
+ ["S2 · il cartello di attraversamento",v=>{fillBg("#1D2A3D");const s=lerp(1,1.08,v);ctx.save();ctx.translate(960,560);ctx.scale(s,s);ctx.fillStyle="#1F57B8";rr(-260,-260,520,520,30);ctx.fill();ctx.strokeStyle="#FFFFFF";ctx.lineWidth=14;rr(-236,-236,472,472,22);ctx.stroke();ctx.fillStyle="#FFFFFF";ctx.beginPath();ctx.moveTo(0,-200);ctx.lineTo(200,170);ctx.lineTo(-200,170);ctx.closePath();ctx.fill();ctx.fillStyle="#111";ctx.beginPath();ctx.arc(10,-70,24,0,Math.PI*2);ctx.fill();ctx.lineWidth=20;ctx.strokeStyle="#111";ctx.lineCap="round";ctx.beginPath();ctx.moveTo(5,-40);ctx.lineTo(-10,40);ctx.lineTo(-50,120);ctx.moveTo(-10,40);ctx.lineTo(40,110);ctx.moveTo(0,-20);ctx.lineTo(-50,20);ctx.moveTo(0,-20);ctx.lineTo(50,10);ctx.stroke();ctx.lineCap="butt";for(let i=0;i<4;i++){ctx.fillStyle="#111";ctx.fillRect(-150+i*80,130,46,26);}ctx.restore();}]
+];
+SC.stat=function(u){
+  const n=MONT.length,d=8/n;const i=Math.min(n-1,Math.floor(u/d));const v=(u-i*d)/d;
+  MONT[i][1](v);
+  ctx.fillStyle="rgba(4,5,7,.62)";ctx.fillRect(0,0,W,H);
+  const g=ctx.createLinearGradient(0,0,W*.75,0);g.addColorStop(0,"rgba(4,5,7,.75)");g.addColorStop(1,"rgba(4,5,7,0)");ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+  chip("FONTE "+MONT[i][0],120,840,{s:20,a:.9,c:C.dim});
+  const a=eo(seg(u,.3,1.2));
+  T("470",112,470,{s:330,w:800,a:a,ls:-4});
+  T("pedoni morti in Italia nel 2024",124,556,{s:62,w:600,a:eo(seg(u,.9,1.7))});
+  T("Più di uno al giorno.",124,650,{s:76,w:700,c:C.amber,a:eo(seg(u,2.8,3.6))});
+  T("Fonte: ACI–ISTAT, incidenti stradali 2024",126,712,{s:24,f:F.m,w:400,c:C.dim,a:eo(seg(u,3.4,4.2))});
+};
+function moleSil(x,base,sc){
+  ctx.fillRect(x-60*sc,base-120*sc,120*sc,120*sc);ctx.fillRect(x-70*sc,base-140*sc,140*sc,20*sc);
+  ctx.beginPath();ctx.moveTo(x-64*sc,base-140*sc);ctx.quadraticCurveTo(x-54*sc,base-262*sc,x-15*sc,base-364*sc);ctx.lineTo(x+15*sc,base-364*sc);ctx.quadraticCurveTo(x+54*sc,base-262*sc,x+64*sc,base-140*sc);ctx.closePath();ctx.fill();
+  ctx.fillRect(x-17*sc,base-414*sc,34*sc,50*sc);ctx.fillRect(x-11*sc,base-452*sc,22*sc,38*sc);
+  ctx.beginPath();ctx.moveTo(x-8*sc,base-452*sc);ctx.lineTo(x,base-640*sc);ctx.lineTo(x+8*sc,base-452*sc);ctx.closePath();ctx.fill();
+}
+const SKY=(function(){const R=mulberry(5);const out=[];let x=-20;while(x<W+40){const w=60+R()*120,h=90+R()*190;const wins=[];for(let i=0;i<14;i++)wins.push([x+8+R()*(w-16),R()*(h-20)+10,R()]);out.push([x,w,h,wins]);x+=w+4;}return out;})();
+SC.dark=function(u){
+  const k=seg(u,.4,7.5);
+  const top=[lerp(45,4,k),lerp(60,6,k),lerp(110,14,k)],bot=[lerp(240,18,k),lerp(140,24,k),lerp(80,44,k)];
+  const g=ctx.createLinearGradient(0,0,0,760);g.addColorStop(0,"rgb("+top.map(Math.round).join(",")+")");g.addColorStop(1,"rgb("+bot.map(Math.round).join(",")+")");ctx.fillStyle=g;ctx.fillRect(0,0,W,760);
+  glow(1520,760,lerp(420,120,k),"#FF9A4A",lerp(.55,0,k));
+  const base=760;ctx.fillStyle="#07090D";
+  for(const b of SKY){ctx.fillRect(b[0],base-b[2],b[1],b[2]);}
+  moleSil(1250,base,.92);
+  const lit=seg(u,2,8);
+  ctx.fillStyle="rgba(242,177,58,.75)";for(const b of SKY)for(const w of b[3]){if(w[2]>lit*.85)continue;ctx.fillRect(w[0],base-b[2]+w[1],7,10);}
+  ctx.fillStyle="#0C0F14";ctx.fillRect(0,760,W,320);
+  ctx.beginPath();ctx.moveTo(0,1080);ctx.lineTo(560,770);ctx.lineTo(1360,770);ctx.lineTo(W,1080);ctx.closePath();ctx.fillStyle="#12151A";ctx.fill();
+  const sa=lerp(.85,.25,k);
+  const xa=y=>lerp(560,0,(y-770)/310),xb=y=>lerp(1360,1920,(y-770)/310);const yA=812,yB=884;
+  ctx.fillStyle="rgba(230,230,223,"+sa+")";
+  for(let s2=0;s2<13;s2+=2){const f0=s2/13,f1=(s2+1)/13;ctx.beginPath();ctx.moveTo(lerp(xa(yA),xb(yA),f0),yA);ctx.lineTo(lerp(xa(yA),xb(yA),f1),yA);ctx.lineTo(lerp(xa(yB),xb(yB),f1),yB);ctx.lineTo(lerp(xa(yB),xb(yB),f0),yB);ctx.closePath();ctx.fill();}
+  const lamps=seg(u,3.2,4.2);
+  for(const lx of [380,1540]){ctx.fillStyle="#1D2127";ctx.fillRect(lx-5,560,10,220);ctx.fillRect(lx-5,560,lx<960?60:-60,8);const hx=lx+(lx<960?58:-58);glow(hx,575,lerp(0,260,lamps),"#FFC56B",.55*lamps);}
+  const px=lerp(760,1060,seg(u,1,10)),pa=lerp(1,.1,seg(u,3,8));
+  ctx.save();ctx.globalAlpha=pa;ctx.fillStyle="#2B3038";rr(px-13,800,26,72,12);ctx.fill();ctx.beginPath();ctx.arc(px,788,12,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#2B3038";ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(px+15,826);ctx.lineTo(px+28,874);ctx.stroke();ctx.restore();
+  const hk=seg(u,5,10);if(hk>0){const cx=lerp(975,905,hk),cy=lerp(778,842,hk),sp=lerp(12,170,hk),r=lerp(12,120,hk);glow(cx-sp/2,cy,r,"#FFF1CC",.95*Math.min(1,hk*3));glow(cx+sp/2,cy,r,"#FFF1CC",.95*Math.min(1,hk*3));}
+  const ta=eo(seg(u,.5,1.4));
+  T("25.10",120,190,{s:64,f:F.m,w:700,a:ta});
+  T("torna l'ora solare",120,262,{s:58,w:600,a:ta});
+  const hh=17,mm=Math.min(30,Math.floor(lerp(12,30,seg(u,.5,6))));
+  T(hh+":"+String(mm).padStart(2,"0"),W-120,190,{s:96,f:F.m,w:700,al:"right",a:ta,c:mm>=30?C.amber:C.ink});
+  T("ora di punta",W-124,236,{s:30,f:F.b,w:500,al:"right",c:C.dim,a:ta});
+};
+SC.logo=function(u){
+  fillBg("#050608");
+  const cx=960,cy=470;
+  const merge=eio(seg(u,1.4,2.8));
+  const housing=1-seg(u,1.2,2.2);
+  if(housing>0){ctx.save();ctx.globalAlpha=housing*eo(seg(u,0,.6));ctx.fillStyle="#15181C";rr(cx-90,cy-250,180,500,46);ctx.fill();ctx.restore();}
+  const a0=eo(seg(u,0,.7));
+  const cols=["#E24B4A","#EF9F27","#639922"];
+  for(let i=0;i<3;i++){const y=lerp(cy-150+i*150,cy,merge);const c=i===1?C.amber:cols[i];const r=i===1?lerp(56,62,merge):lerp(56,20,merge);ctx.save();ctx.globalAlpha=a0*(i===1?1:1-merge*.9);glow(cx,y,r*3,c,.35);ctx.fillStyle=c;ctx.beginPath();ctx.arc(cx,y,r,0,Math.PI*2);ctx.fill();ctx.restore();}
+  if(u>2.6){for(let j=0;j<3;j++){const ph=((u-2.6)*.8+j/3)%1;ctx.save();ctx.globalAlpha=(1-ph)*.6*seg(u,2.6,3.2);ctx.strokeStyle=C.amber;ctx.lineWidth=4;ctx.beginPath();ctx.arc(cx,cy,62+ph*330,0,Math.PI*2);ctx.stroke();ctx.restore();}}
+  const wa=eo(seg(u,3.3,4.3));
+  if(wa>0){const y=cy+300;ctx.save();ctx.beginPath();ctx.rect(0,y-200,W*wa+200,260);ctx.clip();T("MDGB",cx,y,{s:230,w:800,al:"center",ls:18});ctx.restore();
+    T("MOBILITY DATA & GUARDIAN BEACON",cx,y+64,{s:30,f:F.m,w:500,al:"center",c:C.dim,ls:6,a:eo(seg(u,4.2,5))});}
+  T("Arduino UNO Q · AI a bordo · nessun cloud",cx,H-170,{s:28,f:F.m,w:400,al:"center",c:C.amber,a:eo(seg(u,5.4,6.2))});
+};
+let MINI=null;
+function buildMini(){const c=document.createElement("canvas");c.width=W;c.height=H;const g=c.getContext("2d");const R=mulberry(7);g.fillStyle="#3B3F45";g.fillRect(0,0,W,H);g.save();g.translate(W/2,H/2);g.rotate(-.3);
+  const bw=200,bh=150,st=44;const roofs=["#B4683A","#8C8A85","#C69A52","#A55F36","#9B9993","#C7A466"];
+  for(let i=-8;i<=8;i++)for(let j=-7;j<=7;j++){const x=i*(bw+st)-bw/2,y=j*(bh+st)-bh/2;g.fillStyle="#6E7177";g.fillRect(x-6,y-6,bw+12,bh+12);g.fillStyle=roofs[Math.floor(R()*roofs.length)];g.fillRect(x,y,bw,bh);g.fillStyle="rgba(40,46,40,.85)";g.fillRect(x+bw*.28,y+bh*.28,bw*.44,bh*.44);g.fillStyle="#4E7A3B";for(let t=0;t<3;t++){g.beginPath();g.arc(x+bw*.35+R()*bw*.3,y+bh*.35+R()*bh*.3,7+R()*6,0,Math.PI*2);g.fill();}
+    g.fillStyle="#E9E9E2";for(let s=0;s<6;s++){g.fillRect(x+bw+6+s*6.5,y+bh*.4,3.5,26);}}
+  g.fillStyle="#3E7A35";for(let i=-8;i<=8;i++){const x=i*(bw+st)+bw/2+st/2;for(let y=-1200;y<1200;y+=36){g.beginPath();g.arc(x-st/2+6,y,8,0,Math.PI*2);g.fill();}}
+  g.restore();MINI=c;}
+SC.mini=function(u){
+  if(!MINI)buildMini();
+  const z=u<3.4?lerp(1,1.22,eio(seg(u,0,3.4))):lerp(1.22,4.2,eio(seg(u,3.4,4.3)));
+  const toModel=seg(u,3.9,4.5);
+  if(toModel<1){
+    const drawAt=(filter)=>{ctx.save();if(filter&&("filter" in ctx))ctx.filter=filter;ctx.translate(W/2,H/2);ctx.scale(z,z);ctx.translate(-W/2,-H/2);ctx.drawImage(MINI,0,0);
+      ctx.translate(W/2,H/2);ctx.rotate(-.3);const R=mulberry(3);for(let k=0;k<16;k++){const lane=Math.floor(R()*12)-6;const sp=60+R()*80;const y=lane*194+97+(R()<.5?-9:9);const x=((u*sp+R()*2400)%2400)-1200;ctx.fillStyle=["#D9483B","#F2F2F2","#2F6DD1","#F2C84B"][k%4];ctx.fillRect(x,y-6,26,12);}ctx.restore();};
+    drawAt("blur(9px) saturate(1.35)");
+    ctx.save();ctx.beginPath();ctx.rect(0,H*.36,W,H*.28);ctx.clip();drawAt("saturate(1.35)");ctx.restore();
+    if(toModel>0)fadeBlack(toModel);
+    chip("FONTE drone D5 · tilt-shift in montaggio",120,840,{s:20,a:.9*(1-toModel),c:C.dim});
+  }
+  if(u>=4.3){
+    const m=seg(u,4.3,4.9);fillBg("#0B0C0E");glow(W/2,H/2,900,"#3A2E22",.6);
+    ctx.save();ctx.globalAlpha=eo(m);
+    ctx.fillStyle="#6E5034";rr(300,190,1320,720,18);ctx.fill();ctx.strokeStyle="rgba(0,0,0,.18)";ctx.lineWidth=3;for(let y=215;y<900;y+=26){ctx.beginPath();ctx.moveTo(310,y);ctx.bezierCurveTo(700,y+8,1200,y-8,1610,y+4);ctx.stroke();}
+    ctx.fillStyle="#9EA3A8";ctx.fillRect(330,300,1260,120);ctx.fillRect(330,690,1260,110);ctx.fillStyle="#2B2F35";ctx.fillRect(330,420,1260,270);
+    for(let s=0;s<7;s++){ctx.fillStyle="#EDEDE6";ctx.fillRect(860,430+s*38,200,19);}
+    ctx.fillStyle="#C9302C";rr(1240,560,150,66,10);ctx.fill();ctx.fillStyle="rgba(255,255,255,.25)";rr(1290,570,50,46,6);ctx.fill();
+    ctx.fillStyle="#F4F4EE";ctx.beginPath();ctx.arc(905,380,15,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#F4F4EE";ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(920,385);ctx.lineTo(934,412);ctx.stroke();
+    ctx.fillStyle="#1A1D21";ctx.fillRect(780,250,12,170);rr(756,196,60,110,12);ctx.fill();
+    const lc=["#E24B4A","#3A3010","#2F4A12"];for(let i=0;i<3;i++){ctx.fillStyle=lc[i];ctx.beginPath();ctx.arc(786,220+i*32,11,0,Math.PI*2);ctx.fill();}
+    ctx.restore();
+    const drop=eo(seg(u,4.9,5.5));const bounce=u>5.5&&u<5.8?Math.sin((u-5.5)/.3*Math.PI)*6:0;
+    const my=lerp(60,322,drop)-bounce;
+    ctx.fillStyle="#121418";rr(816,my,92,58,10);ctx.fill();ctx.strokeStyle="#2C3138";ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle="#05070A";ctx.beginPath();ctx.arc(848,my+29,17,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#5A6068";ctx.beginPath();ctx.arc(848,my+29,17,0,Math.PI*2);ctx.stroke();
+    const on=u>5.6;if(on){glow(886,my+29,60,C.amber,.6);}ctx.fillStyle=on?C.amber:"#3A2A0C";ctx.beginPath();ctx.arc(886,my+29,8,0,Math.PI*2);ctx.fill();
+    if(u>5.6){const ph=(u-5.6)/1.2;if(ph<1){ctx.save();ctx.globalAlpha=1-ph;ctx.strokeStyle=C.amber;ctx.lineWidth=4;ctx.beginPath();ctx.arc(862,my+29,40+ph*200,0,Math.PI*2);ctx.stroke();ctx.restore();}}
+    chip("~200 € di componenti",1180,236,{s:30,a:eo(seg(u,5.8,6.4)),c:C.amber,bg:"rgba(10,12,15,.88)"});
+    chip("si monta sul semaforo esistente",1180,300,{s:30,a:eo(seg(u,6.3,6.9)),bg:"rgba(10,12,15,.88)"});
+    chip("FONTE plastico P2",120,840,{s:20,a:.9,c:C.dim});
+  }
+};
+function hudCam(label,extra){chip(label,40,96,{s:22,c:C.ink});if(extra)extra.forEach((e,i)=>chip(e[0],40,146+i*48,{s:20,c:e[1]||C.dim}));}
+SC.see=function(u){
+  MORPH=0;world({zones:.5});
+  const kb=Math.min(u/8,1);
+  const objs=[
+    {k:"car",id:31,x:3+11.5*u,y:1.75,v:11.5,dir:1},
+    {k:"car",id:27,x:6+50*Math.pow(1-kb,2),y:5.25,v:12.5*(1-kb),dir:-1,lights:true},
+    {k:"ped",id:12,x:-1.4+1.3*u,y:-1.4,v:1.3},
+    {k:"ped",id:14,x:.6,y:Math.min(-.7+.8*Math.max(0,u-1),7.6),v:u>1?.8:0,cane:true,sub:u>3.2?"lento 0,8 m/s":null}
+  ];
+  if(u>1.4)objs.push({k:"bike",id:7,x:-1.5+5*(u-1.4),y:.95,v:5});
+  const pl=lineOnGround(-2.6,3.5,2.6,3.5,C.cyan,4);
+  const vl=lineOnGround(0,0,0,7,rgba(C.cyan,.55),3,[12,10]);
+  drawDetections(objs);
+  T("linea ped",pl[0][0]-120,pl[0][1]+8,{s:22,f:F.m,w:600,c:C.cyan});
+  const crossed=u>1+4.2/.8;
+  const yielded=u>6.6;
+  const panelX=W-470,panelY=96;
+  ctx.fillStyle="rgba(10,12,15,.82)";rr(panelX,panelY,430,220,10);ctx.fill();
+  T("CONTEGGI   IN   OUT",panelX+20,panelY+40,{s:20,f:F.m,w:600,c:C.dim});
+  const rows=[["pedoni",14+(crossed?1:0),11],["auto",52,47+(u>.2?1:0)],["ciclisti",6,4+(u>1.9?1:0)]];
+  rows.forEach((r,i)=>{T(r[0],panelX+20,panelY+86+i*42,{s:24,f:F.m,w:500});T(String(r[1]),panelX+250,panelY+86+i*42,{s:24,f:F.m,w:700,al:"right",c:(i===0&&crossed)?C.amber:C.ink});T(String(r[2]),panelX+352,panelY+86+i*42,{s:24,f:F.m,w:700,al:"right"});});
+  if(yielded)chip("yield ✓ l'auto #27 ha dato la precedenza",panelX-60,panelY+238,{s:20,c:C.green,a:eo(seg(u,6.6,7.1))});
+  hudCam("CAM 01 · Via Roma, Torino",[["AI a bordo · nessun cloud",C.green],["Wi-Fi spento",C.amber],["FONTE ripresa S1 + overlay",C.dim]]);
+};
+SC.measure=function(u){
+  MORPH=eio(seg(u,3.5,6.0));
+  const lit=k=>u>.4+k*.38;
+  world({stripe:k=>(lit(k)&&u<3.4)?C.amber:C.stripe});
+  if(u<3.5){for(let k=0;k<7;k++){if(!lit(k))continue;const p=gp(2.35,k+.5);T((k+1)+" m",p[0]+8,p[1]+8,{s:24,f:F.m,w:700,c:C.amber,a:eo(seg(u,.4+k*.38,.7+k*.38))});}
+    const p1=gp(-2,.25),p2=gp(-2,.75);if(u>.4){T("50 cm",p1[0]-130,(p1[1]+p2[1])/2+8,{s:24,f:F.m,w:700,c:C.amber,a:eo(seg(u,.4,.9))});}
+    if(u>3.0){const a=gp(-2.6,0),b=gp(-2.6,7);ctx.save();ctx.globalAlpha=eo(seg(u,3,3.4));ctx.strokeStyle=C.ink;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();ctx.restore();T("W = 7,0 m",(a[0]+b[0])/2-210,(a[1]+b[1])/2,{s:34,f:F.m,w:700,a:eo(seg(u,3,3.4))});}}
+  if(MORPH>.55){const ga=seg(MORPH,.55,1);ctx.save();ctx.globalAlpha=ga*.5;ctx.strokeStyle="rgba(70,211,227,.35)";ctx.lineWidth=1;ctx.beginPath();for(let x=-20;x<=40;x++){const a=tp(x,-6),b=tp(x,11);ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);}for(let y=-6;y<=11;y++){const a=tp(-20,y),b=tp(40,y);ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);}ctx.stroke();ctx.restore();
+    const pk=seg(u,5.4,8);const ped=tp(.3,.4+.8*pk*2.6),car=tp(lerp(30,24,pk),5.25);
+    ctx.save();ctx.globalAlpha=ga;ctx.fillStyle=C.pedbox;ctx.beginPath();ctx.arc(ped[0],ped[1],12,0,Math.PI*2);ctx.fill();arrow(ped[0],ped[1],ped[0],ped[1]-64,C.pedbox,4);
+    ctx.fillStyle=C.cyan;rr(car[0]-88,car[1]-36,176,72,12);ctx.fill();arrow(car[0]-92,car[1],car[0]-300,car[1],C.cyan,5);ctx.restore();
+    T("0,8 m/s",ped[0]+24,ped[1]-34,{s:30,f:F.m,w:700,c:C.pedbox,a:ga});
+    T("13,9 m/s · 50 km/h",car[0]-90,car[1]-56,{s:30,f:F.m,w:700,c:C.cyan,a:ga});
+    T("vista dall'alto · 1 quadretto = 1 m",120,H-170,{s:26,f:F.m,w:500,c:C.dim,a:ga});}
+  hudCam(MORPH<.5?"calibrazione · 4 punti sulle strisce":"omografia · pixel → metri",[["FONTE calibrate.py (SC2) + grafiche M4–M5",C.dim]]);
+};
+SC.understand=function(u){
+  MORPH=0;world({});
+  const ph=u<2.7?0:u<5.3?1:2;
+  const objs=[];
+  objs.push({k:"ped",id:14,x:.4,y:.4+.8*Math.min(u,8)*.55,v:.8,cane:true,dim:ph!==0,color:C.amber,label:"#14 pedone 3 km/h",sub:"lento · 0,8 m/s",subc:C.amber});
+  objs.push({k:"ped",id:21,x:7+1.1*u,y:-1.3,v:1.1,dim:ph!==1});
+  objs.push({k:"child",id:22,x:7.6+1.1*u,y:-.75,v:1.1,dim:ph!==1,color:C.blue,label:"#22 bambino",sub:"altezza 1,15 m < 1,30 m",subc:C.blue});
+  objs.push({k:"ped",id:30,x:16-1.0*u,y:8.2,v:1,dim:ph!==2});
+  objs.push({k:"dog",id:31,x:17.3-1.0*u,y:8.0,v:1,dim:ph!==2,color:C.green,label:"#31 cane · al guinzaglio",sub:"nessun allarme",subc:C.green});
+  if(u>6.1)objs.push({k:"dog",id:33,x:lerp(10,7,seg(u,6.1,8)),y:lerp(-1.6,2.4,seg(u,6.1,8)),v:2.2,color:C.magenta,label:"#33 cane libero",sub:"ANIMAL_ALERT",subc:C.magenta});
+  drawDetections(objs);
+  if(ph===2){const a=gp(16-u,8.2,1.0),b=gp(17.3-u,8.0,.45);ctx.save();ctx.strokeStyle=C.green;ctx.lineWidth=2;ctx.setLineDash([6,6]);ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.lineTo(b[0],b[1]);ctx.stroke();ctx.restore();}
+  if(u>6.1){const on=Math.floor(u*8)%2===0;chip("lampeggio ambra 4 Hz",W-470,96,{s:22,c:on?"#0A0C0F":C.amber,bg:on?C.amber:"rgba(10,12,15,.85)"});}
+  const caps=["passo misurato su 2 s di cammino","altezza in metri, dalla camera ricostruita","guinzaglio: persona entro 2 m, stessa direzione"];
+  chip(caps[ph],120,H-214,{s:26,c:C.ink,bg:"rgba(10,12,15,.88)"});
+  hudCam("CAM 01 · Via Roma, Torino",[["FONTE S1 con overlay + figurine P6",C.dim]]);
+};
+function lcd(x,y,l1,l2,bg){ctx.fillStyle="#1B1E22";rr(x,y,720,200,14);ctx.fill();ctx.fillStyle=bg;rr(x+26,y+26,668,148,8);ctx.fill();const cw=41;for(let r=0;r<2;r++)for(let c=0;c<16;c++){ctx.fillStyle="rgba(0,0,0,.07)";ctx.fillRect(x+36+c*cw,y+38+r*66,cw-5,56);}T(l1.padEnd(16).slice(0,16),x+39,y+84,{s:54,f:F.m,w:700,c:"#2A1800",ls:8.6});T(l2.padEnd(16).slice(0,16),x+39,y+150,{s:54,f:F.m,w:700,c:"#2A1800",ls:8.6});T("LCD · verso chi guida",x,y+236,{s:22,f:F.m,w:500,c:C.dim});}
+function oled(x,y,l1,l2){ctx.fillStyle="#1B1E22";rr(x,y,380,180,14);ctx.fill();ctx.fillStyle="#020304";rr(x+20,y+20,340,140,6);ctx.fill();T(l1,x+40,y+78,{s:40,f:F.m,w:700,c:"#DDF4FF"});T(l2,x+40,y+128,{s:30,f:F.m,w:500,c:"#9FD8F5"});T("OLED · verso chi cammina",x,y+216,{s:22,f:F.m,w:500,c:C.dim});}
+SC.decide=function(u){
+  fillBg("#07090C");
+  const ped=u>=6.2;
+  const lines=[
+    ["d = 60 m     v = 13,9 m/s (50 km/h)",C.ink],
+    ["TTC    = d / v           = 4,3 s",C.red],
+    ["W = 7,0 m    v_ped = 0,8 m/s (misurata)",C.ink],
+    ["T_need = W / v_ped + 1   = 9,8 s",C.ink],
+    ["d_stop = v·1,0 + v²/14   = 27,7 m",C.ink],
+    ped?["d = 25 m ≤ d_stop + 10 e non frena","#FF8A8D"]:["4,3 < 9,8  e  60 > 37,7  →",C.amber]
+  ];
+  lines.forEach((L,i)=>{const t0=.2+i*.62;const k=seg(u,t0,t0+.55);if(k<=0)return;T(typed(L[0],k),110,250+i*76,{s:38,f:F.m,w:i===5?700:500,c:L[1]});});
+  const st=ped?"WARN_PEDESTRIAN":"WARN_DRIVER";
+  if(u>3.6){chip(st,110,700,{s:44,w:700,c:"#0A0C0F",bg:ped?C.red:C.amber,px:18,py:18});}
+  const reason=ped?'reason: "auto 50 km/h a 25 m; non frena (a > -2 m/s²)"':'reason: "anziano 0.8 m/s; auto 50 km/h a 60 m; TTC 4.3 s < T_need 9.8 s"';
+  const rk=ped?seg(u,6.3,7.2):seg(u,4.0,5.6);
+  if(rk>0){ctx.fillStyle="rgba(28,32,37,.9)";rr(100,800,1720,70,10);ctx.fill();T(typed(reason,rk),124,846,{s:28,f:F.m,w:500,c:"#C9F0D0"});}
+  const on=Math.floor(u*4)%2===0&&u>3.6;
+  const bg=ped?(on?"#F06B5E":"#7A2C26"):(on?"#F6B544":"#7A5410");
+  lcd(1110,180,ped?"FRENA!  50 km/h":"PEDONE  50 km/h",ped?"PEDONE":"RALLENTA",u>3.6?bg:"#3B3F45");
+  oled(1110,470,ped?"FERMO!":"ATTENDI","auto 50km/h");
+  const sy=740;for(let i=0;i<24;i++){const x=1120+i*29;const c=u>3.6&&on?(ped?C.red:C.amber):"#2A2E33";if(u>3.6&&on)glow(x,sy,26,ped?C.red:C.amber,.45);ctx.fillStyle=c;ctx.beginPath();ctx.arc(x,sy,9,0,Math.PI*2);ctx.fill();}
+  T(ped?"striscia a terra · RED_GROUND_BLINK":"striscia ambra · AMBER_BLINK_2HZ",1110,790,{s:22,f:F.m,w:500,c:C.dim});
+  if(!ped&&u>4.4)chip("richiesta: rosso trattenuto · verde allungato",1110,96,{s:22,c:C.green,a:eo(seg(u,4.4,4.9))});
+  hudCam("la regola · rules.py",[["FONTE terminale SC3 + plastico P3",C.dim]]);
+};
+SC.failsafe=function(u){
+  fillBg("#07090C");
+  const kill=3.0,x0=120,x1=1800,yc=410,amp=120,win=2.0;
+  ctx.strokeStyle="rgba(255,255,255,.06)";ctx.lineWidth=1;ctx.beginPath();for(let x=x0;x<=x1;x+=84){ctx.moveTo(x,yc-170);ctx.lineTo(x,yc+170);}for(let y=yc-160;y<=yc+160;y+=40){ctx.moveTo(x0,y);ctx.lineTo(x1,y);}ctx.stroke();
+  const sig=t=>{if(t>kill||t<0)return 0;const p=(t%.1)/.1;if(p<.06)return -Math.sin(p/.06*Math.PI);if(p<.12)return .45*Math.sin((p-.06)/.06*Math.PI);return 0;};
+  ctx.save();ctx.strokeStyle=u<kill?C.green:C.red;ctx.lineWidth=4;ctx.shadowColor=u<kill?C.green:C.red;ctx.shadowBlur=12;ctx.beginPath();
+  for(let x=x0;x<=x1;x+=2){const t=u-win*(1-(x-x0)/(x1-x0));const y=yc+sig(t)*amp;if(x===x0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();ctx.restore();
+  T("battito C2 verso il microcontrollore · ogni 100 ms",x0,yc-200,{s:30,f:F.m,w:500,c:C.dim});
+  ctx.fillStyle="rgba(28,32,37,.92)";rr(x0,640,820,190,10);ctx.fill();
+  const term=["$ systemctl is-active mdgb-ai","active"];if(u>2.2)term.push(typed("$ sudo systemctl kill -s KILL mdgb-ai",seg(u,2.2,2.95)));if(u>kill)term.push("visione ferma");
+  term.forEach((s,i)=>T(s,x0+22,684+i*40,{s:26,f:F.m,w:500,c:i===3?C.red:"#C9F0D0"}));
+  if(u>kill){const e=Math.min(.5,u-kill);T(it(e,2)+" s",1240,760,{s:120,f:F.m,w:700,al:"right",c:u-kill>=.5?C.amber:C.ink});T("senza battito",1240,808,{s:26,f:F.m,w:500,al:"right",c:C.dim});}
+  if(u>kill+.5){chip("FAIL-SAFE · il semaforo torna al suo ciclo",x0,560,{s:30,w:700,c:"#0A0C0F",bg:C.amber,px:16,py:16});}
+  const lx=1560,ly=500;ctx.fillStyle="#15181C";rr(lx-70,ly,140,360,34);ctx.fill();
+  let lamp=-1;if(u<=kill+.5){lamp=0;}else{const c=u-(kill+.5);lamp=c<2.1?2:c<2.9?1:0;}
+  const cols=[C.red,C.amber,C.green];for(let i=0;i<3;i++){const on=i===lamp;if(on)glow(lx,ly+62+i*118,90,cols[i],.5);ctx.fillStyle=on?cols[i]:"#24282D";ctx.beginPath();ctx.arc(lx,ly+62+i*118,44,0,Math.PI*2);ctx.fill();}
+  T(u<=kill+.5?"rosso trattenuto da MDGB":"ciclo normale della centralina",lx,ly+398,{s:24,f:F.m,w:500,al:"center",c:C.dim});
+  if(u>kill+1.6){const on=Math.floor(u*4)%2===0;chip("PIR + ToF sul microcontrollore: il pedone resta visto",x0,880,{s:22,c:on?C.amber:C.dim});}
+  hudCam("il kill test",[["FONTE plastico P4 a 240 fps + grafica M7",C.dim]]);
+};
+SC.network=function(u){
+  fillBg("#07090C");
+  const N=[360,560],Cn=[1560,560];
+  const off=u>1.2&&u<5.0;
+  const q=u<1.2?0:u<5.0?Math.round(lerp(0,37,seg(u,1.2,5.0))):Math.round(lerp(37,0,eo(seg(u,5.0,6.6))));
+  const bez=t=>{const cx=960,cy=300;return[(1-t)*(1-t)*N[0]+2*(1-t)*t*cx+t*t*Cn[0],(1-t)*(1-t)*N[1]+2*(1-t)*t*cy+t*t*Cn[1]];};
+  ctx.save();ctx.lineWidth=5;ctx.strokeStyle=off?rgba(C.red,.8):rgba(C.green,.75);if(off)ctx.setLineDash([16,14]);ctx.beginPath();for(let i=0;i<=40;i++){const p=bez(i/40);if(i)ctx.lineTo(p[0],p[1]);else ctx.moveTo(p[0],p[1]);}ctx.stroke();ctx.restore();
+  if(off){const p=bez(.5);ctx.save();ctx.strokeStyle=C.red;ctx.lineWidth=8;ctx.beginPath();ctx.moveTo(p[0]-22,p[1]-22);ctx.lineTo(p[0]+22,p[1]+22);ctx.moveTo(p[0]+22,p[1]-22);ctx.lineTo(p[0]-22,p[1]+22);ctx.stroke();ctx.restore();T("MQTT · nessuna conferma",p[0],p[1]-44,{s:26,f:F.m,w:600,al:"center",c:C.red});}
+  else{const n=u>5?10:4;const sp=u>5?1.6:.6;for(let i=0;i<n;i++){const t=((u*sp)+i/n)%1;const p=bez(t);ctx.fillStyle=C.green;ctx.beginPath();ctx.arc(p[0],p[1],8,0,Math.PI*2);ctx.fill();}T("Wi-Fi · MQTT 5, QoS 1",960,262,{s:26,f:F.m,w:600,al:"center",c:C.green});}
+  if(u>2.4&&u<5.6){for(let j=0;j<3;j++){const ph=((u-2.4)/.55+j/3)%1;ctx.save();ctx.globalAlpha=(1-ph)*.75;ctx.strokeStyle=C.blue;ctx.lineWidth=4;ctx.beginPath();ctx.arc(N[0],N[1],80+ph*260,-.6,.6);ctx.stroke();ctx.restore();}
+    const bt=((u-2.4)*.7)%1;const bx=lerp(N[0]+120,Cn[0]-140,bt);ctx.fillStyle=C.blue;rr(bx-36,770,72,30,6);ctx.fill();T("27 B",bx,786,{s:18,f:F.m,w:700,al:"center",bl:"middle",c:"#0A0C0F"});
+    ctx.strokeStyle=rgba(C.blue,.5);ctx.lineWidth=2;ctx.setLineDash([8,8]);ctx.beginPath();ctx.moveTo(N[0]+120,785);ctx.lineTo(Cn[0]-140,785);ctx.stroke();ctx.setLineDash([]);
+    T("backup Bluetooth: allarmi, stato, conteggi",960,850,{s:26,f:F.m,w:500,al:"center",c:C.blue});}
+  ctx.fillStyle="#14171B";rr(N[0]-150,N[1]-110,300,220,16);ctx.fill();ctx.fillStyle="#0E5A7A";rr(N[0]-100,N[1]-70,200,90,8);ctx.fill();ctx.fillStyle="#C8A64A";for(let i=0;i<8;i++)ctx.fillRect(N[0]-92+i*24,N[1]-82,12,12);
+  T("nodo01 · Via Roma",N[0],N[1]+62,{s:26,f:F.m,w:600,al:"center"});
+  T("coda su disco: "+q,N[0],N[1]+150,{s:28,f:F.m,w:700,al:"center",c:q>0?C.amber:C.dim});
+  ctx.fillStyle="#14171B";rr(Cn[0]-170,Cn[1]-120,340,220,16);ctx.fill();ctx.fillStyle="#1F2A33";rr(Cn[0]-140,Cn[1]-92,280,150,8);ctx.fill();ctx.fillStyle="#2B3540";ctx.fillRect(Cn[0]-210,Cn[1]+100,420,16);
+  const dotC=u<2.4?C.green:u<5.6?C.amber:C.green;glow(Cn[0]+20,Cn[1]-20,40,dotC,.6);ctx.fillStyle=dotC;ctx.beginPath();ctx.arc(Cn[0]+20,Cn[1]-20,11,0,Math.PI*2);ctx.fill();
+  T("MDGB Centrale",Cn[0],Cn[1]+160,{s:26,f:F.m,w:600,al:"center"});
+  const st=u<2.4?"OK":u<5.6?"rete giù · nodo sano":"OK";chip(st,Cn[0],Cn[1]+184,{s:24,al:"center",c:"#0A0C0F",bg:dotC,w:700});
+  if(u>1.2&&u<2.4)T("+30 s senza conferme",960,700,{s:26,f:F.m,w:500,al:"center",c:C.dim});
+  if(u>5.0&&u<6.6)T("rete stabile: la coda si svuota",960,700,{s:26,f:F.m,w:500,al:"center",c:C.green});
+  if(u>6.5){const a=eo(seg(u,6.5,7.1));T("Eventi persi: 0",960,740,{s:96,w:800,al:"center",c:C.green,a:a});}
+  hudCam("rete · store & forward",[["FONTE app MDGB Centrale SC4 + grafica M8",C.dim]]);
+};
+const JSONL=['{"type":"crossing","cls":"pedestrian","dir":"in","attrs":{"slow":true}}','{"type":"yield","yielded":true}','{"type":"crossing","cls":"car","dir":"out","line":"veh"}','{"type":"crossing","cls":"cyclist","dir":"in"}','{"type":"status","state":"PRESENCE"}','{"type":"near_miss","ttc_s":0.8}','{"type":"agg","ped":{"in":14,"out":11}}','{"type":"crossing","cls":"animal","coco":"dog"}'];
+SC.privacy=function(u){
+  fillBg("#07090C");
+  ctx.save();ctx.beginPath();ctx.rect(0,80,1150,860);ctx.clip();ctx.translate(-150,40);ctx.scale(.72,.72);
+  topCrossing();
+  const k=eio(seg(u,1.2,2.8));
+  const P=[[0,-1.2,.0,.8],[1.2,8.4,0,-.9],[-8,-2,1.4,0],[6,8.6,-1.2,0],[-1.2,8.2,.2,-.7]];
+  for(const p of P){const x=p[0]+p[2]*u,y=p[1]+p[3]*u;
+    if(k>0){ctx.save();ctx.strokeStyle=rgba(C.amber,.55*k);ctx.lineWidth=5;ctx.beginPath();for(let s=0;s<=20;s++){const tt=Math.max(0,u-s*.12);const X=tdx(p[0]+p[2]*tt),Y=tdy(p[1]+p[3]*tt);if(s)ctx.lineTo(X,Y);else ctx.moveTo(X,Y);}ctx.stroke();ctx.restore();}
+    if(k<1){pedTop(x,y,{a:1-k});glow(tdx(x),tdy(y)-4,30,"#FFFFFF",.4*(1-k));}
+    if(k>0){ctx.fillStyle=rgba(C.amber,k);ctx.beginPath();ctx.arc(tdx(x),tdy(y),12,0,Math.PI*2);ctx.fill();}}
+  ctx.restore();
+  ctx.fillStyle="#101317";rr(1190,96,670,560,12);ctx.fill();T("cosa esce dal nodo",1220,140,{s:24,f:F.m,w:600,c:C.dim});
+  const n=Math.min(JSONL.length,Math.floor(seg(u,2.4,7.6)*JSONL.length)+ (u>2.4?1:0));
+  for(let i=0;i<n;i++){const s=JSONL[i];T(s.length>44?s.slice(0,43)+"…":s,1220,190+i*54,{s:19,f:F.m,w:500,c:i===n-1?"#C9F0D0":"#7F8A93"});}
+  const ta=eo(seg(u,4,4.6));
+  ctx.save();ctx.globalAlpha=ta;T("notte · termocamera 16×4",1220,712,{s:22,f:F.m,w:600,c:C.dim});
+  const col=Math.floor(lerp(1,14.9,seg(u,4.4,8)));
+  for(let c=0;c<16;c++)for(let r=0;r<4;r++){const d=Math.abs(c-col);const hot=d<1.5&&r>0;const warm=d<2.5&&r>0;ctx.fillStyle=hot?"#F2603A":warm?"#C9822F":"#1E3550";ctx.fillRect(1220+c*39,736+r*39,35,35);}
+  T("calore sì, volti no",1220,920,{s:24,f:F.m,w:600,c:C.amber});ctx.restore();
+  T("0 frame salvati",120,868,{s:64,w:800,a:eo(seg(u,2.6,3.2))});
+  T("solo metadati anonimi",124,912,{s:30,f:F.m,w:500,c:C.dim,a:eo(seg(u,3,3.6))});
+  hudCam("privacy",[["FONTE S1 + grafica M9 + termocamera",C.dim]]);
+};
+let CITY=null;
+function inPoly(x,y,ring){let ins=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const xi=ring[i][0],yi=ring[i][1],xj=ring[j][0],yj=ring[j][1];if(((yi>y)!==(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi)+xi))ins=!ins;}return ins;}
+function buildCity(){const R=mulberry(17);const pts=[];const ang=-.42,sp=380;let tries=0;while(pts.length<720&&tries<40000){tries++;const gx=Math.round((R()*2-1)*24),gy=Math.round((R()*2-1)*24);const x=SAN_CARLO[0]+gx*sp*Math.cos(ang)-gy*sp*Math.sin(ang),y=SAN_CARLO[1]+gx*sp*Math.sin(ang)+gy*sp*Math.cos(ang);if(x<0||y<0||x>TO_W||y>TO_H)continue;if(!inPoly(x,y,TO_RING))continue;const d=Math.hypot(x-SAN_CARLO[0],y-SAN_CARLO[1]);if(R()>Math.exp(-d/5200)+.08)continue;if(pts.some(p=>p[0]===x&&p[1]===y))continue;pts.push([x,y,d]);}
+  pts.sort((a,b)=>a[2]-b[2]);const md=pts[pts.length-1][2];const fl=[];for(let i=0;i<22;i++){const a=pts[Math.floor(R()*pts.length*.5)],b=pts[Math.floor(R()*pts.length*.6)];fl.push([a,b,R()]);}CITY={pts:pts,md:md,fl:fl};}
+SC.city=function(u){
+  if(!CITY)buildCity();
+  fillBg("#06080B");
+  const sc=860/TO_H,ox=170,oy=130;const M=(x,y)=>[ox+x*sc,oy+y*sc];
+  ctx.save();ctx.beginPath();TO_RING.forEach((p,i)=>{const q=M(p[0],p[1]);if(i)ctx.lineTo(q[0],q[1]);else ctx.moveTo(q[0],q[1]);});ctx.closePath();ctx.fillStyle="#0E141C";ctx.fill();ctx.strokeStyle=rgba(C.blue,.7);ctx.lineWidth=2.5;ctx.stroke();ctx.restore();
+  const grow=seg(u,.3,5);
+  for(const p of CITY.pts){const k=p[2]/CITY.md;if(k>grow)continue;const q=M(p[0],p[1]);const age=grow-k;ctx.fillStyle=age<.05?"#FFFFFF":rgba(C.amber,.9);ctx.beginPath();ctx.arc(q[0],q[1],age<.05?4:2.6,0,Math.PI*2);ctx.fill();}
+  const fa=seg(u,2.2,4);
+  if(fa>0){for(const f of CITY.fl){const a=M(f[0][0],f[0][1]),b=M(f[1][0],f[1][1]);const mx=(a[0]+b[0])/2,my=(a[1]+b[1])/2-60;ctx.save();ctx.globalAlpha=.35*fa;ctx.strokeStyle=C.blue;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.quadraticCurveTo(mx,my,b[0],b[1]);ctx.stroke();ctx.restore();const t=(u*.35+f[2])%1;const x=(1-t)*(1-t)*a[0]+2*(1-t)*t*mx+t*t*b[0],y=(1-t)*(1-t)*a[1]+2*(1-t)*t*my+t*t*b[1];ctx.fillStyle=rgba("#9CC3FF",fa);ctx.beginPath();ctx.arc(x,y,3.5,0,Math.PI*2);ctx.fill();}}
+  const sc0=M(SAN_CARLO[0],SAN_CARLO[1]);for(let j=0;j<2;j++){const ph=(u*.7+j/2)%1;ctx.save();ctx.globalAlpha=1-ph;ctx.strokeStyle=C.amber;ctx.lineWidth=3;ctx.beginPath();ctx.arc(sc0[0],sc0[1],8+ph*46,0,Math.PI*2);ctx.stroke();ctx.restore();}
+  ctx.fillStyle=C.amber;ctx.beginPath();ctx.arc(sc0[0],sc0[1],8,0,Math.PI*2);ctx.fill();chip("nodo01 · Via Roma",sc0[0]+18,sc0[1]-62,{s:20});
+  T("Torino",ox,240,{s:30,f:F.m,w:600,c:C.dim});
+  const pa=eo(seg(u,4.6,5.6));
+  if(pa>0){const px=lerp(1960,1080,pa),py=150,pw=760,ph=650;ctx.save();ctx.globalAlpha=pa;ctx.fillStyle="#0F1318";rr(px,py,pw,ph,14);ctx.fill();
+    T("Previsione pedoni · nodo01",px+30,py+52,{s:30,w:700});T("open data per il Comune · afflussi per le attività",px+30,py+88,{s:18,f:F.m,w:500,c:C.dim});chip("concept · dati simulati",px+pw-30,py+24,{s:18,al:"right",c:C.amber});
+    const gx0=px+70,gx1=px+pw-40,gy0=py+150,gy1=py+460;ctx.strokeStyle="rgba(255,255,255,.07)";ctx.lineWidth=1;ctx.beginPath();for(let i=0;i<=4;i++){const y=lerp(gy1,gy0,i/4);ctx.moveTo(gx0,y);ctx.lineTo(gx1,y);}ctx.stroke();
+    const base=h=>40+120*Math.exp(-Math.pow((h-8.5)/1.2,2))+90*Math.exp(-Math.pow((h-13)/1.5,2))+160*Math.exp(-Math.pow((h-18)/1.4,2));
+    const tom=h=>base(h)*(1+.32*Math.exp(-Math.pow((h-18)/1.3,2)))*(1-.1*Math.exp(-Math.pow((h-8.5)/1.2,2)));
+    const X=h=>lerp(gx0,gx1,(h-7)/15),Y=v=>lerp(gy1,gy0,v/300);
+    const draw=(f,c,dash,k)=>{ctx.save();ctx.strokeStyle=c;ctx.lineWidth=4;if(dash)ctx.setLineDash(dash);ctx.beginPath();for(let h=7;h<=7+15*k;h+=.1){const x=X(h),y=Y(f(h));if(h===7)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();ctx.restore();};
+    draw(base,"#B9C0C7",null,seg(u,5.2,6.6));draw(tom,C.amber,[12,8],seg(u,6.2,7.8));
+    for(const h of [7,10,13,16,19,22])T(String(h),X(h),gy1+32,{s:18,f:F.m,w:500,al:"center",c:C.dim});
+    T("pedoni / 15 min",gx0-10,gy0-18,{s:18,f:F.m,w:500,c:C.dim});
+    if(u>7.4){const x=X(18),y=Y(tom(18));ctx.fillStyle=C.amber;ctx.beginPath();ctx.arc(x,y,8,0,Math.PI*2);ctx.fill();chip("domani 18:00 · +32% · pioggia",x-20,y-54,{s:20,c:"#0A0C0F",bg:C.amber,w:700,al:"right"});}
+    T("— oggi, misurato    - - domani, previsto",gx0,gy1+70,{s:18,f:F.m,w:500,c:C.dim});
+    const tags=["ora","giorno","meteo","eventi","temperatura","umidità","luce","aria"];let tx=px+30,ty=py+560;tags.forEach(t=>{const w=chip(t,tx,ty,{s:18,bg:"#1A2028",c:C.ink});tx+=w+8;if(tx>px+pw-120){tx=px+30;ty+=44;}});
+    ctx.restore();}
+  hudCam("la città",[["FONTE grafica M10 + drone D3",C.dim]]);
+};
+SC.end=function(u){
+  if(u<3.2){topCrossing();const py=Math.min(6.0+.6*u,7.7);pedTop(.2,py,{glow:true,ga:.2,cane:true});
+    if(u>1.7){const a=eo(seg(u,1.7,2.1));T("+1",tdx(.2)+40,tdy(7.8)-20,{s:90,f:F.m,w:700,c:C.amber,a:a});chip("pedoni IN 15",tdx(.2)+40,tdy(7.8)+8,{s:24,a:a});}
+    fadeBlack(seg(u,2.6,3.2));}
+  else{fillBg("#050608");
+    const a=eo(seg(u,3.2,4.0));T("MDGB",960,470,{s:230,w:800,al:"center",ls:18,a:a});T("Il tempo che serve.",960,590,{s:92,w:600,al:"center",c:C.amber,a:eo(seg(u,3.7,4.5))});
+    const ca=eo(seg(u,5.2,5.9));
+    TEAM.forEach((p,i)=>{const x=300+i*440;T(p[0],x,800,{s:34,w:700,al:"center",a:ca});T(p[1],x,840,{s:22,f:F.m,w:500,al:"center",c:C.dim,a:ca});});
+    T("HackTurin 2026 · Sfida GOMA Smart Crossing",960,920,{s:26,f:F.m,w:500,al:"center",c:C.dim,a:ca});
+    T("Riprese di test del team, volti oscurati. MDGB non salva immagini.",960,966,{s:20,f:F.m,w:400,al:"center",c:"#5E646A",a:ca});}
+};
+
+/* ------------------------------------------------------------------ frame */
+function sentences(s){const out=[];let cur="";for(let i=0;i<s.length;i++){cur+=s[i];if((s[i]==="."||s[i]==="?"||s[i]==="!")&&(i===s.length-1||s[i+1]===" ")){out.push(cur.trim());cur="";}}if(cur.trim())out.push(cur.trim());return out;}
+for(const b of BEATS){const S=b.vo?sentences(b.vo):[];const tot=S.reduce((a,s)=>a+s.length+10,0);let t=.3;const span=b.dur-.5;b.subs=S.map(s=>{const d=span*(s.length+10)/tot;const r=[t,t+d,s];t+=d;return r;});}
+function wrap(s,maxW,sz){const words=s.split(" ");const lines=[];let cur="";for(const w of words){const t=cur?cur+" "+w:w;if(TW(t,{s:sz,f:F.b,w:600})>maxW&&cur){lines.push(cur);cur=w;}else cur=t;}if(cur)lines.push(cur);return lines;}
+function beatAt(t){for(let i=BEATS.length-1;i>=0;i--)if(t>=BEATS[i].t0)return i;return 0;}
+function overlay(b,u,t){
+  ctx.fillStyle="rgba(5,6,8,.78)";ctx.fillRect(0,0,W,64);
+  ctx.fillStyle=STAGE_ACT[b.act];ctx.fillRect(0,0,10,64);
+  T(b.id+" · "+b.name.toUpperCase(),32,44,{s:32,w:700,ls:1.5});
+  T(ACTS[b.act][0].toUpperCase(),W/2,42,{s:20,f:F.m,w:500,al:"center",c:STAGE_ACT[b.act],ls:3});
+  T(fmt(t)+" / 2:00",W-32,42,{s:24,f:F.m,w:500,al:"right"});
+  const sub=b.nosub?null:b.subs.find(s=>u>=s[0]&&u<s[1]);
+  if(sub){const lines=wrap(sub[2],1500,44);const h=lines.length*56+28;ctx.fillStyle="rgba(0,0,0,.72)";const w=Math.max(...lines.map(l=>TW(l,{s:44,f:F.b,w:600})))+56;rr(W/2-w/2,H-48-h,w,h,10);ctx.fill();lines.forEach((l,i)=>T(l,W/2,H-48-h+52+i*56,{s:44,f:F.b,w:600,al:"center"}));}
+}
+let t=9.6,playing=false,started=false,lastTs=null,dirty=true;
+function render(){const i=beatAt(Math.min(t,TOTAL-1e-3));const b=BEATS[i];const u=Math.min(t,TOTAL-1e-3)-b.t0;ctx.save();MORPH=0;try{SC[b.scene](u);}catch(e){fillBg("#200");T("errore scena "+b.id,120,200,{s:40});if(window.console)console.error(e);}ctx.restore();vignette();overlay(b,u,t);updateUI(i);}
+
+/* ------------------------------------------------------------------ audio guide */
+let AC=null,soundOn=false;const EV=[];
+(function(){for(let s=0;s<12;s+=1)EV.push([s,"tic"]);for(let s=12;s<30;s+=.5)EV.push([s,(s%2===0)?"acc":"kick"]);EV.push([30,"hit"]);for(let s=30.5;s<102;s+=.5)EV.push([s,((s-30)%8===0)?"acc":((s*2)%2===0?"kick":"hat")]);for(let s=102;s<112;s+=1)EV.push([s,"soft"]);EV.push([112,"hit"]);EV.push([119,"tic"]);})();
+function blip(kind){if(!AC)return;const now=AC.currentTime;const o=AC.createOscillator(),g=AC.createGain();o.connect(g);g.connect(AC.destination);
+  if(kind==="tic"){o.type="square";o.frequency.value=2300;g.gain.setValueAtTime(.08,now);g.gain.exponentialRampToValueAtTime(.0001,now+.03);o.start(now);o.stop(now+.04);return;}
+  if(kind==="hat"){o.type="square";o.frequency.value=6000;g.gain.setValueAtTime(.015,now);g.gain.exponentialRampToValueAtTime(.0001,now+.02);o.start(now);o.stop(now+.03);return;}
+  if(kind==="soft"){o.type="sine";o.frequency.value=440;g.gain.setValueAtTime(.06,now);g.gain.exponentialRampToValueAtTime(.0001,now+.5);o.start(now);o.stop(now+.55);return;}
+  o.type="sine";o.frequency.setValueAtTime(kind==="hit"?110:140,now);o.frequency.exponentialRampToValueAtTime(40,now+(kind==="hit"?.6:.14));g.gain.setValueAtTime(kind==="hit"?.6:kind==="acc"?.38:.22,now);g.gain.exponentialRampToValueAtTime(.0001,now+(kind==="hit"?.9:.2));o.start(now);o.stop(now+1);
+  if(kind==="acc"){const o2=AC.createOscillator(),g2=AC.createGain();o2.connect(g2);g2.connect(AC.destination);o2.type="triangle";o2.frequency.value=880;g2.gain.setValueAtTime(.05,now);g2.gain.exponentialRampToValueAtTime(.0001,now+.12);o2.start(now);o2.stop(now+.15);}}
+function sounds(t0,t1){if(!soundOn||!AC)return;for(const e of EV){if(e[0]>t0&&e[0]<=t1)blip(e[1]);}}
+
+/* ------------------------------------------------------------------ UI */
+const $=s=>document.querySelector(s);
+const tl=$("#timeline"),ph=$("#playhead"),tcread=$("#tcread"),card=$("#beatcard"),playBtn=$("#play"),big=$("#bigplay");
+BEATS.forEach((b,i)=>{const d=document.createElement("div");d.className="seg";d.style.setProperty("--d",b.dur);d.style.setProperty("--c","var("+ACTS[b.act][1]+")");d.title=b.id+" · "+b.name+" ("+fmt(b.t0)+"–"+fmt(b.t0+b.dur)+")";d.innerHTML="<b>"+b.id+"</b>"+(b.dur>=8?b.name:"");tl.insertBefore(d,ph);});
+const legend=$("#legend");Object.keys(ACTS).filter(k=>k!=="close").forEach(k=>{const s=document.createElement("span");s.innerHTML='<i style="--c:var('+ACTS[k][1]+')"></i>'+ACTS[k][0]+(k==="open"?" e chiusura":"");legend.appendChild(s);});
+let lastBeat=-1;
+function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+function updateUI(i){
+  ph.style.left=(100*t/TOTAL)+"%";tcread.innerHTML=fmt(t)+" <span>/ 2:00</span>";tl.setAttribute("aria-valuenow",String(Math.round(t)));tl.setAttribute("aria-valuetext",fmt(t)+", "+BEATS[i].id+" "+BEATS[i].name);
+  if(i===lastBeat)return;lastBeat=i;const b=BEATS[i];
+  [...tl.querySelectorAll(".seg")].forEach((s,j)=>s.classList.toggle("on",j===i));
+  card.style.setProperty("--c","var("+ACTS[b.act][2]+")");
+  card.innerHTML='<div class="bhead"><span class="bid">'+b.id+'</span><h3>'+esc(b.name)+'</h3><span class="btc">'+fmt(b.t0)+'–'+fmt(b.t0+b.dur)+' · '+b.dur+' s</span><span class="bact">'+ACTS[b.act][0]+'</span></div>'+
+   '<dl class="kv"><dt>Si vede</dt><dd>'+esc(b.see)+'</dd><dt>Fonte</dt><dd>'+esc(b.src)+'</dd><dt>Piano B</dt><dd>'+esc(b.pb)+'</dd></dl>'+
+   '<dl class="kv"><dt>Voce</dt><dd class="vo">'+(b.vo?esc(b.vo):'<span class="muted" style="font-style:normal">Nessuna voce</span>')+'</dd><dt>A schermo</dt><dd class="mono" style="font-size:14px">'+esc(b.ost)+'</dd><dt>Suono</dt><dd>'+esc(b.sfx)+'</dd></dl>';
+}
+function setPlaying(p){playing=p;playBtn.querySelector("span").textContent=p?"Pausa":"Play";playBtn.querySelector("svg").innerHTML=p?'<path fill="currentColor" d="M6 4h4v16H6zM14 4h4v16h-4z"/>':'<path fill="currentColor" d="M6 4l15 8-15 8z"/>';big.hidden=p||started;if(p){started=true;big.hidden=true;}lastTs=null;}
+function seek(nt){t=clamp(nt,0,TOTAL);lastTs=null;dirty=true;}
+function startFromTop(){if(!started){t=0;}started=true;setPlaying(true);}
+playBtn.addEventListener("click",()=>{if(!started){startFromTop();return;}if(t>=TOTAL)seek(0);setPlaying(!playing);});
+big.addEventListener("click",()=>{startFromTop();});
+$("#restart").addEventListener("click",()=>{seek(0);started=true;big.hidden=true;setPlaying(true);});
+$("#prev").addEventListener("click",()=>{const i=beatAt(t);const b=BEATS[i];seek(t-b.t0>1.2?b.t0:BEATS[Math.max(0,i-1)].t0);started=true;big.hidden=true;});
+$("#next").addEventListener("click",()=>{const i=beatAt(t);seek(BEATS[Math.min(BEATS.length-1,i+1)].t0);started=true;big.hidden=true;});
+$("#sound").addEventListener("click",e=>{soundOn=!soundOn;e.currentTarget.setAttribute("aria-pressed",String(soundOn));if(soundOn&&!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(err){AC=null;}}if(AC&&AC.state==="suspended")AC.resume();});
+function fromPointer(ev){const r=tl.getBoundingClientRect();return clamp((ev.clientX-r.left)/r.width)*TOTAL;}
+let dragging=false;
+tl.addEventListener("pointerdown",ev=>{dragging=true;tl.setPointerCapture(ev.pointerId);seek(fromPointer(ev));started=true;big.hidden=true;});
+tl.addEventListener("pointermove",ev=>{if(dragging)seek(fromPointer(ev));});
+tl.addEventListener("pointerup",()=>{dragging=false;});
+tl.addEventListener("keydown",ev=>{if(ev.key==="ArrowRight"){seek(t+2);ev.preventDefault();}else if(ev.key==="ArrowLeft"){seek(t-2);ev.preventDefault();}else if(ev.key==="Home"){seek(0);ev.preventDefault();}else if(ev.key==="End"){seek(TOTAL-.01);ev.preventDefault();}});
+document.addEventListener("keydown",ev=>{if(ev.target&&(ev.target.tagName==="INPUT"||ev.target.tagName==="TEXTAREA"))return;if(ev.code==="Space"&&(document.activeElement===tl||document.activeElement===document.body||document.activeElement===canvas)){ev.preventDefault();if(!started){startFromTop();return;}setPlaying(!playing);}});
+canvas.addEventListener("click",()=>{if(!started){startFromTop();return;}setPlaying(!playing);});
+function loop(ts){if(playing){if(lastTs!==null){const prev=t;t=Math.min(TOTAL,t+(ts-lastTs)/1000);sounds(prev,t);if(t>=TOTAL){setPlaying(false);}}lastTs=ts;dirty=true;}if(dirty){render();dirty=false;}requestAnimationFrame(loop);}
+if(document.fonts&&document.fonts.ready){document.fonts.ready.then(()=>{dirty=true;});}
+requestAnimationFrame(loop);
+window.__mdgbSeek=function(x){seek(x);render();};
+
+/* ------------------------------------------------------------------ script table + VO */
+const tb=$("#scripttable tbody");
+BEATS.forEach(b=>{const tr=document.createElement("tr");tr.style.setProperty("--c","var("+ACTS[b.act][2]+")");
+  tr.innerHTML='<td class="tc" data-l="Tempo"><b>'+fmt(b.t0)+'</b><span>'+b.dur+' s</span></td>'+
+  '<td data-l="Scena"><span class="actn">'+b.id+' · '+ACTS[b.act][0]+'</span><span class="scn">'+esc(b.name)+'</span></td>'+
+  '<td data-l="Cosa si vede · fonte">'+esc(b.see)+'<br><span class="src">'+esc(b.src)+'</span><span class="pb">Piano B: '+esc(b.pb)+'</span></td>'+
+  '<td data-l="Voce">'+(b.vo?'<span class="vo">'+esc(b.vo)+'</span>':'<span class="vo none">—</span>')+'</td>'+
+  '<td data-l="Testo a schermo · suono"><span class="ost">'+esc(b.ost)+'</span><span class="sfx">'+esc(b.sfx)+'</span></td>';tb.appendChild(tr);});
+const vl=$("#volist");let words=0;
+BEATS.filter(b=>b.vo).forEach(b=>{const r=document.createElement("div");r.className="vo-row";words+=b.vo.split(/\s+/).length;r.innerHTML='<div class="t">'+fmt(b.t0)+' · '+b.id+'</div><div class="it">'+esc(b.vo)+'</div><div class="en">'+esc(b.voEn)+'</div>';vl.appendChild(r);});
+$("#vostats").innerHTML='<span><b>'+words+'</b> parole</span><span><b>'+BEATS.filter(b=>b.vo).length+'</b> scene con voce</span><span>circa <b>'+Math.round(words/2.4)+' s</b> di parlato a ritmo pacato, su 120 s</span>';
+
+/* ------------------------------------------------------------------ checklist + copy */
+const KEY="mdgb-trailer-shots-v1";let saved={};
+try{saved=JSON.parse(localStorage.getItem(KEY)||"{}")||{};}catch(e){saved={};}
+function progress(){document.querySelectorAll(".shotgroup").forEach(g=>{const all=g.querySelectorAll("input[type=checkbox]");const done=[...all].filter(c=>c.checked).length;const p=g.querySelector("[data-prog]");if(p)p.textContent=done+"/"+all.length;});}
+document.querySelectorAll(".shotgroup input[type=checkbox]").forEach(cb=>{cb.checked=!!saved[cb.id];cb.addEventListener("change",()=>{saved[cb.id]=cb.checked;try{localStorage.setItem(KEY,JSON.stringify(saved));}catch(e){}progress();});});
+progress();
+document.querySelectorAll("[data-copy]").forEach(btn=>btn.addEventListener("click",()=>{const pre=document.getElementById(btn.dataset.copy);const text=pre.innerText;const done=m=>{btn.textContent=m;setTimeout(()=>{btn.textContent="Copia";},1800);};
+  const fallback=()=>{const r=document.createRange();r.selectNodeContents(pre);const s=window.getSelection();s.removeAllRanges();s.addRange(r);done("Testo selezionato: copialo");};
+  try{if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>done("Copiato"),fallback);}else fallback();}catch(e){fallback();}}));
+})();
+</script>
+
+</body></html>
