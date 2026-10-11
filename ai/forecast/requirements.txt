@@ -1,0 +1,4 @@
+# Only to retrain the expected-flow model (python -m forecast.train). Not needed at run time:
+# the control-room app reads model.json with the standard library.
+numpy==2.4.6
+scikit-learn==1.9.1
