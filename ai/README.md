@@ -19,6 +19,9 @@ Non salva mai frame su disco. Tutto funziona senza internet.
 Decisioni, numeri, interfacce e questioni aperte: [DECISIONS.md](DECISIONS.md).
 Specifica completa: [`PROMPT_SMART_CROSSING.md`](../PROMPT_SMART_CROSSING.md), §5.1.
 
+Accanto a `smartcrossing` c'è [`forecast/`](forecast/README.md): il modello del flusso atteso che la centrale mostra
+per ogni camera (gradient boosting su calendario, luoghi vicini, ESA WorldCover e meteo, corretto con i conteggi del nodo).
+
 ## Stato
 
 | Milestone | Contenuto | Stato |

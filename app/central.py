@@ -3,6 +3,8 @@ questa stessa classe Central; da terminale: python app/central.py.
 
     canale principale:  nodo ──Wi-Fi/MQTT──► broker (Mosquitto nell'app; in futuro in cloud) ──► qui   (ingest.py)
     canale di backup:   nodo ──BLE──────────────────────────────────────► qui   (Bluetooth del PC, SENZA Internet)
+    in uscita:          qui ──MQTT──► {prefisso}/<nodo>/forecast e /analytics (publisher.py), ogni ANALYTICS_PERIOD_S
+                        qui ──HTTP──► dati per i clienti con chiave API (customers.py, docs/DATA_API.md)
 Tutto finisce nello stesso database (app/central.db): eventi deduplicati, aggregati, heartbeat, messaggi di
 backup, e ogni 10 s la diagnosi di ogni nodo (OK / rete giù / guasto / Linux bloccato / manomissione / ...).
 La dashboard per chi guarda i dati è su http://localhost:8080 (dashboard.py).
@@ -27,6 +29,7 @@ import time
 
 import dashboard
 import ingest
+import publisher
 from ble_receiver import COMPANY_ID, Receiver
 
 log = logging.getLogger("ingest")
@@ -67,7 +70,7 @@ class Central:
         self.node, self.use_ble, self.addr = node, use_ble, addr
         self.web, self.host, self.port = web, host, port
         self.ble_status = "spento" if not use_ble else "in avvio"
-        self.store = self.mqtt = self.ttn = self.server = None
+        self.store = self.mqtt = self.ttn = self.server = self.flow = self.publisher = None
         self._stop = threading.Event()
         self._thread = None
 
@@ -79,11 +82,15 @@ class Central:
         self.store = ingest.Store(self.db_path)
         self.mqtt = ingest.main_loop(self.store)
         self.ttn = ingest.ttn_loop(self.store)
+        # flusso atteso e metriche: lo stesso oggetto per la pagina, per l'API dei clienti e per MQTT
+        self.flow = dashboard.Flow(self.store)
+        self.publisher = publisher.Publisher(self.mqtt, self.flow, ingest.PREFIX,
+                                             period_s=float(os.environ.get("ANALYTICS_PERIOD_S", 30)))
         if self.web:
             try:
-                self.server = dashboard.serve(self.store, self.host, self.port, info=self.info)
+                self.server = dashboard.serve(self.store, self.host, self.port, info=self.info, flow=self.flow)
             except OSError:                       # porta occupata: ne sceglie una libera
-                self.server = dashboard.serve(self.store, self.host, 0, info=self.info)
+                self.server = dashboard.serve(self.store, self.host, 0, info=self.info, flow=self.flow)
             log.info("dashboard: %s", self.url)
         self._thread = threading.Thread(target=lambda: asyncio.run(self._run()), name="central", daemon=True)
         self._thread.start()
@@ -96,6 +103,7 @@ class Central:
                          "connected": bool(self.mqtt and self.mqtt.is_connected()), "local": local,
                          "nodes_connect_to": f"{lan_ip()}:{ingest.MQTT_PORT}" if local else None},
                 "ble": self.ble_status, "config_dir": os.environ.get("MDGB_HOME"), "db": self.db_path,
+                "published": self.publisher.sent if self.publisher else 0,
                 "maps_key": os.environ.get("GOOGLE_MAPS_API_KEY", "")}
 
     async def _run(self):
@@ -130,6 +138,10 @@ class Central:
         try:
             while not self._stop.is_set():
                 await asyncio.sleep(0.5)
+                try:
+                    self.publisher.tick()           # stima e metriche di ogni camera su MQTT, ogni ANALYTICS_PERIOD_S
+                except Exception:
+                    log.exception("pubblicazione di stime e metriche fallita")
                 if time.time() - t_log >= 10:
                     log_status(self.store)
                     t_log = time.time()

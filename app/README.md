@@ -13,6 +13,15 @@ Contratti: [`docs/CONTRACTS.md`](../docs/CONTRACTS.md). Cosa devono fare gli alt
   "Apri in Google Maps" e "Apri in Mappe";
 - **video dal vivo** della camera con i riconoscimenti, se la visione lo trasmette (campo `video` in `nodes.json`): si apre
   solo con un clic, si chiude cambiando camera e non viene mai registrato;
+- **flusso atteso** per ogni camera: pedoni in/out, ciclisti e veicoli attesi all'ora, adesso e nelle prossime 24 ore,
+  stimati da un modello (calendario, luoghi vicini, ESA WorldCover, meteo) e corretti con i conteggi della camera.
+  Sulla mappa un **alone** intorno a ogni camera dice quanti pedoni sono attesi, e il cursore sopra la mappa sceglie
+  l'ora; nel dettaglio ci sono i numeri di quell'ora e il grafico delle 24 ore. Funziona anche per una camera che non
+  manda dati. Modello e limiti: [`ai/forecast/`](../ai/forecast/README.md) (owner Paolo);
+- **dati per i clienti**: dalla scheda in fondo alla pagina si crea una chiave API per un cliente, legata a una zona
+  intorno a una camera; con quella il cliente scarica conteggi, stime e previsioni delle camere della sua zona
+  (`/api/v1/...`). Le stesse stime e le metriche di ogni camera escono anche su MQTT (`mdgb/<nodo>/forecast` e
+  `/analytics`). Indirizzi, formati ed esempi: [`docs/DATA_API.md`](../docs/DATA_API.md);
 - tutti gli allarmi e i numeri della rete: eventi ricevuti, **eventi persi (deve restare 0)**, doppioni scartati;
 - in alto: MQTT connesso o no, Bluetooth in ascolto o no, e l'**indirizzo da dare all'Arduino** (`Arduino → 192.168.x.y:1883`).
 
@@ -73,7 +82,7 @@ Pulsanti **Configurazione** e **Cartella** in alto nella finestra. La cartella �
 
 | File | Cosa |
 |---|---|
-| `config.env` | broker (locale o cloud), Bluetooth, porta della dashboard, chiave di Google Maps. Dopo una modifica, riapri l'app |
+| `config.env` | broker (locale o cloud), Bluetooth, porta della dashboard, chiave di Google Maps, ogni quanto pubblicare stime e metriche su MQTT. Dopo una modifica, riapri l'app |
 | `nodes.json` | camere sulla mappa, una per Arduino: `id` (= `NODE_ID` dell'Arduino), nome, `lat`, `lon`, profilo, `video` (facoltativo: indirizzo dello stream dal vivo, es. `http://192.168.1.50:8090/stream.mjpg`). Si modifica anche ad app aperta. Un nodo che si collega senza essere qui compare lo stesso nella lista, senza posizione |
 | `certs/` | solo con un broker in cloud: certificati TLS della centrale |
 | `central.db`, `centrale.log` | database e log della centrale |
@@ -116,7 +125,9 @@ MQTT_HOST=127.0.0.1 NODE_ID=nodo01 BACKUP_LINK=none MDGB_C3_DIR=/tmp/c3 DB_PATH=
 | `desktop/build_mac.sh`, `desktop/build_windows.ps1`, `desktop/centrale.spec`, `desktop/make_icon.py` | costruzione dell'app per Mac e Windows (PyInstaller) e delle icone |
 | `central.py` | la centrale: MQTT + Bluetooth + dashboard (`Central.start()` / `stop()`) |
 | `ingest.py` | ricezione MQTT, database, deduplica su (nodo, numero evento), conteggio degli eventi persi |
-| `dashboard.py`, `dashboard.html` | la pagina e i suoi dati (`/api/state`, `/api/info`) |
+| `dashboard.py`, `dashboard.html` | la pagina e i suoi dati (`/api/state`, `/api/info`, `/api/flow`, `/api/forecast/<nodo>`) |
+| `customers.py` | chiavi API dei clienti (zona, scadenza, uso) e API `/api/v1/...`; da terminale: `python app/customers.py create\|list\|revoke` |
+| `publisher.py` | stime e metriche di ogni camera su MQTT, ogni `ANALYTICS_PERIOD_S` secondi |
 | `diagnosis.py` | la regola che decide lo stato di ogni nodo (OK, rete giù, guasto, Linux bloccato, manomissione, batteria, spento) |
 | `decoder.py` | lettura dei messaggi binari del backup (BLE oggi, LoRa in futuro) |
 | `ble_receiver.py` | ricezione dei beacon Bluetooth; da solo con `--dry-run` serve alla prima prova radio |
@@ -126,7 +137,7 @@ I test sono in `comms/tests/` (`python -m pytest comms -q`).
 
 ## Dipendenze
 
-`paho-mqtt`, `bleak`, `flask` (`requirements.txt`); per l'app anche `pywebview` e `pyinstaller` (`desktop/requirements.txt`).
+`paho-mqtt`, `bleak`, `flask`, `certifi` (`requirements.txt`); per l'app anche `pywebview` e `pyinstaller` (`desktop/requirements.txt`).
 Per costruire l'app serve Mosquitto installato (Homebrew sul Mac, `C:\Program Files\mosquitto` su Windows): finisce
 dentro l'app. Python 3.9 o superiore (3.12 per la build Windows). Provata su macOS (Apple Silicon); Windows tramite la
 build automatica su GitHub.

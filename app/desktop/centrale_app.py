@@ -63,9 +63,18 @@ BLE_NODE=nodo01
 WEB_HOST=127.0.0.1
 WEB_PORT=8080
 
-# --- Mappa: chiave di Google Maps (Maps JavaScript API). Vuota = mappa senza chiave; senza Internet = schematica ---
+# --- Mappa: chiave di Google Maps (Maps JavaScript API). Vuota = mappa senza chiave; senza Internet = schematica.
+#     La stessa chiave, con "Places API (New)" e "Routes API" abilitate, aggiunge al flusso atteso orari e
+#     recensioni dei luoghi e il traffico (facoltativo: senza, il modello usa OpenStreetMap, ESA e il meteo) ---
 GOOGLE_MAPS_API_KEY=
+
+# --- Stime e metriche di ogni camera pubblicate su MQTT (mdgb/<nodo>/forecast e /analytics): ogni quanti secondi.
+#     0 = non pubblicare ---
+ANALYTICS_PERIOD_S=30
 """
+
+# nodes.json delle versioni precedenti: nodo01 era in piazza San Carlo (vedi default_camera_moved)
+OLD_DEFAULT_CAMERAS = [{"id": "nodo01", "name": "Via Roma, piazza San Carlo", "lat": 45.0679, "lon": 7.6829, "site": "urbano"}]
 
 log = logging.getLogger("app")
 
@@ -92,6 +101,16 @@ def read_config(path):
     return out
 
 
+def default_camera_moved(nodes):
+    """True se nodes.json nelle impostazioni è ancora quello copiato da una versione precedente e mai modificato:
+    va sostituito, perché la camera di nodo01 ora è in corso Castelfidardo. Un file toccato a mano resta com'è."""
+    try:
+        with open(nodes, encoding="utf-8") as f:
+            return json.load(f).get("nodes") == OLD_DEFAULT_CAMERAS
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
 def prepare_home(home):
     """Primo avvio: crea la cartella con config.env, certs/ e nodes.json."""
     os.makedirs(os.path.join(home, "certs"), exist_ok=True)
@@ -100,7 +119,7 @@ def prepare_home(home):
         with open(cfg, "w", encoding="utf-8") as f:
             f.write(CONFIG_TEMPLATE)
     nodes = os.path.join(home, "nodes.json")
-    if not os.path.exists(nodes):
+    if not os.path.exists(nodes) or default_camera_moved(nodes):
         shutil.copy(os.path.join(RESOURCES, "nodes.json"), nodes)
     return cfg
 
@@ -236,9 +255,11 @@ def selftest(url):
             break
         time.sleep(0.25)
     state = json.loads(get("/api/state"))
-    ok = info["mqtt"]["connected"] and bool(state["nodes"]) and b"Centrale MDGB" in get("/")
-    log.info("SELFTEST %s: mqtt=%s camere=%d mosquitto=%s", "OK" if ok else "FALLITO", info["mqtt"],
-             len(state["nodes"]), find_mosquitto())
+    forecast = json.loads(get("/api/forecast/nodo01"))  # il modello del flusso atteso è dentro l'app e risponde
+    ok = (info["mqtt"]["connected"] and bool(state["nodes"]) and b"Centrale MDGB" in get("/")
+          and forecast.get("available") is True)
+    log.info("SELFTEST %s: mqtt=%s camere=%d mosquitto=%s flusso atteso=%s", "OK" if ok else "FALLITO", info["mqtt"],
+             len(state["nodes"]), find_mosquitto(), forecast.get("available"))
     return ok
 
 

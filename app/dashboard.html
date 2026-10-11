@@ -11,6 +11,7 @@
     --ok: #166534; --ok-bg: #dcfce7; --warn: #92400e; --warn-bg: #fef3c7; --bad: #991b1b; --bad-bg: #fee2e2;
     --info: #1e40af; --info-bg: #dbeafe; --neutral: #4b5563; --neutral-bg: #f3f4f6;
     --bar: #3b82f6; --bar2: #93c5fd; --map: #eef1f5; --grid: #dfe4ea;
+    --halo: rgba(59,130,246,.6); --halo-soft: rgba(59,130,246,.07);
     --shadow: 0 1px 2px rgba(16,24,40,.05), 0 2px 8px rgba(16,24,40,.06);
   }
   @media (prefers-color-scheme: dark) {
@@ -20,6 +21,7 @@
       --ok: #86efac; --ok-bg: #14321f; --warn: #fcd34d; --warn-bg: #3a2a0a; --bad: #fca5a5; --bad-bg: #3b1212;
       --info: #93c5fd; --info-bg: #10233f; --neutral: #9ca3af; --neutral-bg: #1f2430;
       --bar: #60a5fa; --bar2: #1e3a5f; --map: #1a1f27; --grid: #2a313d;
+      --halo: rgba(96,165,250,.65); --halo-soft: rgba(96,165,250,.08);
       --shadow: 0 1px 2px rgba(0,0,0,.4);
     }
   }
@@ -101,9 +103,62 @@
   .bars span:last-child, .bars .num { text-align: right; font-variant-numeric: tabular-nums; }
   .track { height: 8px; background: var(--soft); border-radius: 99px; overflow: hidden; }
   .fill { height: 100%; background: var(--bar); border-radius: 99px; min-width: 3px; }
-  .cols { display: flex; align-items: flex-end; gap: 3px; height: 64px; margin-top: 12px; }
-  .col { flex: 1; background: var(--bar); border-radius: 3px 3px 0 0; min-height: 3px; opacity: .85; }
-  .col.prov { background: repeating-linear-gradient(45deg, var(--bar) 0 3px, transparent 3px 6px); border: 1px solid var(--bar); }
+  /* conteggi misurati per intervallo: colonne sottili dalla linea di base, massimo a sinistra, orari sotto */
+  .mchart { display: grid; grid-template-columns: auto 1fr; gap: 0 8px; margin-top: 14px; }
+  .yax { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; font-size: 11px;
+         color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1; }
+  .yax span:first-child { transform: translateY(-50%); } .yax span:last-child { transform: translateY(50%); }
+  .cols { display: flex; align-items: flex-end; gap: 2px; height: 64px; border-top: 1px solid var(--line);
+          border-bottom: 1px solid var(--muted); }
+  .colw { flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+  .col { width: 100%; max-width: 24px; background: var(--bar); border-radius: 4px 4px 0 0; }
+  .colw:hover .col { filter: brightness(1.2); }
+  .col.prov { background: repeating-linear-gradient(45deg, var(--bar) 0 3px, transparent 3px 6px); border: 1px solid var(--bar); border-bottom: 0; }
+  .xax { grid-column: 2; display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 5px;
+         font-variant-numeric: tabular-nums; }
+
+  /* flusso atteso: riquadri con i numeri dell'ora scelta, grafico delle prossime 24 ore, tabella */
+  .tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .tile { background: var(--soft); border-radius: 10px; padding: 8px 10px; }
+  .tile .k, .tile .s { font-size: 11px; color: var(--muted); }
+  .tile .v { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+  .tile .v small { font-size: 11px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+  .fc-title { font-size: 12px; font-weight: 600; margin: 16px 0 4px; }
+  .fc-wrap { position: relative; }
+  svg.fc { display: block; width: 100%; height: auto; cursor: pointer; }
+  svg.fc text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+  svg.fc text.strong { fill: var(--text); font-weight: 600; }
+  .fc-tip { position: absolute; pointer-events: none; background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+            padding: 6px 9px; font-size: 12px; box-shadow: var(--shadow); white-space: nowrap; z-index: 2; }
+  .fc-tip b { display: block; font-size: 14px; }
+  .fc-table { margin-top: 6px; font-size: 12px; }
+  .fc-table summary { cursor: pointer; color: var(--muted); }
+  .fc-table table { width: 100%; border-collapse: collapse; margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .fc-table th, .fc-table td { text-align: right; padding: 3px 6px; border-bottom: 1px solid var(--line); font-weight: 400; }
+  .fc-table th { color: var(--muted); }
+  .fc-table th:first-child, .fc-table td:first-child { text-align: left; }
+  .fc-table tr.sel td { font-weight: 700; background: var(--soft); }
+
+  /* affluenza sulla mappa: scelta dell'ora, alone intorno alla camera, legenda delle grandezze */
+  .flowbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; font-size: 13px; }
+  .flowbar label { font-weight: 600; }
+  .flowbar input[type=range] { flex: 1; min-width: 150px; accent-color: var(--bar); }
+  .flowbar output { min-width: 170px; font-variant-numeric: tabular-nums; }
+  .flowbar .btn:disabled { opacity: .5; cursor: default; }
+  .mapwrap { position: relative; }
+  .halo-legend { position: absolute; left: 10px; top: 10px; z-index: 2; background: var(--card); border: 1px solid var(--line);
+                 border-radius: 10px; padding: 8px 10px; font-size: 11px; color: var(--muted); box-shadow: var(--shadow); pointer-events: none; }
+  .hl-t { color: var(--text); font-weight: 600; margin-bottom: 8px; }
+  .hl-c { position: relative; }
+  .hl-ring { position: absolute; bottom: 0; border-radius: 50%; border: 1.5px solid var(--bar); background: var(--halo-soft); }
+  .hl-lab { position: absolute; font-variant-numeric: tabular-nums; line-height: 1; white-space: nowrap; }
+  .mk-halo { position: absolute; left: 50%; top: 50%; width: 0; height: 0; transform: translate(-50%, -50%); border-radius: 50%;
+             background: radial-gradient(closest-side, var(--halo) 0%, var(--halo) 40%, transparent 100%); pointer-events: none;
+             transition: width .3s ease, height .3s ease, opacity .3s ease; }
+  .mk-flow { position: absolute; left: 50%; top: 100%; transform: translate(-50%, 6px); white-space: nowrap; background: var(--card);
+             color: var(--text); border: 1px solid var(--line); border-radius: 999px; font-size: 11px; font-weight: 600; padding: 1px 7px;
+             pointer-events: none; font-variant-numeric: tabular-nums; }
+  .mk-flow:empty, .mk-root:hover .mk-flow, .mk-root.sel-root .mk-flow { display: none; }
   .envs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
   .envs span { font-size: 12px; background: var(--soft); border-radius: 999px; padding: 3px 9px; }
   .minis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
@@ -135,6 +190,27 @@
   .good { color: var(--ok); } .badv { color: var(--bad); }
   .hint { font-size: 12px; color: var(--muted); margin: 10px 0 0; }
   .foot { text-align: center; font-size: 12px; color: var(--muted); margin-top: 18px; }
+
+  /* dati per i clienti: chiavi API */
+  .clients { margin-top: 14px; }
+  .keyform { display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  .keyform label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+  .keyform input, .keyform select { font: inherit; font-size: 13px; background: var(--card); color: var(--text);
+                                    border: 1px solid var(--line); border-radius: 8px; padding: 6px 9px; }
+  .keyform input[type=number] { width: 90px; }
+  .keybox { background: var(--ok-bg); color: var(--ok); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; display: grid; gap: 6px; }
+  .keybox.bad { background: var(--bad-bg); color: var(--bad); }
+  .keybox input { font: 13px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; width: 100%; background: var(--card);
+                  color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; }
+  .keybox code { font-size: 12px; color: var(--text); background: var(--card); border-radius: 8px; padding: 7px 9px;
+                 overflow-wrap: anywhere; }
+  .keybox .muted { color: inherit; opacity: .85; }
+  table.keys { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.keys th { text-align: left; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase;
+                  letter-spacing: .04em; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  table.keys td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.keys td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.keys tr:last-child td { border-bottom: 0; }
 
   /* marcatori sulla mappa */
   #map .maplibregl-canvas { outline: none; }
@@ -187,7 +263,13 @@
           <select id="mapstyle" aria-label="Stile della mappa" hidden>
             <option value="auto">Mappa automatica</option><option value="light">Mappa chiara</option>
             <option value="dark">Mappa scura</option><option value="detailed">Mappa dettagliata</option></select></div></div>
-      <div id="map"></div>
+      <div class="flowbar" id="flowbar" hidden>
+        <label for="flow-range">Affluenza pedoni attesa</label>
+        <input type="range" id="flow-range" min="0" max="24" step="1" value="0">
+        <output id="flow-when" for="flow-range">adesso</output>
+        <button class="btn" id="flow-now" type="button" title="Torna alla stima di adesso">Adesso</button>
+      </div>
+      <div class="mapwrap"><div id="map"></div><div class="halo-legend" id="halo-legend" hidden></div></div>
       <div class="nodelist" id="nodelist"></div>
     </div>
     <aside class="card detail"><div id="detail"><div class="empty">Clicca una camera sulla mappa o nella lista per vederne i dettagli.</div></div>
@@ -198,6 +280,20 @@
     <div class="card"><div class="card-h"><h2>__IC_server__ Salute della rete</h2></div><div class="metrics" id="metrics"></div>
       <p class="hint">Ogni evento delle camere ha un numero progressivo: la centrale vede subito se ne manca qualcuno.
         I doppioni sono normali dopo un blackout (il nodo rimanda ciò che non era confermato) e vengono scartati.</p></div>
+  </section>
+  <section class="card clients" id="clients-card" hidden>
+    <div class="card-h"><h2>__IC_link__ Dati per i clienti</h2>
+      <span class="muted" id="clients-sub">Chiavi API per scaricare conteggi e previsioni delle camere di una zona · solo dati anonimi</span></div>
+    <div class="keyform">
+      <label>Cliente <input id="key-name" maxlength="80" placeholder="es. Bar Sport" autocomplete="off"></label>
+      <label>Raggio (m) <input id="key-radius" type="number" min="50" max="20000" step="50" value="500"></label>
+      <label>Durata <select id="key-days"><option value="30">30 giorni</option><option value="365">1 anno</option>
+        <option value="">senza scadenza</option></select></label>
+      <button class="btn" id="key-create" type="button">Crea la chiave</button>
+      <span class="muted" id="key-zone"></span>
+    </div>
+    <div class="keybox" id="key-result" hidden></div>
+    <div id="keys-table"></div>
   </section>
   <div class="foot" id="updated">in attesa dei dati…</div>
 </main>
@@ -275,19 +371,23 @@ function markerEl(n) {
   const root = document.createElement("div");
   root.className = "mk-root";
   root.dataset.node = n.node;
-  root.innerHTML = `<div class="mk"></div><div class="mk-label"></div>`;
+  root.innerHTML = `<div class="mk-halo"></div><div class="mk"></div><div class="mk-flow"></div><div class="mk-label"></div>`;
   root.addEventListener("click", e => { e.stopPropagation(); select(n.node); });
   return root;
 }
 
 function updateMarkerEl(root, n) {
-  const dot = root.firstChild, lab = root.lastChild, color = DOT[cls(n)];
+  const dot = root.querySelector(".mk"), lab = root.lastChild, color = DOT[cls(n)], v = flowAt(n.node);
+  const halo = root.firstChild, flow = root.querySelector(".mk-flow");
+  halo.style.width = halo.style.height = v == null ? "0" : `${haloPx(v)}px`;      // alone: pedoni attesi all'ora scelta
+  halo.style.opacity = v == null ? 0 : (0.5 + 0.5 * flowShare(v)).toFixed(2);     // più gente, alone più grande e più pieno
+  flow.textContent = v == null ? "" : `${num(r1(v))}/h`;
   dot.className = "mk" + (n.node === picked ? " sel" : "") + (n.diagnosis.code === "unknown" ? " faint" : "")
     + (PULSE.has(n.diagnosis.code) ? " pulse" : "");
   dot.style.background = color;
   dot.style.color = color;
-  lab.textContent = n.name ? `${n.node} · ${n.name}` : n.node;
-  root.title = `${n.node} · ${n.name} · ${label(n)}`;
+  lab.textContent = (n.name ? `${n.node} · ${n.name}` : n.node) + (v == null ? "" : ` · ${num(r1(v))} pedoni/h`);
+  root.title = `${n.node} · ${n.name} · ${label(n)}` + (v == null ? "" : ` · ${num(r1(v))} pedoni attesi all'ora`);
   root.classList.toggle("sel-root", n.node === picked);
   root.style.zIndex = PULSE.has(n.diagnosis.code) ? 3 : n.node === picked ? 2 : 1;   // gli allarmi restano sopra le etichette
 }
@@ -409,10 +509,11 @@ function drawMap(s) {
   let g = "";
   for (let i = 1; i < 8; i++) g += `<line x1="${i * W / 8}" y1="0" x2="${i * W / 8}" y2="${H}" stroke="var(--grid)"/><line x1="0" y1="${i * H / 8}" x2="${W}" y2="${i * H / 8}" stroke="var(--grid)"/>`;
   const dots = placed.map(n => {
-    const c = DOT[cls(n)], sel = n.node === picked, faint = n.diagnosis.code === "unknown";
+    const c = DOT[cls(n)], sel = n.node === picked, faint = n.diagnosis.code === "unknown", v = flowAt(n.node);
     return `<g style="cursor:pointer" data-node="${esc(n.node)}"><title>${esc(n.node)} · ${esc(n.name)} · ${esc(label(n))}</title>
+      ${v == null ? "" : `<circle cx="${px(n)}" cy="${py(n)}" r="${haloPx(v) / 2}" fill="var(--halo)" fill-opacity="${(0.5 + 0.5 * flowShare(v)).toFixed(2)}"/>`}
       <circle cx="${px(n)}" cy="${py(n)}" r="${sel ? 12 : 9}" fill="${c}" fill-opacity="${faint ? 0.3 : 0.9}" stroke="${sel ? "var(--text)" : c}" stroke-width="${sel ? 3 : 2}"/>
-      <text x="${px(n) + 14}" y="${py(n) + 4}" font-size="12" fill="var(--text)">${esc(n.node)}</text></g>`;
+      <text x="${px(n) + 14}" y="${py(n) + 4}" font-size="12" fill="var(--text)">${esc(n.node)}${v == null ? "" : ` · ${num(r1(v))}/h`}</text></g>`;
   }).join("");
   el.innerHTML = `<svg class="schematic" viewBox="0 0 ${W} ${H}" role="img" aria-label="Mappa schematica delle camere">${g}${dots}</svg>`;
 }
@@ -425,14 +526,248 @@ function trafficView(t) {
     .map(([k, v]) => `<span>${k}</span><div class="track"><div class="fill" style="width:${(100 * v / max).toFixed(1)}%"></div></div><span>${num(v)}</span>`).join("");
   const tot = w => w.ped_in + w.ped_out + w.cyclist + w.vehicles + w.animals;
   const cmax = Math.max(1, ...t.windows.map(tot));
-  const cols = t.windows.map(w => `<div class="col ${w.provisional ? "prov" : ""}" style="height:${(100 * tot(w) / cmax).toFixed(1)}%"
-    title="${hhmm(w.t0)}–${hhmm(w.t1)}: ${tot(w)} passaggi${w.provisional ? " (provvisorio, arrivato via Bluetooth)" : ""}"></div>`).join("");
+  const cols = t.windows.map(w => `<div class="colw" title="${hhmm(w.t0)}–${hhmm(w.t1)}: ${tot(w)} passaggi${w.provisional ? " (provvisorio, arrivato via Bluetooth)" : ""}">
+    <div class="col ${w.provisional ? "prov" : ""}" style="height:${(100 * tot(w) / cmax).toFixed(1)}%"></div></div>`).join("");
+  const first = t.windows[0], last = t.windows[t.windows.length - 1];
   const e = t.env || {};
   const env = [e.t_c != null ? `${e.t_c} °C` : null, e.rh != null ? `${e.rh}% umidità` : null, e.lux != null ? `${e.lux} lux` : null].filter(Boolean);
-  return `<div class="bars">${rows}</div><div class="cols">${cols}</div>
-    <div class="muted" style="margin-top:6px">Passaggi per intervallo${t.last_hour_provisional ? " · le barre tratteggiate sono provvisorie (arrivate via Bluetooth)" : ""}</div>
+  return `<div class="bars">${rows}</div>
+    <div class="mchart"><div class="yax"><span>${num(cmax)}</span><span>0</span></div><div class="cols">${cols}</div>
+      <div class="xax"><span>${hhmm(first.t0)}</span><span>passaggi per intervallo di ${dur(first.t1 - first.t0)}</span><span>${hhmm(last.t1)}</span></div></div>
+    ${t.last_hour_provisional ? `<div class="muted" style="margin-top:6px">Le colonne tratteggiate sono provvisorie (arrivate via Bluetooth).</div>` : ""}
     ${env.length ? `<div class="envs">${env.map(x => `<span>${x}</span>`).join("")}</div>` : ""}`;
 }
+
+/* ---------- flusso atteso: modello di ai/forecast (gradient boosting su calendario, luoghi vicini, ESA WorldCover, meteo),
+   corretto con i conteggi della camera quando ci sono. /api/flow dà, per ogni camera, la stima di adesso e delle prossime
+   24 ore: l'ora scelta sopra la mappa decide gli aloni delle camere e i numeri del riquadro di dettaglio. ---------- */
+let FLOW = null, flowHour = 0, flowTimer = null, flowKey = "", fcGeom = null;
+const flowEl = document.createElement("div");           // resta lo stesso nodo tra un aggiornamento e l'altro della pagina
+const FLOW_MAX = 600;                                   // pedoni all'ora oltre i quali l'alone non cresce più
+const flowShare = v => Math.sqrt(Math.min(Math.max(v, 0), FLOW_MAX) / FLOW_MAX);
+const haloPx = v => 26 + 90 * flowShare(v);             // diametro: l'area cresce in proporzione al flusso
+const r1 = v => v >= 10 ? Math.round(v) : Math.round(v * 10) / 10;
+const ANOMALY_IT = { normal: "nella norma", high: "più del solito", low: "meno del solito" };
+const flowOf = id => { const f = FLOW && FLOW.nodes[id]; return f && f.available ? f : null; };
+const hourOf = f => f.outlook[Math.min(flowHour, f.outlook.length - 1)];
+const pedsOf = o => o.ped_in + o.ped_out;
+const flowAt = id => { const f = flowOf(id); return f ? pedsOf(hourOf(f)) : null; };
+const whenText = o => o.now ? "adesso"
+  : `${new Date(o.t0 * 1000).toDateString() === new Date().toDateString() ? "oggi" : "domani"} alle ${hhmm(o.t0)}`;
+
+function niceMax(v) {
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  return [1, 2, 4, 5, 10].map(m => m * p).find(x => x >= v);
+}
+
+/* grafico: pedoni attesi all'ora (in + out) da adesso alle prossime 24 ore, con l'ora scelta e il picco in evidenza */
+function flowChart(f, W) {
+  const H = 176, L = 38, R = 14, T = 20, B = 24, pw = W - L - R, ph = H - T - B;
+  const o = f.outlook, vals = o.map(pedsOf), ts = o.map(x => x.now ? x.t0 : x.t0 + 1800);
+  const t0 = ts[0], t1 = ts[ts.length - 1], ymax = niceMax(Math.max(4, ...vals));
+  const X = t => L + (t - t0) / (t1 - t0) * pw, Y = v => T + ph - v / ymax * ph;
+  const pts = ts.map((t, i) => [X(t), Y(vals[i])]);
+  fcGeom = { W, H, pts, f };
+  const grid = [0, ymax / 2, ymax].map(v => `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v ? "var(--line)" : "var(--muted)"}"/>
+    <text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end">${num(r1(v))}</text>`).join("");
+  let ticks = `<text x="${L}" y="${H - 6}">ora</text>`;
+  for (const x of o.slice(1)) {
+    const d = new Date(x.t0 * 1000), h = d.getHours(), px = X(x.t0);
+    if (h % 3 || px < L + 30 || px > W - R) continue;
+    ticks += `<line x1="${px}" x2="${px}" y1="${T + ph}" y2="${T + ph + 4}" stroke="var(--muted)"/>
+      <text x="${px}" y="${H - 6}" text-anchor="middle" ${h ? "" : 'class="strong"'}>${h ? String(h).padStart(2, "0") : d.toLocaleDateString("it-IT", { weekday: "short" })}</text>`;
+  }
+  const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)},${p[1].toFixed(1)}`).join("");
+  const area = `${line}L${pts[pts.length - 1][0].toFixed(1)},${Y(0)}L${pts[0][0].toFixed(1)},${Y(0)}Z`;
+  const pk = vals.indexOf(Math.max(...vals)), sel = Math.min(flowHour, o.length - 1);
+  const anchor = x => x < L + 46 ? "start" : x > W - R - 46 ? "end" : "middle";
+  const peak = pk === sel || !vals[pk] ? "" : `<circle cx="${pts[pk][0]}" cy="${pts[pk][1]}" r="4" fill="var(--bar)" stroke="var(--card)" stroke-width="2"/>`
+    + (Math.abs(pts[pk][0] - pts[sel][0]) < 70 ? "" : `<text class="strong" x="${pts[pk][0]}" y="${pts[pk][1] - 9}" text-anchor="${anchor(pts[pk][0])}">picco ${num(r1(vals[pk]))}</text>`);
+  const mark = `<line x1="${pts[sel][0]}" x2="${pts[sel][0]}" y1="${T}" y2="${T + ph}" stroke="var(--text)" stroke-opacity=".35"/>
+    <circle cx="${pts[sel][0]}" cy="${pts[sel][1]}" r="5" fill="var(--bar)" stroke="var(--card)" stroke-width="2.5"/>
+    <text class="strong" x="${pts[sel][0]}" y="${Math.max(11, pts[sel][1] - 10)}" text-anchor="${anchor(pts[sel][0])}">${num(r1(vals[sel]))}</text>`;
+  return `<svg class="fc" viewBox="0 0 ${W} ${H}" role="img" aria-label="Pedoni attesi all'ora, da adesso alle prossime 24 ore">${grid}${ticks}
+    <path d="${area}" fill="var(--bar)" fill-opacity=".10"/>
+    <path d="${line}" fill="none" stroke="var(--bar)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${peak}${mark}
+    <line class="fc-cross" y1="${T}" y2="${T + ph}" stroke="var(--muted)" visibility="hidden"/>
+    <circle class="fc-hover" r="4" fill="var(--card)" stroke="var(--bar)" stroke-width="2" visibility="hidden"/></svg>`;
+}
+
+function renderFlow() {
+  const n = S && S.nodes.find(x => x.node === picked), f = n && flowOf(n.node);
+  const W = Math.max(280, Math.min(560, document.getElementById("detail").clientWidth || 440));
+  const key = [picked, flowHour, FLOW && FLOW.now, W, !!f].join("|");
+  if (key === flowKey) return;
+  flowKey = key;
+  if (!n || !f) {
+    flowEl.innerHTML = n && !FLOW ? `<h3>Flusso atteso</h3><div class="empty">${ic("activity")} Calcolo della stima…</div>` : "";
+    return;
+  }
+  const tableOpen = !!flowEl.querySelector("details[open]");
+  const o = hourOf(f), e = f.estimate, perHour = 3600 / f.window_s, src = f.sources, inp = f.inputs;
+  const tile = (name, k) => `<div class="tile"><div class="k">${name}</div><div class="v">${num(r1(o[k]))} <small>all'ora</small></div>
+    <div class="s">${o.now ? `tra ${num(r1(e[k].lo * perHour))} e ${num(r1(e[k].hi * perHour))}` : "previsione"}</div></div>`;
+  const how = !o.now ? (f.history_windows ? "Previsione del modello, riportata al livello abituale di questa camera."
+                                           : "Previsione del solo modello: nessun conteggio da questa camera.")
+    : f.mode === "fused" ? `Stima del modello corretta con i conteggi della camera, che pesano per il ${Math.round(100 * e.ped_in.node_weight)}%.`
+    : "Solo modello: nessun conteggio recente da questa camera.";
+  const q = o.now && f.quality;
+  const checked = q ? `<div class="muted" style="margin-top:6px" title="Ogni finestra è stata stimata con i soli dati disponibili prima che iniziasse, poi confrontata con il conteggio. Errore medio in pedoni per finestra.">
+      Verifica sulle ultime ${q.windows} finestre di ${dur(q.window_s)} (in media ${num(q.mean_count)} pedoni): la stima ha sbagliato di ${num(q.mae)},
+      ripetere l'ultimo conteggio di ${num(q.mae_persistence)}, il solo modello di ${num(q.mae_model)}.</div>` : "";
+  const a = o.now && f.anomaly, mini = (k, v, tip) => `<div class="mini" title="${esc(tip)}"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+  const check = a ? `<div class="minis" style="margin-top:10px">
+      ${mini("Pedoni contati", num(a.measured), "Pedoni contati dalla camera nell'ultima ora, nei due versi")}
+      ${mini("Attesi", num(a.expected), "Quanti ne aspettava il modello, al livello abituale di questo attraversamento")}
+      ${mini("Ultima ora", ANOMALY_IT[a.level], `Contati / attesi = ${a.ratio}`)}</div>` : "";
+  const rows = f.outlook.map((x, i) => `<tr class="${x === o ? "sel" : ""}"><td>${whenText(x)}</td><td>${num(r1(x.ped_in))}</td>
+    <td>${num(r1(x.ped_out))}</td><td>${num(r1(pedsOf(x)))}</td></tr>`).join("");
+  const chips = [];
+  if (!src.located) chips.push("camera senza coordinate: solo calendario");
+  if (src.places) chips.push(`${num(inp.poi_food)} locali · ${num(inp.poi_shop)} negozi · ${num(inp.poi_transit)} fermate (${src.places === "osm" ? "OpenStreetMap" : "Google"})`);
+  if (src.esa) chips.push(`ESA WorldCover: ${Math.round(100 * inp.esa_built)}% costruito, ${Math.round(100 * inp.esa_green)}% verde`);
+  if (inp.temp_c != null) chips.push(`adesso ${inp.temp_c} °C${inp.rain_mm != null ? ` · pioggia ${inp.rain_mm} mm/h` : ""}`);
+  if (src.google) chips.push("Google: orari e recensioni dei luoghi");
+  if (src.traffic) chips.push(`traffico Google ×${inp.traffic}`);
+  if (src.located && !src.google_key) chips.push("Google Maps: chiave non impostata");
+  if (src.pending) chips.push("fonti in aggiornamento…");
+  const last = f.outlook[f.outlook.length - 1];
+  flowEl.innerHTML = `<h3>Flusso atteso · ${whenText(o)}</h3>
+    <div class="tiles">${tile("Pedoni in", "ped_in")}${tile("Pedoni out", "ped_out")}${tile("Ciclisti", "cyclist")}${tile("Veicoli", "vehicles")}</div>
+    <div class="muted" style="margin-top:6px">${how}</div>${checked}${check}
+    <div class="fc-title">Pedoni attesi all'ora, da adesso a ${whenText(last)}</div>
+    <div class="fc-wrap">${flowChart(f, W)}<div class="fc-tip" hidden></div></div>
+    <div class="muted">Clic su un'ora del grafico, o il cursore sopra la mappa, per vedere quel momento.</div>
+    <details class="fc-table"><summary>Tabella oraria</summary><table><thead><tr><th>Quando</th><th>In</th><th>Out</th><th>Pedoni</th></tr></thead>
+      <tbody>${rows}</tbody></table></details>
+    <div class="envs">${chips.map(x => `<span>${esc(x)}</span>`).join("")}</div>
+    <div class="muted" style="margin-top:8px">Gradient boosting addestrato su uno storico simulato: mostra il metodo, non misure reali.</div>`;
+  if (tableOpen) flowEl.querySelector("details").open = true;
+}
+
+/* il grafico risponde al puntatore: riga verticale sull'ora più vicina, valori in un riquadro, clic per sceglierla */
+function fcIndex(ev) {
+  const r = flowEl.querySelector("svg.fc").getBoundingClientRect(), x = (ev.clientX - r.left) / r.width * fcGeom.W;
+  return fcGeom.pts.reduce((best, p, i) => Math.abs(p[0] - x) < Math.abs(fcGeom.pts[best][0] - x) ? i : best, 0);
+}
+function fcHide() {
+  for (const el of flowEl.querySelectorAll(".fc-cross, .fc-hover")) el.setAttribute("visibility", "hidden");
+  const tip = flowEl.querySelector(".fc-tip");
+  if (tip) tip.hidden = true;
+}
+flowEl.addEventListener("pointermove", ev => {
+  if (!ev.target.closest || !ev.target.closest("svg.fc") || !fcGeom) return fcHide();
+  const i = fcIndex(ev), [x, y] = fcGeom.pts[i], o = fcGeom.f.outlook[i];
+  const cross = flowEl.querySelector(".fc-cross"), dot = flowEl.querySelector(".fc-hover"), tip = flowEl.querySelector(".fc-tip");
+  cross.setAttribute("x1", x); cross.setAttribute("x2", x); cross.setAttribute("visibility", "visible");
+  dot.setAttribute("cx", x); dot.setAttribute("cy", y); dot.setAttribute("visibility", "visible");
+  const value = document.createElement("b"), when = document.createElement("div"), split = document.createElement("div");
+  value.textContent = `${num(r1(pedsOf(o)))} pedoni all'ora`;
+  when.textContent = whenText(o);
+  split.className = "muted";
+  split.textContent = `in ${num(r1(o.ped_in))} · out ${num(r1(o.ped_out))}`;
+  tip.replaceChildren(value, when, split);
+  tip.hidden = false;
+  const fx = x / fcGeom.W;
+  tip.style.left = `${100 * fx}%`;
+  tip.style.top = `${100 * y / fcGeom.H}%`;
+  tip.style.transform = `translate(${fx < .3 ? "-12%" : fx > .7 ? "-88%" : "-50%"}, calc(-100% - 12px))`;
+});
+flowEl.addEventListener("pointerleave", fcHide);
+flowEl.addEventListener("click", ev => { if (ev.target.closest("svg.fc") && fcGeom) setFlowHour(fcIndex(ev)); });
+
+function updateFlowBar() {
+  const any = FLOW && Object.values(FLOW.nodes).find(f => f.available);
+  document.getElementById("flowbar").hidden = document.getElementById("halo-legend").hidden = !any;
+  if (!any) return;
+  const range = document.getElementById("flow-range"), o = any.outlook[Math.min(flowHour, any.outlook.length - 1)];
+  const ahead = (o.t0 - FLOW.now) / 3600;
+  range.max = any.outlook.length - 1;
+  range.value = flowHour;
+  document.getElementById("flow-when").textContent = o.now ? "adesso" : `${whenText(o)} · ${ahead < 1 ? "tra meno di un'ora" : `tra ${Math.round(ahead)} h`}`;
+  document.getElementById("flow-now").disabled = flowHour === 0;
+}
+
+function setFlowHour(h) {
+  flowHour = h;
+  updateFlowBar();
+  if (S) render(S);
+}
+
+async function refreshFlow() {
+  try {
+    FLOW = await (await fetch("/api/flow", { cache: "no-store" })).json();
+    updateFlowBar();
+    if (S) render(S);
+    clearTimeout(flowTimer);
+    if (Object.values(FLOW.nodes).some(f => f.available && f.sources.pending)) flowTimer = setTimeout(refreshFlow, 4000);   // fonti in arrivo
+  } catch (e) { /* senza stima il resto della pagina funziona lo stesso */ }
+}
+
+/* ---------- dati per i clienti: chiavi API legate a una zona (app/customers.py, docs/DATA_API.md). La scheda compare
+   solo sul PC della centrale: dalla rete locale /api/keys risponde 403. La chiave intera si vede una volta sola. ---------- */
+const KEY_STATE = { active: ["attiva", "ok-b"], expired: ["scaduta", "neutral"], revoked: ["revocata", "neutral"] };
+const zoneText = k => k.zone.nodes ? `nodi ${k.zone.nodes.join(", ")}` : `${num(k.zone.radius_m)} m intorno a ${k.zone.lat.toFixed(4)}, ${k.zone.lon.toFixed(4)}`;
+
+async function refreshKeys() {
+  try {
+    const res = await fetch("/api/keys", { cache: "no-store" });
+    document.getElementById("clients-card").hidden = !res.ok;
+    if (!res.ok) return;
+    const keys = (await res.json()).keys;
+    document.getElementById("keys-table").innerHTML = keys.length ? `<table class="keys"><thead><tr><th>Cliente</th><th>Zona</th>
+      <th>Camere</th><th>Stato</th><th>Richieste oggi</th><th>In tutto</th><th>Ultimo uso</th><th></th></tr></thead><tbody>` + keys.map(k => `<tr>
+        <td><b>${esc(k.name)}</b><div class="muted">${esc(k.scopes.map(s => s === "realtime" ? "tempo reale" : "previsioni").join(" · "))}</div></td>
+        <td>${esc(zoneText(k))}</td><td>${k.cameras.length ? esc(k.cameras.join(", ")) : `<span class="muted">nessuna</span>`}</td>
+        <td><span class="badge ${KEY_STATE[k.state][1]}">${KEY_STATE[k.state][0]}</span>${k.expires && k.state === "active" ? `<div class="muted">fino al ${new Date(k.expires * 1000).toLocaleDateString("it-IT")}</div>` : ""}</td>
+        <td class="num">${num(k.requests_today)}</td><td class="num">${num(k.requests_total)}</td>
+        <td>${k.last_used ? ago(Date.now() / 1000 - k.last_used) : "mai"}</td>
+        <td>${k.state === "active" ? `<button class="btn" data-revoke="${esc(k.id)}">Revoca</button>` : ""}</td></tr>`).join("") + "</tbody></table>"
+      : `<div class="empty">${ic("link")} Nessuna chiave. Creane una per dare a un cliente i dati delle camere della sua zona.</div>`;
+  } catch (e) { /* la scheda resta com'era */ }
+}
+
+function keyZone() {
+  const n = S && S.nodes.find(x => x.node === picked);
+  if (!n) return null;
+  const radius = Math.round(+document.getElementById("key-radius").value || 500);
+  return n.lat != null ? { lat: n.lat, lon: n.lon, radius_m: radius } : { nodes: [n.node] };
+}
+
+document.getElementById("key-create").addEventListener("click", async () => {
+  const out = document.getElementById("key-result"), days = document.getElementById("key-days").value;
+  out.hidden = false;
+  out.className = "keybox";
+  try {
+    const res = await fetch("/api/keys", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: document.getElementById("key-name").value, zone: keyZone(), days: days ? +days : null }) });
+    const body = await res.json();
+    if (!res.ok) { out.classList.add("bad"); out.textContent = `Chiave non creata: ${body.error}`; return; }
+    const title = document.createElement("div"), field = document.createElement("input"), how = document.createElement("div"), cmd = document.createElement("code");
+    title.textContent = `Chiave per ${body.name}: si vede solo adesso, copiala e consegnala al cliente.`;
+    field.readOnly = true; field.value = body.key; field.setAttribute("aria-label", "Chiave API appena creata");
+    field.addEventListener("focus", () => field.select());
+    how.className = "muted";
+    how.textContent = body.cameras.length ? `Camere nella zona: ${body.cameras.join(", ")}. Esempio:` : "Nella zona non ci sono ancora camere: i dati compariranno quando ne verrà installata una. Esempio:";
+    cmd.textContent = `curl -H "X-API-Key: ${body.key}" ${location.origin}/api/v1/forecast`;
+    out.replaceChildren(title, field, how, cmd);
+    document.getElementById("key-name").value = "";
+    refreshKeys();
+  } catch (e) { out.classList.add("bad"); out.textContent = "Chiave non creata: la centrale non risponde."; }
+});
+
+document.getElementById("keys-table").addEventListener("click", async ev => {
+  const btn = ev.target.closest("[data-revoke]");
+  if (!btn) return;
+  if (!btn.dataset.armed) {                      // due clic: il primo arma il pulsante, il secondo revoca
+    btn.dataset.armed = "1";
+    btn.textContent = "Conferma la revoca";
+    setTimeout(() => { if (btn.isConnected) { delete btn.dataset.armed; btn.textContent = "Revoca"; } }, 4000);
+    return;
+  }
+  await fetch(`/api/keys/${encodeURIComponent(btn.dataset.revoke)}`, { method: "DELETE" });
+  refreshKeys();
+});
 
 function alarmRow(a, withNode, now) {
   const icon = a.severity === "info" ? "check" : "alert";
@@ -452,7 +787,8 @@ function detailView(n, s) {
     <span class="badge ${c}">${esc(label(n))}</span></div>${links}`;
   if (n.diagnosis.code === "unknown") {
     return head + `<h3>Stato</h3><div class="empty">${ic("camera")}<div>Nessun dato ricevuto da questa camera.<br>`
-      + `<span class="muted">Si accende quando il nodo con <code>NODE_ID=${esc(n.node)}</code> si collega (Wi-Fi o Bluetooth).</span></div></div>`;
+      + `<span class="muted">Si accende quando il nodo con <code>NODE_ID=${esc(n.node)}</code> si collega (Wi-Fi o Bluetooth).</span></div></div>`
+      + `<div id="flow-slot"></div>`;
   }
   const kv = (icon, k, v, tip = "", wide = false) =>
     `<div class="${wide ? "wide" : ""}" ${tip ? `title="${esc(tip)}"` : ""}><div class="k">${ic(icon)} ${k}</div><div class="v">${v}</div></div>`;
@@ -470,6 +806,7 @@ function detailView(n, s) {
   const mini = (k, v, tip) => `<div class="mini" title="${esc(tip)}"><div class="k">${k}</div><div class="v">${v}</div></div>`;
   return head + `<h3>Stato</h3><div class="kv">${items.join("")}</div>
     <h3>Traffico · ultima ora</h3>${trafficView(t)}
+    <div id="flow-slot"></div>
     <h3>Sicurezza · oggi</h3><div class="minis">
       ${mini("Precedenza data", today.yield_rate == null ? "n.d." : Math.round(100 * today.yield_rate) + "%", "Veicoli che hanno rallentato con un pedone in attesa")}
       ${mini("Quasi incidenti", num(today.near_miss ?? 0), "Veicolo e pedone a meno di 1 secondo l'uno dall'altro")}
@@ -535,10 +872,14 @@ function render(s) {
   document.getElementById("nodelist").innerHTML = s.nodes.map(n =>
     `<button class="node ${n.node === picked ? "sel" : ""}" data-node="${esc(n.node)}">
       <span class="dot" style="background:${DOT[cls(n)]}"></span>
-      <span><span class="n1">${esc(shortName(n))}</span><br><span class="n2">${esc(label(n))}${n.diagnosis.code !== "unknown" ? " · " + ago(n.last_contact_s) : ""}</span></span></button>`).join("");
+      <span><span class="n1">${esc(shortName(n))}</span><br><span class="n2">${esc(label(n))}${n.diagnosis.code !== "unknown" ? " · " + ago(n.last_contact_s) : ""}${flowAt(n.node) == null ? "" : ` · ${num(r1(flowAt(n.node)))} pedoni/h ${flowHour ? "attesi" : "adesso"}`}</span></span></button>`).join("");
 
   const n = s.nodes.find(x => x.node === picked);
+  document.getElementById("key-zone").textContent = n ? (n.lat != null ? `Zona: intorno a ${shortName(n)}, la camera scelta` : `Zona: il nodo ${n.node} (senza coordinate)`) : "";
+  renderFlow();                                       // prima di svuotare il pannello: misura la larghezza senza spostare lo scorrimento
   document.getElementById("detail").innerHTML = n ? detailView(n, s) : `<div class="empty">Nessuna camera configurata.</div>`;
+  const slot = document.getElementById("flow-slot");
+  if (slot) slot.replaceWith(flowEl);
   updateVideo(n);
   document.getElementById("alarm-count").textContent = s.alarms.length ? `${s.alarms.length} recenti` : "";
   document.getElementById("alarms").innerHTML = s.alarms.length ? s.alarms.map(a => alarmRow(a, true, s.now)).join("")
@@ -565,6 +906,8 @@ async function refreshInfo() {
     document.getElementById("sys-ble").title = `Ricezione Bluetooth: ${i.ble}`;
     document.getElementById("sys-nodes").innerHTML = i.mqtt.nodes_connect_to ? `${ic("link")} Arduino → <b>${esc(i.mqtt.nodes_connect_to)}</b>` : "";
     document.getElementById("btn-config").hidden = document.getElementById("btn-folder").hidden = !i.config_dir;
+    if (i.published) document.getElementById("clients-sub").textContent =
+      `Chiavi API per scaricare conteggi e previsioni delle camere di una zona · solo dati anonimi · ${num(i.published)} messaggi di stime e metriche pubblicati su MQTT`;
   } catch (e) { /* il banner di errore lo gestisce refresh() */ }
 }
 for (const [id, what] of [["btn-config", "config"], ["btn-folder", "folder"]]) {
@@ -588,12 +931,25 @@ for (const id of ["nodelist", "map", "attention"]) {
     if (el) select(el.dataset.node);
   });
 }
-window.addEventListener("resize", () => { if (mapMode === "svg" && S) drawMap(S); });
+window.addEventListener("resize", () => { if (mapMode === "svg" && S) drawMap(S); renderFlow(); });
+document.getElementById("flow-range").addEventListener("input", ev => setFlowHour(+ev.target.value));
+document.getElementById("flow-now").addEventListener("click", () => setFlowHour(0));
+{ // legenda degli aloni: tre cerchi di riferimento, nella stessa scala della mappa
+  const big = haloPx(FLOW_MAX);
+  document.getElementById("halo-legend").innerHTML = `<div class="hl-t">Pedoni attesi all'ora</div>
+    <div class="hl-c" style="width:${big + 62}px;height:${big}px">` + [FLOW_MAX, 200, 50].map(v => { const d = haloPx(v);
+      return `<span class="hl-ring" style="width:${d}px;height:${d}px;left:${(big - d) / 2}px"></span>
+        <span class="hl-lab" style="left:${big + 8}px;bottom:${d - 9}px">${num(v)}${v === FLOW_MAX ? " o più" : ""}</span>`; }).join("") + `</div>`;
+}
 loadMap();
 refresh();
 refreshInfo();
 setInterval(refresh, 2000);
 setInterval(refreshInfo, 5000);
+refreshFlow();
+setInterval(refreshFlow, 30000);
+refreshKeys();
+setInterval(refreshKeys, 30000);
 </script>
 </body>
 </html>
