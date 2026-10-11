@@ -643,3 +643,17 @@ con v_ped 0,3 → 25 s.
     fallite e fotogrammi scuri con il momento in cui capitano. La camera ha un lettore alla volta: si registra
     mentre la visione è su un video. La visione continua a non salvare mai fotogrammi.
 
+53. **Logo nuovo: telecamera intelligente con la scritta MDGB (11/10, 12:45)**, chiesto da Paolo: "strisce e
+    faro" non piaceva al team.
+    - Disegno: telecamera da strada sul suo braccio che guarda in basso, lente ambra, archi davanti. Il nome MDGB
+      è disegnato come forme, non scritto con un font: è uguale su ogni sistema.
+    - Una sola fonte: `docs/brand/genera_logo.py`, una lista di forme. Lo script riscrive gli SVG e anche le copie
+      dentro altri file: `ai/smartcrossing/brand.py` (pagina del tecnico; `operator_ui.py` lo importa), l'`<svg>`
+      dell'intestazione di `app/dashboard.html`, `firmware/unoq_mcu/assets/logo.svg`.
+    - Icona dell'app della centrale: `app/desktop/make_icon.py` legge le stesse forme e disegna ogni misura da
+      sola (`--iconset` per il Mac, `--ico` per Windows): con il nome da 48 px in su, sola telecamera sotto.
+    - `test_logo_of_the_page_is_the_one_of_the_brand` fallisce se si cambia il disegno senza rilanciare lo script.
+    - Tocca `docs/` (condivisa), `app/` (Lorenzo) e `firmware/` (Salvatore): il merge aspetta l'ok di Paolo e
+      l'avviso a loro due.
+    - Non fatto: il trailer (`trailer/`, di Lorenzo) disegna il suo logo nel codice e resta com'era; sulla scheda
+      il logo nuovo si vede dopo aver ricopiato la visione e l'app di App Lab.

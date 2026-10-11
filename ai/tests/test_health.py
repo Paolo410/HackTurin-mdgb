@@ -1,11 +1,14 @@
 """Check of the parts of the node (health.py) and what the technician's page shows of it: status of each part,
 the Registro with accesses and events, the vision going on when the event file cannot be written."""
 import http.client
+import importlib.util
 import json
 import secrets
+from pathlib import Path
 
 import cv2
 import numpy as np
+import pytest
 
 from smartcrossing import app
 from smartcrossing.config import load_config
@@ -120,8 +123,21 @@ def test_page_shows_the_check_and_writes_accesses_in_the_registro(monkeypatch):
 
 def test_every_copy_of_the_logo_has_its_own_ids():
     for i in (1, 2, 3):
-        assert f'id="lg{i}-b"' in PAGE and f"url(#lg{i}-b)" in PAGE
-    assert 'id="lg-b"' not in PAGE
+        assert f'id="lg{i}-glow"' in PAGE and f"url(#lg{i}-glow)" in PAGE
+    assert 'id="lg-glow"' not in PAGE
+
+
+def test_logo_of_the_page_is_the_one_of_the_brand():
+    """smartcrossing/brand.py is written by docs/brand/genera_logo.py: it must not be left behind by a new drawing."""
+    repo = Path(__file__).resolve().parents[2]
+    script = repo / "docs" / "brand" / "genera_logo.py"
+    if not script.exists():                                  # on the board there is only ai/
+        pytest.skip("docs/brand is not here")
+    spec = importlib.util.spec_from_file_location("genera_logo", script)
+    brand = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(brand)
+    written = (repo / "ai" / "smartcrossing" / "brand.py").read_text(encoding="utf-8")
+    assert written == brand.page_module(), "lancia: python docs/brand/genera_logo.py"
 
 
 def test_a_c3_file_that_cannot_be_written_does_not_stop_the_vision(tmp_path, capsys, monkeypatch):

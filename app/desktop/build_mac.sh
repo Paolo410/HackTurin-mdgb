@@ -22,12 +22,9 @@ echo "1/3 ambiente di build (app/desktop/build/venv)"
 "$BUILD/venv/bin/pip" install -q -r "$HERE/requirements.txt"
 
 echo "2/3 icona"
-"$BUILD/venv/bin/python" "$HERE/make_icon.py" "$BUILD/icon.png"
-rm -rf "$BUILD/icon.iconset" && mkdir "$BUILD/icon.iconset"
-for s in 16 32 128 256 512; do
-  sips -z $s $s "$BUILD/icon.png" --out "$BUILD/icon.iconset/icon_${s}x${s}.png" >/dev/null
-  sips -z $((s * 2)) $((s * 2)) "$BUILD/icon.png" --out "$BUILD/icon.iconset/icon_${s}x${s}@2x.png" >/dev/null
-done
+# Each size is drawn on its own (the small ones without the name, which would not be readable).
+rm -rf "$BUILD/icon.iconset"
+"$BUILD/venv/bin/python" "$HERE/make_icon.py" --iconset "$BUILD/icon.iconset"
 iconutil -c icns "$BUILD/icon.iconset" -o "$BUILD/icon.icns"
 
 echo "3/3 app"

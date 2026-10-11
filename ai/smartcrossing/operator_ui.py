@@ -1,27 +1,13 @@
 """The technician's page served by status_page.py: one HTML file with its style, script and logo inside.
 
 Everything is in this string so the board needs no other file (push_to_arduino.sh copies the package as it is) and
-the page works without Internet. The logo is the MDGB placeholder of docs/brand/ (genera_logo.py): same drawing.
+the page works without Internet. The logo is in brand.py, written by docs/brand/genera_logo.py: same drawing.
 Three moments: locked (pass the badge), login (user and password within operator.login_s), open (Stato, Vista,
 Registro). The data comes from status.json every second; images only from stream.mjpg, only while the Vista tab is
 open, so the vision draws frames only while someone is really looking.
 """
 
-# Same drawing as docs/brand/mdgb-simbolo.svg: the M made of crossing stripes, the amber beacon in its notch.
-LOGO = (
-    '<svg class="logo" viewBox="0 0 64 64" aria-hidden="true"><defs><clipPath id="lg-b">'
-    '<rect y="13" width="64" height="6"/><rect y="21.25" width="64" height="6"/><rect y="29.5" width="64" height="6"/>'
-    '<rect y="37.75" width="64" height="6"/><rect y="46" width="64" height="6"/></clipPath>'
-    '<radialGradient id="lg-g" cx="32" cy="20.5" r="15" gradientUnits="userSpaceOnUse">'
-    '<stop offset="0" stop-color="#f2a900" stop-opacity=".55"/><stop offset="1" stop-color="#f2a900" stop-opacity="0"/>'
-    '</radialGradient></defs><rect width="64" height="64" rx="15" fill="#1d2226"/>'
-    '<circle cx="32" cy="20.5" r="15" fill="url(#lg-g)"/>'
-    '<polygon points="10,52 10,13 19.5,13 32,31 44.5,13 54,13 54,52 45,52 45,29 32,47.5 19,29 19,52" fill="#f3f4f1" '
-    'clip-path="url(#lg-b)"/><circle cx="32" cy="20.5" r="4.4" fill="#f2a900"/></svg>')
-
-FAVICON = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' "
-           "height='64' rx='15' fill='%231d2226'/%3E%3Cpolygon points='10,52 10,13 19.5,13 32,31 44.5,13 54,13 54,52 45,52 "
-           "45,29 32,47.5 19,29 19,52' fill='%23f3f4f1'/%3E%3Ccircle cx='32' cy='20.5' r='4.4' fill='%23f2a900'/%3E%3C/svg%3E")
+from .brand import FAVICON, LOGO   # the MDGB symbol, written by docs/brand/genera_logo.py
 
 _PAGE = """<!doctype html>
 <html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -439,7 +425,7 @@ tick(); setInterval(tick, 1000);
 """
 
 def _with_logos(page: str) -> str:
-    """Each copy of the logo gets its own ids: the copies in the hidden screens must not lend their clip and glow."""
+    """Each copy of the logo gets its own ids: the copies in the hidden screens must not lend their glow."""
     parts = page.split("__LOGO__")
     out = parts[0]
     for i, rest in enumerate(parts[1:], 1):
