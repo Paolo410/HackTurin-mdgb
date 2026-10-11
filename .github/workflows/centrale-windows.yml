@@ -35,7 +35,7 @@ jobs:
         run: |
           python -m pip install -q -r comms/requirements-dev.txt -r app/requirements.txt
           python -m pytest comms/tests/test_dashboard.py comms/tests/test_offline.py -q
-          python -m pytest ai/tests/test_forecast.py -q
+          python -m pytest ai/tests/test_forecast.py ai/tests/test_forecast_sources.py ai/tests/test_forecast_service.py -q
 
       - name: Build e autotest dell'app
         shell: pwsh
