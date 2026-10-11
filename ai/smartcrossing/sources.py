@@ -65,6 +65,7 @@ class FrameSource:
         self.loop = bool(loop) and not self.is_live
         self.loops = 0        # times a looped file started again
         self.dropped = 0      # late frames skipped
+        self._pos = -1        # last frame read from the file (the timeline, _frame_idx, never goes back)
 
         if not self.is_live and not Path(self.name).is_file():
             raise FileNotFoundError(f"Video not found: {self.name}")
@@ -112,6 +113,7 @@ class FrameSource:
                     if not self._cap.grab():
                         break             # end of the file: _read_file starts again or stops
                     self._frame_idx += 1
+                    self._pos += 1
                     self.dropped += 1
             frame = self._read_file()
             if frame is None:
@@ -137,12 +139,35 @@ class FrameSource:
                 ok, frame = self._cap.read()
             if ok:
                 self._frame_idx += self._step
+                self._pos += self._step
                 return frame
             if not self.loop or self._frame_idx < 0:
                 return None
             self._cap.set(cv2.CAP_PROP_POS_FRAMES, 0)    # the timeline (frame index) goes on
+            self._pos = -1
             self.loops += 1
         return None
+
+    # ---- position in a video file (technician's page: back / forward)
+
+    @property
+    def duration_s(self) -> float:
+        n = float(self._cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0.0)
+        return n / self.native_fps if self.native_fps and not self.is_live else 0.0
+
+    @property
+    def position_s(self) -> float:
+        return max(self._pos, 0) / self.native_fps if self.native_fps and not self.is_live else 0.0
+
+    def seek(self, seconds: float) -> None:
+        """Moves back or forward in a video file. The timeline goes on (like a cut in the video): the tracks of
+        the old scene simply end. Nothing happens with a camera."""
+        if self.is_live or not self.native_fps:
+            return
+        last = max(int(self._cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0) - 1, 0)
+        target = min(max(self._pos + int(round(seconds * self.native_fps)), 0), last)
+        self._cap.set(cv2.CAP_PROP_POS_FRAMES, target)
+        self._pos = target - 1
 
     def _pace(self, min_period: float) -> None:
         now = time.monotonic()

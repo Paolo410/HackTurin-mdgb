@@ -212,6 +212,7 @@ operator:                         # page for the technician (--operator-port): b
   stream_fps: 5                   # live view: frames per second,
   stream_width: 480               # width in pixels
   jpeg_quality: 70                # and JPEG quality
+  video_seek_s: 10                # recorded videos only: how far the back / forward buttons of the page jump
 
 derive:
   rider_iou: 0.3                  # (spec) person/two-wheeler IoU above which the person is the rider

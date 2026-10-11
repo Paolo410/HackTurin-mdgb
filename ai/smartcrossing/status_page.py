@@ -51,7 +51,8 @@ h1{font-size:20px;margin:0 0 4px}.big{font-size:34px;font-weight:700;margin:10px
 td{padding:6px 4px;border-bottom:1px solid #2a343b}td:last-child{text-align:right;font-variant-numeric:tabular-nums}
 .warn{color:#ffb454}.muted{color:#aab6bd;font-size:14px;margin-top:14px}
 input,button{font:inherit;padding:10px;margin:4px 0;width:100%;max-width:320px;display:block;border-radius:6px;border:1px solid #3a474f;background:#1a2228;color:inherit}
-button{background:#1f6f54;border-color:#1f6f54;font-weight:600}#view{max-width:100%;margin:12px 0;border:1px solid #2a343b;display:block}
+button{background:#1f6f54;border-color:#1f6f54;font-weight:600}
+.vbtns{display:flex;gap:6px;flex-wrap:wrap;max-width:520px}.vbtns button{width:auto;flex:1 1 40%;margin:0;background:#1a2228;border-color:#3a474f}#view{max-width:100%;margin:12px 0;border:1px solid #2a343b;display:block}
 </style></head><body>
 <h1>MDGB &middot; tecnico</h1>
 <div id="locked" hidden><p class="big warn">BLOCCATO</p><p>Passa il badge del tecnico sul lettore.</p></div>
@@ -59,11 +60,16 @@ button{background:#1f6f54;border-color:#1f6f54;font-weight:600}#view{max-width:1
 <input id="user" autocomplete="username" placeholder="utente" required>
 <input id="password" type="password" autocomplete="current-password" placeholder="password" required>
 <button>Accedi</button><p id="error" class="warn"></p></form>
-<div id="open" hidden><p id="state" class="big"></p><p id="reason"></p><div id="live"></div><table id="rows"></table>
+<div id="open" hidden><p id="state" class="big"></p><p id="reason"></p><div id="live"></div>
+<div id="video" hidden><p class="muted" id="vname"></p><div class="vbtns">
+<button data-a="prev">&#9198; Video prima</button><button data-a="back">&#9194; Indietro</button>
+<button data-a="fwd">Avanti &#9193;</button><button data-a="next">Video dopo &#9197;</button></div></div>
+<table id="rows"></table>
 <p class="muted"><span id="images"></span> <span id="left"></span> Il cicalino resta muto finch&eacute; non esci.
 <a href="#" id="logout" style="color:inherit">Esci</a></p></div>
 <script>
 const $ = id => document.getElementById(id);
+function mmss(x) { x = Math.round(x || 0); return Math.floor(x / 60) + ":" + String(x % 60).padStart(2, "0"); }
 function row(k, v) { return "<tr><td>" + k + "</td><td>" + (v === null || v === undefined ? "-" : v) + "</td></tr>"; }
 function show(which) { for (const id of ["locked", "login", "open"]) $(id).hidden = id !== which; if (which !== "open") $("live").innerHTML = ""; }
 async function tick() {
@@ -77,6 +83,10 @@ async function tick() {
     $("reason").textContent = s.reason || "";
     if (s.images && !$("view")) $("live").innerHTML = "<img id='view' src='stream.mjpg' alt='vista dal vivo'>";
     if (!s.images) $("live").innerHTML = "";
+    const v = s.video;
+    $("video").hidden = !v;
+    if (v) $("vname").textContent = "Video " + v.index + "/" + v.total + ": " + v.name + " \u00b7 " + mmss(v.pos_s) + " / "
+      + mmss(v.dur_s) + " \u00b7 " + (v.calib ? "calibrazione " + v.calib : "senza calibrazione") + " \u00b7 salto " + v.seek_s + " s";
     let h = row("Lampada richiesta", s.led) + row("Verde pedonale richiesto", s.green_s + " s");
     h += row("Semaforo (firmware)", s.link_failsafe ? "ciclo normale: nessun collegamento" : "collegato alla visione");
     h += row("Fotogrammi al secondo", s.fps) + row("Tempi (ms)", "detect " + l.detect + " / track " + l.track + " / regole " + l.rules);
@@ -101,6 +111,9 @@ $("login").addEventListener("submit", async ev => {
     : r.status === 403 ? "Troppi tentativi o badge scaduto: ripassa il badge." : "Utente o password sbagliati.";
   tick();
 });
+document.querySelectorAll(".vbtns button").forEach(b => b.addEventListener("click", async () => {
+  await fetch("video", {method: "POST", body: new URLSearchParams({action: b.dataset.a})}); tick();
+}));
 $("logout").addEventListener("click", async ev => { ev.preventDefault(); await fetch("logout", {method: "POST"}); tick(); });
 tick(); setInterval(tick, 1000);
 </script></body></html>
@@ -157,6 +170,8 @@ class OperatorPage:
         self._started = time.monotonic()
         self._lock = threading.Lock()
         self._sessions: dict[str, float] = {}     # session token -> monotonic time it ends (inf = at logout)
+        # Set by the app when the source is a recorded video: called with "prev", "next", "back" or "fwd".
+        self.video_control: Callable[[str], bool] | None = None
         self._badges_seen = mcu.badges
         self._failed = 0
         self._failed_window = -1
@@ -202,6 +217,14 @@ class OperatorPage:
                 elif path == "/logout":
                     page.logout(self._token())
                     self._send(200, "text/plain", b"", f"{COOKIE}=; Max-Age=0; Path=/")
+                elif path == "/video":                 # previous / next video, back / forward (videos only)
+                    code = page.access(self._token())
+                    length = int(self.headers.get("Content-Length") or 0)
+                    action = (parse_qs(self.rfile.read(length).decode("utf-8", "replace")).get("action", [""])[0]
+                              if 0 < length <= MAX_LOGIN_BYTES else "")
+                    if code == 200:
+                        code = 404 if page.video_control is None else 200 if page.video_control(action) else 400
+                    self._send(code, "text/plain", b"")
                 else:
                     self._send(404, "text/plain", b"not found")
 

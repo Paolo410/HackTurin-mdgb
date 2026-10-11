@@ -265,6 +265,24 @@ def test_with_a_session_limit_the_session_ends_and_a_badge_starts_it_again(monke
         page.close()
 
 
+def test_video_buttons_only_for_a_logged_in_technician_and_only_with_a_video(monkeypatch):
+    page, mcu = page_with_login(monkeypatch)
+    asked = []
+    try:
+        assert request(page.port, "POST", "/video", body="action=next")[0] == 403          # no badge
+        mcu.on_line(BADGE)
+        assert request(page.port, "POST", "/video", body="action=next")[0] == 401          # badge, no login
+        _, _, cookie = login(page)
+        assert request(page.port, "POST", "/video", body="action=next", cookie=cookie)[0] == 404   # camera: none
+        page.video_control = lambda action: asked.append(action) or action in ("prev", "next", "back", "fwd")
+        assert request(page.port, "POST", "/video", body="action=fwd", cookie=cookie)[0] == 200
+        assert request(page.port, "POST", "/video", body="action=next", cookie=cookie)[0] == 200
+        assert request(page.port, "POST", "/video", body="action=reboot", cookie=cookie)[0] == 400
+        assert asked == ["fwd", "next", "reboot"]
+    finally:
+        page.close()
+
+
 def test_without_credentials_on_the_board_nobody_gets_in(monkeypatch, tmp_path):
     monkeypatch.delenv(USER_VAR, raising=False)
     monkeypatch.delenv(HASH_VAR, raising=False)

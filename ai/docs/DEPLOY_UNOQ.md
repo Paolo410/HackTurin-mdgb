@@ -156,6 +156,10 @@ journalctl -u mdgb-ai | grep -a -A8 "^pass "                                    
 - Gli eventi del video arrivano in centrale come `nodo01`: le statistiche del giorno li comprendono.
 - Il video va a velocità reale: se la scheda è più lenta, salta i fotogrammi in ritardo come farebbe con la camera
   (`source.file_drop_late`).
+- **Dalla pagina del tecnico** (dopo badge e login), solo quando la sorgente è un video: pulsanti *Video prima* /
+  *Video dopo* (i video della stessa cartella, ognuno con la sua calibrazione da `samples/calib/` se c'è) e
+  *Indietro* / *Avanti* di 10 s (`operator.video_seek_s`). Il cambio avviene dentro la visione: la sessione del
+  tecnico resta aperta, tracce e conteggi ripartono per la scena nuova. Con la camera i pulsanti non ci sono.
 
 A mano, senza `sudo`, in background (resta accesa anche chiudendo ssh):
 
