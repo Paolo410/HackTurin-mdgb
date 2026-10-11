@@ -6,6 +6,7 @@
     GET /api/flow    flusso atteso di tutte le camere, adesso e nelle prossime 24 ore (modello di ai/forecast,
                      owner Paolo): aloni sulla mappa e riquadro "Flusso atteso"
     GET /api/forecast/<nodo>   lo stesso per una camera sola
+    GET /api/v1/...  dati per i clienti, con chiave API (customers.py); /api/keys per gestire le chiavi da questo PC
     POST /api/open/folder|config   apre la cartella delle impostazioni o il file di configurazione (app per il PC)
 
 Cosa mostra: mappa delle camere (posizioni in app/nodes.json; con Internet OpenStreetMap, senza una mappa schematica),
@@ -194,6 +195,54 @@ def load_forecaster():
         return None
 
 
+class Flow:
+    """Flusso atteso e metriche delle camere: lo stesso calcolo per la pagina (/api/flow), per MQTT (publisher.py) e
+    per l'API dei clienti (customers.py). Il modello di ai/forecast si carica al primo uso; se manca, ogni risposta è
+    {"available": False} e il resto della centrale funziona lo stesso."""
+
+    def __init__(self, store, config=None, forecaster=None):
+        self.store, self.config, self._forecaster = store, config, forecaster
+
+    def cameras(self):
+        return node_config() if self.config is None else self.config
+
+    def nodes(self):
+        return sorted(set(self.store.nodes()) | set(self.cameras()))
+
+    def windows(self, node, n=96):
+        return forecast_windows(self.store, node, n)
+
+    def forecaster(self):
+        if self._forecaster is None:
+            self._forecaster = load_forecaster() or False       # False = cercato e non trovato: non si riprova
+        return self._forecaster or None
+
+    def node(self, node):
+        """Stima di adesso e previsione di una camera (Forecaster.forecast), oppure {"available": False}."""
+        model = self.forecaster()
+        if model is None:
+            return {"available": False}
+        try:
+            return model.forecast(self.cameras().get(node, {"id": node}), self.windows(node))
+        except Exception as e:                      # una stima mancata non deve mai fermare la dashboard
+            logging.getLogger("forecast").exception("stima del flusso per %s fallita", node)
+            return {"available": False, "error": str(e)}
+
+    def all(self):
+        return {"now": time.time(), "nodes": {node: self.node(node) for node in self.nodes()}}
+
+    def analytics(self, node, now=None):
+        """Metriche delle ultime 24 ore di una camera (ai/forecast/analytics.py): traffico per ora, picco, sicurezza."""
+        if self.forecaster() is None:
+            return {"available": False}
+        from forecast import analytics
+        now = time.time() if now is None else now
+        with self.store.lock:
+            rows = self.store.db.execute("SELECT body FROM events WHERE node=? AND ts>=? AND type IN "
+                                         "('crossing','yield','near_miss','incident')", (node, now - 86400)).fetchall()
+        return analytics.summary(self.windows(node, 1440), [json.loads(r[0]) for r in rows], now)
+
+
 def open_path(path, edit=False):
     """Apre una cartella o un file con l'app predefinita del sistema (Finder / TextEdit su macOS)."""
     if sys.platform == "darwin":
@@ -207,12 +256,15 @@ def open_path(path, edit=False):
         subprocess.Popen(["xdg-open", path])
 
 
-def create_app(store, config=None, info=None, forecaster=None):
+def create_app(store, config=None, info=None, forecaster=None, flow=None):
     from flask import Flask, Response, abort, jsonify
+
+    import customers
 
     app = Flask(__name__)
     page = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dashboard.html")
-    models = {"forecast": forecaster}           # il modello si carica alla prima richiesta (False = non c'è)
+    flow = flow or Flow(store, config, forecaster)
+    app.register_blueprint(customers.blueprint(customers.KeyStore(store.db, store.lock), flow))
 
     @app.get("/")
     def index():
@@ -227,26 +279,13 @@ def create_app(store, config=None, info=None, forecaster=None):
     def api_info():
         return jsonify(info() if info else {})
 
-    def forecast_for(node, cams):
-        if models["forecast"] is None:
-            models["forecast"] = load_forecaster() or False
-        if not models["forecast"]:
-            return {"available": False}
-        try:
-            return models["forecast"].forecast(cams.get(node, {"id": node}), forecast_windows(store, node))
-        except Exception as e:                      # una stima mancata non deve mai fermare la dashboard
-            logging.getLogger("forecast").exception("stima del flusso per %s fallita", node)
-            return {"available": False, "error": str(e)}
-
     @app.get("/api/forecast/<node>")
     def api_forecast(node):
-        return jsonify(forecast_for(node, node_config() if config is None else config))
+        return jsonify(flow.node(node))
 
     @app.get("/api/flow")
     def api_flow():
-        cams = node_config() if config is None else config
-        return jsonify({"now": time.time(),
-                        "nodes": {node: forecast_for(node, cams) for node in sorted(set(store.nodes()) | set(cams))}})
+        return jsonify(flow.all())
 
     @app.post("/api/open/<what>")
     def api_open(what):
@@ -259,13 +298,13 @@ def create_app(store, config=None, info=None, forecaster=None):
     return app
 
 
-def serve(store, host="127.0.0.1", port=8080, config=None, info=None):
+def serve(store, host="127.0.0.1", port=8080, config=None, info=None, flow=None):
     """Avvia la dashboard in un thread (server di Werkzeug, va bene per la demo)."""
     import logging
     import threading
     from werkzeug.serving import make_server
 
     logging.getLogger("werkzeug").setLevel(logging.WARNING)       # niente riga di log ogni 2 s
-    srv = make_server(host, port, create_app(store, config, info), threaded=True)
+    srv = make_server(host, port, create_app(store, config, info, flow=flow), threaded=True)
     threading.Thread(target=srv.serve_forever, name="dashboard", daemon=True).start()
     return srv

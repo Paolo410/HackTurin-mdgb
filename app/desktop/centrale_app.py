@@ -67,6 +67,10 @@ WEB_PORT=8080
 #     La stessa chiave, con "Places API (New)" e "Routes API" abilitate, aggiunge al flusso atteso orari e
 #     recensioni dei luoghi e il traffico (facoltativo: senza, il modello usa OpenStreetMap, ESA e il meteo) ---
 GOOGLE_MAPS_API_KEY=
+
+# --- Stime e metriche di ogni camera pubblicate su MQTT (mdgb/<nodo>/forecast e /analytics): ogni quanti secondi.
+#     0 = non pubblicare ---
+ANALYTICS_PERIOD_S=30
 """
 
 # nodes.json delle versioni precedenti: nodo01 era in piazza San Carlo (vedi default_camera_moved)
